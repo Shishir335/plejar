@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plezar // Full-Stack Node.js Starter & User Management</title>
+  <meta name="description" content="Production-ready Node.js & Express application starter featuring JWT authentication, role-based access control, security middleware, and MongoDB integration.">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="brand">
+        <div class="brand-icon">P</div>
+        <span>Plezar <span style="font-weight: 400; color: var(--text-dim); font-size: 0.9rem;">Starter</span></span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="#features" class="nav-item">Features</a>
+        <a href="#api-explorer" class="nav-item">API Explorer</a>
+        <a href="/admin" class="nav-item">Admin Console</a>
+      </nav>
+
+      <div class="nav-actions">
+        <div id="healthStatusPill" class="status-pill">
+          <span class="status-dot"></span> Checking API...
+        </div>
+        <div id="navAuthArea" style="display: flex; align-items: center; gap: 8px;">
+          <!-- Dynamically populated by app.js -->
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="container">
+    
+    <!-- Guest Hero -->
+    <section id="guestHeroSection" class="hero">
+      <div class="hero-badge">
+        <span>🚀 Production-Ready Full-Stack Starter</span>
+      </div>
+      <h1 class="hero-title">Build Your Next Project<br>With a Solid Foundation</h1>
+      <p class="hero-subtitle">
+        A clean, robust Node.js, Express, and MongoDB backend preconfigured with JWT authentication, role-based user management, enterprise security middlewares, and a modern admin dashboard.
+      </p>
+      <div class="hero-cta">
+        <button class="btn btn-primary btn-lg" onclick="openModal('signupModal')">Get Started &rarr;</button>
+        <button class="btn btn-secondary btn-lg" onclick="document.getElementById('api-explorer').scrollIntoView({ behavior: 'smooth' })">Test API Endpoints</button>
+        <a href="/admin" class="btn btn-outline btn-lg">Open Admin Console</a>
+      </div>
+    </section>
+
+    <!-- Authenticated User Hero -->
+    <section id="userHeroSection" class="hero" style="display: none;">
+      <div class="hero-badge">
+        <span>Active User Session</span>
+      </div>
+      <h1 class="hero-title">Welcome back, <span id="userWelcomeName">Developer</span>!</h1>
+      <p class="hero-subtitle">
+        Your authentication session is active. You can explore protected API routes below, access the administration dashboard, or manage your profile.
+      </p>
+      <div class="hero-cta">
+        <a href="/admin" class="btn btn-primary btn-lg">Launch Admin Console &rarr;</a>
+        <button class="btn btn-secondary btn-lg" onclick="openProfileModal()">View Profile Details</button>
+        <button class="btn btn-outline btn-lg" onclick="testEndpoint('me')">Verify Auth in API Console</button>
+      </div>
+    </section>
+
+    <!-- Feature Highlights -->
+    <section id="features">
+      <div class="grid-cards">
+        <div class="card">
+          <div class="card-icon">🔐</div>
+          <h2 class="card-title">Complete Authentication</h2>
+          <p class="card-desc">
+            Production JWT authentication with secure HTTP-only cookies, password hashing with bcryptjs, password reset flows, and Google OAuth 2.0 integration.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">👥</div>
+          <h2 class="card-title">Role-Based Access Control</h2>
+          <p class="card-desc">
+            Built-in hierarchy supporting <code>admin</code>, <code>manager</code>, and <code>user</code> roles with privilege escalation prevention and granular route restrictions.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">🛡️</div>
+          <h2 class="card-title">Enterprise Security</h2>
+          <p class="card-desc">
+            Equipped with Helmet security headers, Express rate-limiting, NoSQL query injection sanitization, XSS cleansing, and Parameter Pollution (HPP) guards.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">⚡</div>
+          <h2 class="card-title">Database & Query Engine</h2>
+          <p class="card-desc">
+            Mongoose ODM architecture with reusable <code>apiFeatures</code> for filtering, sorting, field limiting, and automatic query pagination.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">📊</div>
+          <h2 class="card-title">User Administration Console</h2>
+          <p class="card-desc">
+            A dedicated administration interface to inspect active accounts, create users, promote roles, perform administrative password resets, and export telemetry.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">📬</div>
+          <h2 class="card-title">Transactional Email Engine</h2>
+          <p class="card-desc">
+            Nodemailer dispatcher configured for Gmail App Passwords and SendGrid/Brevo SMTP with responsive Pug email templates for welcome and password reset.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive API Explorer -->
+    <section id="api-explorer" class="explorer-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Interactive API Explorer</h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
+            Test backend REST endpoints in real time directly from your browser.
+          </p>
+        </div>
+        <div id="apiConsoleStatus" style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;">
+          Status: Ready
+        </div>
+      </div>
+
+      <div class="endpoint-tabs">
+        <button class="endpoint-tab active" data-endpoint="health" onclick="testEndpoint('health')">
+          <span class="method-tag method-get">GET</span>
+          <span>/api/v1/health</span>
+        </button>
+
+        <button class="endpoint-tab" data-endpoint="me" onclick="testEndpoint('me')">
+          <span class="method-tag method-get">GET</span>
+          <span>/api/v1/users/me</span>
+        </button>
+
+        <button class="endpoint-tab" data-endpoint="usersList" onclick="testEndpoint('usersList')">
+          <span class="method-tag method-get">GET</span>
+          <span>/api/v1/users</span>
+        </button>
+
+        <button class="endpoint-tab" data-endpoint="subscribe" onclick="testEndpoint('subscribe')">
+          <span class="method-tag method-post">POST</span>
+          <span>/api/v1/subscribers</span>
+        </button>
+      </div>
+
+      <div class="code-console">
+        <div class="console-header">
+          <div class="console-dots">
+            <div class="console-dot dot-red"></div>
+            <div class="console-dot dot-yellow"></div>
+            <div class="console-dot dot-green"></div>
+          </div>
+          <span class="console-title">Live Response Inspector</span>
+        </div>
+        <pre id="apiConsoleOutput" class="console-body">// Click any endpoint tab above to execute live request...</pre>
+      </div>
+    </section>
+
+    <!-- Newsletter / Waitlist Card -->
+    <section class="card" style="margin-bottom: 60px; text-align: center; padding: 48px 24px;">
+      <h3 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 8px;">Stay Updated on Project Milestones</h3>
+      <p style="color: var(--text-muted); max-width: 520px; margin: 0 auto 24px;">
+        Subscribe to receive development announcements, API updates, and release logs.
+      </p>
+      <form onsubmit="handleSubscribe(event)" style="display: flex; justify-content: center; gap: 12px; max-width: 480px; margin: 0 auto; flex-wrap: wrap;">
+        <input type="email" class="form-input" placeholder="Enter your email address" required style="flex: 1; min-width: 240px;">
+        <button type="submit" class="btn btn-primary">Subscribe</button>
+      </form>
+    </section>
+
+  </main>
+
+  <!-- Sign In Modal -->
+  <div id="loginModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 style="font-size: 1.25rem; font-weight: 700;">Sign In to Your Account</h3>
+        <button class="modal-close" onclick="closeModal('loginModal')">&times;</button>
+      </div>
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-input" placeholder="developer@example.com" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <label class="form-label" style="margin-bottom: 0;">Password</label>
+            <a href="javascript:void(0)" onclick="closeModal('loginModal'); openModal('forgotModal');" style="font-size: 0.82rem;">Forgot password?</a>
+          </div>
+          <input type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Sign In</button>
+        <p style="text-align: center; margin-top: 18px; font-size: 0.88rem; color: var(--text-muted);">
+          Don't have an account? <a href="javascript:void(0)" onclick="closeModal('loginModal'); openModal('signupModal');">Sign up</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sign Up Modal -->
+  <div id="signupModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 style="font-size: 1.25rem; font-weight: 700;">Create Developer Account</h3>
+        <button class="modal-close" onclick="closeModal('signupModal')">&times;</button>
+      </div>
+      <form onsubmit="handleSignup(event)">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="name" class="form-input" placeholder="Alex Morgan" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-input" placeholder="alex@example.com" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password (Min 8 Characters)</label>
+          <input type="password" name="password" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password</label>
+          <input type="password" name="confirmPassword" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Create Account</button>
+        <p style="text-align: center; margin-top: 18px; font-size: 0.88rem; color: var(--text-muted);">
+          Already registered? <a href="javascript:void(0)" onclick="closeModal('signupModal'); openModal('loginModal');">Sign in</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Forgot Password Modal -->
+  <div id="forgotModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 style="font-size: 1.25rem; font-weight: 700;">Reset Password</h3>
+        <button class="modal-close" onclick="closeModal('forgotModal')">&times;</button>
+      </div>
+      <form onsubmit="handleForgotPassword(event)">
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 16px;">
+          Enter your registered email address and we will dispatch a secure 10-minute reset link.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-input" placeholder="user@example.com" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Send Reset Link</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- User Profile Modal -->
+  <div id="profileModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 style="font-size: 1.25rem; font-weight: 700;">Account Profile</h3>
+        <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
+      </div>
+      <div style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+          <div class="brand-icon" style="width: 48px; height: 48px; font-size: 1.2rem;">👤</div>
+          <div>
+            <div id="profileName" style="font-size: 1.1rem; font-weight: 700;">-</div>
+            <div id="profileEmail" style="color: var(--text-muted); font-size: 0.88rem;">-</div>
+          </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem;">
+          <div>
+            <span style="color: var(--text-dim); display: block;">ROLE</span>
+            <span id="profileRole" style="font-weight: 700;">USER</span>
+          </div>
+          <div>
+            <span style="color: var(--text-dim); display: block;">MEMBER SINCE</span>
+            <span id="profileCreatedAt" style="font-weight: 600;">-</span>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <a href="/admin" class="btn btn-secondary" style="flex: 1; text-align: center;">Admin Panel</a>
+        <button class="btn btn-danger" style="flex: 1;" onclick="closeModal('profileModal'); handleLogout();">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-inner">
+      <div>
+        <strong>Plezar Application Starter</strong> &copy; 2026. Built with Node.js &amp; Express.
+      </div>
+      <div style="display: flex; gap: 20px;">
+        <a href="/api/v1/health" target="_blank" style="color: var(--text-dim);">Health Check</a>
+        <a href="/admin" style="color: var(--text-dim);">Admin Console</a>
+        <a href="/reset-password" style="color: var(--text-dim);">Password Recovery</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

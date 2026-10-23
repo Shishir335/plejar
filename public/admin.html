@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plezar // Administration & User Management Console</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+</head>
+<body>
+
+  <!-- ADMIN AUTH GATEWAY (SHOWN IF NOT SIGNED IN AS ADMIN) -->
+  <div id="adminLoginView" style="display: none; width: 100vw; height: 100vh; align-items: center; justify-content: center; background: radial-gradient(circle at center, #111827 0%, #090d16 100%); padding: 20px;">
+    <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-lg); padding: 36px; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
+        <div class="sidebar-brand-badge" style="width: 40px; height: 40px; font-size: 1.2rem;">P</div>
+        <div>
+          <h2 style="font-size: 1.3rem; font-weight: 700;">Admin Console</h2>
+          <p style="font-size: 0.84rem; color: var(--text-muted);">Sign in with administrator privileges</p>
+        </div>
+      </div>
+
+      <form onsubmit="handleAdminLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Administrator Email</label>
+          <input type="email" name="email" class="form-input" placeholder="admin@plezar.com" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Sign In to Console</button>
+      </form>
+      <div style="margin-top: 20px; text-align: center;">
+        <a href="/" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">&larr; Return to main site</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN DASHBOARD VIEW -->
+  <div id="adminDashboardView" style="display: none; width: 100%;">
+    
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand-badge">P</div>
+        <div class="sidebar-brand-name">
+          <span style="font-weight: 700; font-size: 1.1rem; display: block;">Plezar</span>
+          <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;">Admin Console</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-link-btn active" data-tab="users" onclick="switchTab('users')">
+          <span>👥</span>
+          <span class="sidebar-text">User Directory</span>
+        </button>
+
+        <button class="nav-link-btn" data-tab="subscribers" onclick="switchTab('subscribers')">
+          <span>📬</span>
+          <span class="sidebar-text">Newsletter Leads</span>
+        </button>
+
+        <button class="nav-link-btn" data-tab="system" onclick="switchTab('system')">
+          <span>⚙️</span>
+          <span class="sidebar-text">System Status</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="/" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center;">
+          &larr; <span class="sidebar-text">Back to Site</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="admin-main">
+      
+      <!-- Topbar -->
+      <header class="admin-topbar">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <h1 style="font-size: 1.25rem; font-weight: 700;">Platform Administration</h1>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div style="font-size: 0.88rem; color: var(--text-muted);">
+            Logged in as <strong id="topbarUserName" style="color: var(--text-primary);">-</strong>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="handleAdminLogout()">Sign Out</button>
+        </div>
+      </header>
+
+      <!-- Content Views -->
+      <main class="admin-content">
+        
+        <!-- Stats Row -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Total Accounts</span>
+              <span class="stat-icon">👥</span>
+            </div>
+            <div id="statTotalUsers" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Admins &amp; Managers</span>
+              <span class="stat-icon">🛡️</span>
+            </div>
+            <div id="statAdminUsers" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Standard Users</span>
+              <span class="stat-icon">👤</span>
+            </div>
+            <div id="statStandardUsers" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Newsletter Leads</span>
+              <span class="stat-icon">📬</span>
+            </div>
+            <div id="statSubscribers" class="stat-value">0</div>
+          </div>
+        </div>
+
+        <!-- 1. USERS DIRECTORY TAB -->
+        <section id="tab-users" class="tab-pane active">
+          <div class="control-bar">
+            <div style="display: flex; gap: 12px; flex: 1; flex-wrap: wrap;">
+              <div class="search-input-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="userSearchInput" class="search-input" placeholder="Search by name, email, or ID..." oninput="filterUsers()">
+              </div>
+
+              <select id="userRoleFilter" class="form-select" style="max-width: 160px;" onchange="filterUsers()">
+                <option value="all">All Roles</option>
+                <option value="admin">Admins</option>
+                <option value="manager">Managers</option>
+                <option value="user">Standard Users</option>
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" onclick="loadUsers()">↻ Refresh</button>
+              <button class="btn btn-primary" onclick="openModal('createUserModal')">+ Create Account</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>User &amp; Email</th>
+                  <th>Role</th>
+                  <th>Joined Date</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <!-- Dynamically populated by admin.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 2. NEWSLETTER SUBSCRIBERS TAB -->
+        <section id="tab-subscribers" class="tab-pane">
+          <div class="control-bar">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <h2 style="font-size: 1.1rem; font-weight: 600;">Newsletter Subscriber Registry</h2>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" onclick="loadSubscribers()">↻ Refresh</button>
+              <button class="btn btn-primary" onclick="exportSubscribersCSV()">⬇ Export CSV</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Source</th>
+                  <th>Date Registered</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="subscribersTableBody">
+                <!-- Dynamically populated by admin.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 3. SYSTEM DIAGNOSTICS TAB -->
+        <section id="tab-system" class="tab-pane">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+            <div class="stat-card">
+              <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">Runtime Environment</h3>
+              <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.88rem;">
+                <div style="display:flex; justify-content: space-between; border-bottom: 1px solid var(--admin-border); padding-bottom: 8px;">
+                  <span style="color: var(--text-muted);">Framework</span>
+                  <strong>Express 4.x / Node.js</strong>
+                </div>
+                <div style="display:flex; justify-content: space-between; border-bottom: 1px solid var(--admin-border); padding-bottom: 8px;">
+                  <span style="color: var(--text-muted);">Database</span>
+                  <strong>MongoDB / Mongoose 8.x</strong>
+                </div>
+                <div style="display:flex; justify-content: space-between; border-bottom: 1px solid var(--admin-border); padding-bottom: 8px;">
+                  <span style="color: var(--text-muted);">Authentication</span>
+                  <strong>JWT / HTTP-Only Cookies</strong>
+                </div>
+                <div style="display:flex; justify-content: space-between;">
+                  <span style="color: var(--text-muted);">Rate Limiting</span>
+                  <strong>Active (1000/hr general, 15/15m auth)</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">Registered API Endpoints</h3>
+              <div style="display: flex; flex-direction: column; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
+                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                  <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/health
+                </div>
+                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                  <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/users/signup
+                </div>
+                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                  <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/users/login
+                </div>
+                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                  <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/users/me
+                </div>
+                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                  <span style="color: var(--color-warning); font-weight: 700;">PATCH</span> /api/v1/users/updateMe
+                </div>
+                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                  <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/users (Admin)
+                </div>
+                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                  <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/subscribers
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Create User Modal -->
+  <div id="createUserModal" class="modal-overlay">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 1.2rem; font-weight: 700;">Create User Account</h3>
+        <button onclick="closeModal('createUserModal')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form onsubmit="handleCreateUser(event)">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="name" class="form-input" placeholder="Jordan Davis" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-input" placeholder="jordan@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">System Role</label>
+          <select name="role" class="form-select">
+            <option value="user">Standard User</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Administrator</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password (Min 8 chars)</label>
+          <input type="password" name="password" class="form-input" placeholder="••••••••" minlength="8" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password</label>
+          <input type="password" name="confirmPassword" class="form-input" placeholder="••••••••" minlength="8" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Role Modal -->
+  <div id="editRoleModal" class="modal-overlay">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 1.2rem; font-weight: 700;">Change Account Role</h3>
+        <button onclick="closeModal('editRoleModal')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form onsubmit="handleUpdateRole(event)">
+        <input type="hidden" id="editRoleId">
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
+          Update system role and access permissions for <strong id="editRoleUserName" style="color: #fff;">-</strong>:
+        </p>
+        <div class="form-group">
+          <label class="form-label">Assign Role</label>
+          <select id="editRoleSelect" class="form-select">
+            <option value="user">Standard User (user)</option>
+            <option value="manager">Manager (manager)</option>
+            <option value="admin">Administrator (admin)</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Update Role</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reset Password Modal (Admin) -->
+  <div id="adminResetModal" class="modal-overlay">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 1.2rem; font-weight: 700;">Account Password Reset</h3>
+        <button onclick="closeModal('adminResetModal')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <input type="hidden" id="resetTargetUserId">
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+        Target User: <strong id="resetTargetUserName" style="color: #fff;">-</strong>
+      </p>
+
+      <form onsubmit="handleAdminDirectPasswordReset(event)">
+        <div class="form-group">
+          <label class="form-label">Set New Password Directly (Min 8 chars)</label>
+          <input type="password" id="newAdminSetPassword" class="form-input" placeholder="••••••••" minlength="8" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 12px;">Update Password Directly</button>
+      </form>
+
+      <div style="text-align: center; margin: 12px 0; color: var(--text-dim); font-size: 0.8rem;">— OR —</div>
+
+      <button type="button" class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="handleSendResetLink()">
+        Dispatch Email Reset Link
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="adminToastContainer" class="toast-container"></div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
