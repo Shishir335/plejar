@@ -3,320 +3,490 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plezar // Full-Stack Node.js Starter & User Management</title>
-  <meta name="description" content="Production-ready Node.js & Express application starter featuring JWT authentication, role-based access control, security middleware, and MongoDB integration.">
-  <link rel="stylesheet" href="/css/main.css">
+  <title>Plezar — Where Explorers Meet Their Local Curators</title>
+  <meta name="description" content="Plezar is a travel social network and marketplace where spontaneous travelers post trip bounties, discover secret spots, and plan custom adventures with certified local guides.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/css/landing.css">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
 </head>
 <body>
 
-  <!-- Navigation Bar -->
-  <header class="navbar">
+  <!-- Icon sprite -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="currentColor"/><path d="M8 17V7h4.6a3.3 3.3 0 0 1 0 6.6H10.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+      <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.7 1 2.7-2.4 1.8-.9 2.9-3-.2L12 21l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.7-1-2.7 2.4-1.8.9-2.9 3 .2z"/><path d="m9 12 2 2 4-4"/></symbol>
+      <symbol id="i-plane" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16.5 22 9.5l-3-2-7 2.5-5-3.5-2 .8 3.5 4.2L4 13l-1.5-1-1 .6 2.5 3.4z"/><path d="M3 21h18"/></symbol>
+      <symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16l-1.5-5h-13zM5 9v11h14V9M9 20v-6h6v6"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></symbol>
+      <symbol id="i-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9s-2-.9-3.4-.9C5.9 6.8 4.2 7.8 3.3 9.4c-1.9 3.3-.5 8.1 1.3 10.8.9 1.3 1.9 2.7 3.3 2.7 1.3-.1 1.8-.9 3.4-.9s2 .9 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.9-1.1-2.9-4.6zM13.8 4.9c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M4.6 2.4c-.3.3-.4.7-.4 1.2v16.8c0 .5.1.9.4 1.2l9.4-9.6zm10.4 8.6 2.9-3L6.2 1.4c-.4-.2-.8-.2-1.1-.1zm0 2-9.9 9.7c.3.1.7.1 1.1-.1l11.7-6.6zm4.3-4.2-3.3 3.2 3.3 3.2 2.3-1.3c1.1-.6 1.1-1.6 0-2.3z"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- Navigation -->
+  <header class="nav" id="top">
     <div class="container nav-inner">
-      <a href="/" class="brand">
-        <div class="brand-icon">P</div>
-        <span>Plezar <span style="font-weight: 400; color: var(--text-dim); font-size: 0.9rem;">Starter</span></span>
+      <a href="/" class="brand" aria-label="Plezar home">
+        <svg class="brand-mark"><use href="#i-logo"/></svg>
+        <span>Plezar</span>
       </a>
 
-      <nav class="nav-links">
-        <a href="#features" class="nav-item">Features</a>
-        <a href="#api-explorer" class="nav-item">API Explorer</a>
-        <a href="/admin" class="nav-item">Admin Console</a>
+      <nav class="nav-links" id="navLinks">
+        <a href="#features">Features</a>
+        <a href="#travelers">For Travelers</a>
+        <a href="#agents">For Agents</a>
+        <a href="#community">Community</a>
+        <a href="#download">App Download</a>
       </nav>
 
       <div class="nav-actions">
-        <div id="healthStatusPill" class="status-pill">
-          <span class="status-dot"></span> Checking API...
+        <a href="#features" class="btn btn-ghost-green btn-sm hide-sm"><svg class="ic"><use href="#i-map"/></svg> Explore Map</a>
+        <div id="navAuthArea" class="nav-auth">
+          <!-- Populated by app.js -->
         </div>
-        <div id="navAuthArea" style="display: flex; align-items: center; gap: 8px;">
-          <!-- Dynamically populated by app.js -->
-        </div>
+        <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" onclick="toggleNav(this)">
+          <svg class="ic"><use href="#i-menu"/></svg>
+        </button>
       </div>
     </div>
   </header>
 
-  <!-- Hero Section -->
-  <main class="container">
-    
-    <!-- Guest Hero -->
-    <section id="guestHeroSection" class="hero">
-      <div class="hero-badge">
-        <span>🚀 Production-Ready Full-Stack Starter</span>
-      </div>
-      <h1 class="hero-title">Build Your Next Project<br>With a Solid Foundation</h1>
-      <p class="hero-subtitle">
-        A clean, robust Node.js, Express, and MongoDB backend preconfigured with JWT authentication, role-based user management, enterprise security middlewares, and a modern admin dashboard.
-      </p>
-      <div class="hero-cta">
-        <button class="btn btn-primary btn-lg" onclick="openModal('signupModal')">Get Started &rarr;</button>
-        <button class="btn btn-secondary btn-lg" onclick="document.getElementById('api-explorer').scrollIntoView({ behavior: 'smooth' })">Test API Endpoints</button>
-        <a href="/admin" class="btn btn-outline btn-lg">Open Admin Console</a>
-      </div>
-    </section>
+  <main>
 
-    <!-- Authenticated User Hero -->
-    <section id="userHeroSection" class="hero" style="display: none;">
-      <div class="hero-badge">
-        <span>Active User Session</span>
-      </div>
-      <h1 class="hero-title">Welcome back, <span id="userWelcomeName">Developer</span>!</h1>
-      <p class="hero-subtitle">
-        Your authentication session is active. You can explore protected API routes below, access the administration dashboard, or manage your profile.
-      </p>
-      <div class="hero-cta">
-        <a href="/admin" class="btn btn-primary btn-lg">Launch Admin Console &rarr;</a>
-        <button class="btn btn-secondary btn-lg" onclick="openProfileModal()">View Profile Details</button>
-        <button class="btn btn-outline btn-lg" onclick="testEndpoint('me')">Verify Auth in API Console</button>
-      </div>
-    </section>
-
-    <!-- Feature Highlights -->
-    <section id="features">
-      <div class="grid-cards">
-        <div class="card">
-          <div class="card-icon">🔐</div>
-          <h2 class="card-title">Complete Authentication</h2>
-          <p class="card-desc">
-            Production JWT authentication with secure HTTP-only cookies, password hashing with bcryptjs, password reset flows, and Google OAuth 2.0 integration.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">👥</div>
-          <h2 class="card-title">Role-Based Access Control</h2>
-          <p class="card-desc">
-            Built-in hierarchy supporting <code>admin</code>, <code>manager</code>, and <code>user</code> roles with privilege escalation prevention and granular route restrictions.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">🛡️</div>
-          <h2 class="card-title">Enterprise Security</h2>
-          <p class="card-desc">
-            Equipped with Helmet security headers, Express rate-limiting, NoSQL query injection sanitization, XSS cleansing, and Parameter Pollution (HPP) guards.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">⚡</div>
-          <h2 class="card-title">Database & Query Engine</h2>
-          <p class="card-desc">
-            Mongoose ODM architecture with reusable <code>apiFeatures</code> for filtering, sorting, field limiting, and automatic query pagination.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">📊</div>
-          <h2 class="card-title">User Administration Console</h2>
-          <p class="card-desc">
-            A dedicated administration interface to inspect active accounts, create users, promote roles, perform administrative password resets, and export telemetry.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="card-icon">📬</div>
-          <h2 class="card-title">Transactional Email Engine</h2>
-          <p class="card-desc">
-            Nodemailer dispatcher configured for Gmail App Passwords and SendGrid/Brevo SMTP with responsive Pug email templates for welcome and password reset.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Interactive API Explorer -->
-    <section id="api-explorer" class="explorer-section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Interactive API Explorer</h2>
-          <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">
-            Test backend REST endpoints in real time directly from your browser.
-          </p>
-        </div>
-        <div id="apiConsoleStatus" style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;">
-          Status: Ready
-        </div>
-      </div>
-
-      <div class="endpoint-tabs">
-        <button class="endpoint-tab active" data-endpoint="health" onclick="testEndpoint('health')">
-          <span class="method-tag method-get">GET</span>
-          <span>/api/v1/health</span>
-        </button>
-
-        <button class="endpoint-tab" data-endpoint="me" onclick="testEndpoint('me')">
-          <span class="method-tag method-get">GET</span>
-          <span>/api/v1/users/me</span>
-        </button>
-
-        <button class="endpoint-tab" data-endpoint="usersList" onclick="testEndpoint('usersList')">
-          <span class="method-tag method-get">GET</span>
-          <span>/api/v1/users</span>
-        </button>
-
-        <button class="endpoint-tab" data-endpoint="subscribe" onclick="testEndpoint('subscribe')">
-          <span class="method-tag method-post">POST</span>
-          <span>/api/v1/subscribers</span>
-        </button>
-      </div>
-
-      <div class="code-console">
-        <div class="console-header">
-          <div class="console-dots">
-            <div class="console-dot dot-red"></div>
-            <div class="console-dot dot-yellow"></div>
-            <div class="console-dot dot-green"></div>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <!-- Guest hero -->
+          <div id="guestHeroSection">
+            <span class="eyebrow"><span class="pulse"></span> The next-gen travel social network &amp; marketplace</span>
+            <h1 class="hero-title">Where Explorers Meet Their <span class="grad">Local Curators</span></h1>
+            <p class="hero-text">
+              Step into a gamified travel playground where spontaneous travelers post real-time trip bounties, discover secret coordinates, and plan custom adventures with certified destination architects worldwide.
+            </p>
+            <div class="hero-cta">
+              <button class="btn btn-primary" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-download"/></svg> Download App &amp; Play</button>
+              <a href="#features" class="btn btn-dark">Explore Playground <svg class="ic"><use href="#i-arrow"/></svg></a>
+            </div>
           </div>
-          <span class="console-title">Live Response Inspector</span>
+
+          <!-- Signed-in hero -->
+          <div id="userHeroSection" style="display: none;">
+            <span class="eyebrow"><span class="pulse"></span> Welcome back, explorer</span>
+            <h1 class="hero-title">Ready for your next drop, <span class="grad" id="userWelcomeName">Explorer</span>?</h1>
+            <p class="hero-text">
+              Your session is active. Post a new trip bounty, check pitches from local curators, or review your profile and badges.
+            </p>
+            <div class="hero-cta">
+              <a href="#features" class="btn btn-primary">Post a Trip Bounty <svg class="ic"><use href="#i-arrow"/></svg></a>
+              <button class="btn btn-dark" onclick="openProfileModal()">View Profile</button>
+            </div>
+          </div>
+
+          <dl class="hero-stats">
+            <div><dt>50k</dt><dd>Active Explorers</dd></div>
+            <div><dt class="t-orange">1,200</dt><dd>Verified Guides</dd></div>
+            <div><dt>45</dt><dd>Countries</dd></div>
+          </dl>
         </div>
-        <pre id="apiConsoleOutput" class="console-body">// Click any endpoint tab above to execute live request...</pre>
+
+        <!-- Phone mockup -->
+        <div class="hero-visual">
+          <div class="phone">
+            <div class="phone-top">
+              <span class="phone-pill">Live Dispatch Feed</span>
+            </div>
+
+            <div class="feed-card">
+              <div class="feed-head">
+                <span class="avatar av-a">S</span>
+                <div class="feed-meta">
+                  <strong>Sarah K. <span class="tag tag-orange">Solo Explorer</span></strong>
+                  <small>Ubud, Bali</small>
+                </div>
+                <small class="muted">3 min ago</small>
+              </div>
+              <p class="feed-quote">"Looking for an uncrowded sunset cliff with a tidal cave entrance before 6 PM today! Any certified locals free?"</p>
+            </div>
+
+            <div class="feed-card feed-card-reply">
+              <div class="feed-head">
+                <span class="avatar av-b">W</span>
+                <div class="feed-meta">
+                  <strong>Wayan Sudita <span class="tag tag-green">Verified Guide</span></strong>
+                  <small><svg class="ic ic-xs t-orange"><use href="#i-star"/></svg> 4.98 (314 tours)</small>
+                </div>
+              </div>
+              <p class="feed-text">"Hey Sarah! Suluban secret cove has open tidal access until 5:40 PM. I have a custom itinerary pinned with route safety &amp; scooter park coordinates ready."</p>
+              <div class="offer">
+                <span class="offer-icon"><svg class="ic"><use href="#i-compass"/></svg></span>
+                <div>
+                  <strong>Hidden Grotto Sunset &amp; Cave Walk</strong>
+                  <small>Private · 2.5h · Escrow · Scooter route</small>
+                </div>
+                <span class="offer-price">$38</span>
+              </div>
+              <button class="offer-cta" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-check"/></svg> 1-Click Escrow Booking ($38 USD)</button>
+            </div>
+
+            <div class="phone-foot">
+              <span><svg class="ic ic-xs"><use href="#i-lock"/></svg> End-to-End Escrow Protection</span>
+              <span>Avg response: 2.4 min</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Newsletter / Waitlist Card -->
-    <section class="card" style="margin-bottom: 60px; text-align: center; padding: 48px 24px;">
-      <h3 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 8px;">Stay Updated on Project Milestones</h3>
-      <p style="color: var(--text-muted); max-width: 520px; margin: 0 auto 24px;">
-        Subscribe to receive development announcements, API updates, and release logs.
-      </p>
-      <form onsubmit="handleSubscribe(event)" style="display: flex; justify-content: center; gap: 12px; max-width: 480px; margin: 0 auto; flex-wrap: wrap;">
-        <input type="email" class="form-input" placeholder="Enter your email address" required style="flex: 1; min-width: 240px;">
-        <button type="submit" class="btn btn-primary">Subscribe</button>
-      </form>
+    <!-- App download card -->
+    <section class="container section-tight" id="download">
+      <div class="download-card">
+        <div class="qr-frame">
+          <div class="qr" data-seed="7"></div>
+          <div class="qr-copy">
+            <span class="eyebrow-sm t-orange"><svg class="ic ic-xs"><use href="#i-bolt"/></svg> Instant Pair</span>
+            <strong>Scan to Launch</strong>
+            <small>Point your phone camera to jump straight into the App Store or Google Play.</small>
+          </div>
+        </div>
+
+        <div class="download-copy">
+          <div class="rating-row">
+            <span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span>
+            <span><strong>4.9 / 5.0</strong> (18,400+ reviews)</span>
+            <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-shield"/></svg> Stripe Escrow Verified</span>
+          </div>
+          <h2 class="h2">Carry the World's Local Knowledge in Your Pocket</h2>
+          <p class="muted">Available worldwide in 24 languages. Connect in real time with certified local guides or monetize your hometown expertise.</p>
+          <div class="store-row">
+            <a href="#download" class="store-btn"><svg class="ic"><use href="#i-apple"/></svg><span><small>Available on the</small>App Store</span></a>
+            <a href="#download" class="store-btn"><svg class="ic"><use href="#i-play"/></svg><span><small>Get it on</small>Google Play</span></a>
+          </div>
+          <form class="inline-form" onsubmit="handleSubscribe(event)" data-source="app_link">
+            <svg class="ic muted"><use href="#i-phone"/></svg>
+            <input type="email" placeholder="Enter your email for a download link" required aria-label="Email address">
+            <button type="submit" class="btn btn-primary btn-sm">Send Magic Link</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two sides -->
+    <section class="container section" id="travelers">
+      <div class="section-head center">
+        <span class="pill">Dual Advantage Ecosystem</span>
+        <h2 class="h2">Two Sides of the Same Playground</h2>
+        <p class="muted">Whether you are crossing oceans with a backpack or leading boutique expeditions in your home city, Plezar eliminates intermediaries.</p>
+      </div>
+
+      <div class="duo">
+        <article class="duo-card duo-green">
+          <div class="duo-top">
+            <span class="duo-icon"><svg class="ic"><use href="#i-plane"/></svg></span>
+            <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-check"/></svg> For Adventurers &amp; Nomads</span>
+          </div>
+          <h3 class="h3">Explore Without the Hassle</h3>
+          <p class="muted">Eliminate cookie-cutter tour buses. Post your travel dreams and get curated bids from local curators who know every rooftop, reef, and hidden kitchen.</p>
+          <ul class="checklist">
+            <li><strong>Post Trip Bounties &amp; Receive Pitches</strong><span>Request specific itineraries, dietary needs, or adventure thresholds; guides reply with tailored plans.</span></li>
+            <li><strong>0% Hidden Tourist Markups</strong><span>Transparent wholesale pricing directly from licensed independent operators without 30% aggregator bloat.</span></li>
+            <li><strong>100% Escrow Protection</strong><span>Funds are held securely and released only after your experience is completed to full satisfaction.</span></li>
+            <li><strong>Direct Voice &amp; Video Messaging</strong><span>Coordinate pickup spots, dietary adjustments, and schedule updates in real time.</span></li>
+          </ul>
+          <button class="btn btn-block btn-dark" onclick="openModal('signupModal')">Start Exploring Trips <svg class="ic"><use href="#i-arrow"/></svg></button>
+        </article>
+
+        <article class="duo-card duo-orange" id="agents">
+          <div class="duo-top">
+            <span class="duo-icon"><svg class="ic"><use href="#i-store"/></svg></span>
+            <span class="tag tag-orange"><svg class="ic ic-xs"><use href="#i-check"/></svg> For Certified Operators &amp; Guides</span>
+          </div>
+          <h3 class="h3">Monetize Your Local Passion</h3>
+          <p class="muted">Stop fighting SEO algorithms. Plezar brings ready-to-book global travelers straight to your inbox with zero listing fees.</p>
+          <ul class="checklist">
+            <li><strong>Inbound High-Intent Global Nomads</strong><span>Receive pre-qualified traveler inquiries matching your exact destination coverage and niche expertise.</span></li>
+            <li><strong>Verified Identity Badge &amp; Global Trust</strong><span>Showcase regional tourism licensing, safety certifications, and audited 5-star traveler reviews.</span></li>
+            <li><strong>Built-in Invoicing &amp; Multi-Currency Payouts</strong><span>Accept USD, EUR, JPY, and GBP with instant bank transfers directly into your local account.</span></li>
+            <li><strong>Smart Schedule &amp; Capacity Management</strong><span>Sync with Google Calendar and manage private, small-group, and VIP departures with one dashboard.</span></li>
+          </ul>
+          <button class="btn btn-block btn-primary" onclick="openModal('signupModal')">Apply as Certified Operator <svg class="ic"><use href="#i-arrow"/></svg></button>
+        </article>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="container section" id="features">
+      <div class="split-head">
+        <div>
+          <span class="eyebrow-sm t-green">Engineered for Freedom</span>
+          <h2 class="h2">Crafted for Spontaneous Wandering</h2>
+        </div>
+        <p class="muted">Designed from the ground up to replace static PDFs and opaque agency phone calls with fluid, real-time social dynamics.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card">
+          <div class="mock">
+            <div class="mock-bar"><span class="tag tag-green"><span class="dot"></span> Active Encrypted Channel</span><svg class="ic ic-xs muted"><use href="#i-mic"/></svg></div>
+            <div class="mock-bubble">"Dropping audio notes for the morning sunrise ascent..."</div>
+            <div class="mock-right"><span class="tag tag-solid-orange"><svg class="ic ic-xs"><use href="#i-mic"/></svg> Voice Memo (0:24)</span></div>
+          </div>
+          <h3 class="h4"><span class="feat-icon t-orange"><svg class="ic"><use href="#i-chat"/></svg></span> Direct Tourist ↔ Agent Chat</h3>
+          <p class="muted sm">Send high-definition voice memos, pin live waypoints on shared offline maps, and finalize bookings with escrow locks without leaving the conversation.</p>
+          <a href="#download" class="link-orange">Voice memos &amp; live map sync <svg class="ic ic-xs"><use href="#i-arrow"/></svg></a>
+        </article>
+
+        <article class="feature-card">
+          <div class="mock">
+            <div class="mock-bar"><span class="tag tag-orange">Trending Challenge</span><small class="muted">+120 PlezarCoins</small></div>
+            <div class="mock-task">
+              <span class="mock-task-icon"><svg class="ic"><use href="#i-map"/></svg></span>
+              <div><strong>Find Old Town Blue Door</strong><small>12 explorers checked in today</small></div>
+              <svg class="ic t-green"><use href="#i-check"/></svg>
+            </div>
+          </div>
+          <h3 class="h4"><span class="feat-icon t-green"><svg class="ic"><use href="#i-compass"/></svg></span> Interactive Travel Playground</h3>
+          <p class="muted sm">Unlock secret viewpoints, collect localized passport badges, vote on community-verified hidden culinary gems, and participate in location-based photo challenges.</p>
+          <a href="#community" class="link-green">Earn PlezarXP on every trip <svg class="ic ic-xs"><use href="#i-arrow"/></svg></a>
+        </article>
+
+        <article class="feature-card">
+          <div class="mock">
+            <div class="mock-bar"><span class="muted xs"><svg class="ic ic-xs"><use href="#i-filter"/></svg> Smart Filter Match</span></div>
+            <div class="chips">
+              <span class="chip chip-orange">Alpine Climber</span>
+              <span class="chip">Italian &amp; English</span>
+              <span class="chip">Gluten-Free Specialist</span>
+              <span class="chip">Certified Skipper</span>
+            </div>
+          </div>
+          <h3 class="h4"><span class="feat-icon t-orange"><svg class="ic"><use href="#i-badge"/></svg></span> Verified Agent Directory</h3>
+          <p class="muted sm">Filter certified operators by native dialect, specialized certifications (scuba divemaster, culinary chef, alpine guide), or instant departure availability.</p>
+          <a href="#agents" class="link-orange">Search 1,200+ certified guides <svg class="ic ic-xs"><use href="#i-arrow"/></svg></a>
+        </article>
+      </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="container section" id="community">
+      <div class="section-head center">
+        <span class="eyebrow-sm t-orange">Unfiltered Community Stories</span>
+        <h2 class="h2">Real Travelers. Real Guides<span class="t-orange">.</span></h2>
+      </div>
+
+      <div class="quote-grid">
+        <figure class="quote-card">
+          <div class="quote-top"><span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span><span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-check"/></svg> Verified Trip</span></div>
+          <blockquote>"I posted a bounty looking for a traditional tea master in Uji who could host a quiet tea ceremony with zero other tourists. Within 45 minutes, Kenji connected with an authentic 5th generation artisan. Absolutely transformed our trip to Japan."</blockquote>
+          <figcaption><span class="avatar av-c">M</span><div><strong>Mateo Rossi</strong><small>Traveled to Kyoto, Japan</small></div></figcaption>
+        </figure>
+
+        <figure class="quote-card">
+          <div class="quote-top"><span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span><span class="tag tag-orange">Certified Guide</span></div>
+          <blockquote>"As an independent sailing skipper in the Greek islands, I used to give up 35% commission to big booking sites. Plezar lets me chat directly with sailors, quote customized sea routes, and receive payment safely through escrow."</blockquote>
+          <figcaption><span class="avatar av-d">E</span><div><strong>Elena Vasquez</strong><small>Skipper · Cyclades, Greece</small></div></figcaption>
+        </figure>
+
+        <figure class="quote-card">
+          <div class="quote-top"><span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span><span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-check"/></svg> Verified Trip</span></div>
+          <blockquote>"We were traveling with two toddlers in the Canadian Rockies and felt overwhelmed by trail logistics. Liam built us an interactive daily trail schedule adapted for stroller access and weather alerts. Invaluable peace of mind!"</blockquote>
+          <figcaption><span class="avatar av-e">M</span><div><strong>Marcus &amp; Chloe Vance</strong><small>Family Explorers · Alberta, Canada</small></div></figcaption>
+        </figure>
+      </div>
+
+      <dl class="metric-row">
+        <div><dt class="t-green">98.4%</dt><dd>5-Star Satisfaction</dd></div>
+        <div><dt>100%</dt><dd>Identity Audited</dd></div>
+        <div><dt class="t-orange">$0</dt><dd>Hidden Agency Fees</dd></div>
+        <div><dt>&lt; 5 min</dt><dd>Average Guide Match</dd></div>
+      </dl>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="container section-tight">
+      <div class="cta-band">
+        <div class="cta-copy">
+          <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-bolt"/></svg> Instant Access Today</span>
+          <h2 class="h1">Ready to Play &amp; Roam?</h2>
+          <p class="muted">Your next unforgettable adventure starts with a single tap. Join 50,000+ wanderers and discover the world through the eyes of certified locals.</p>
+          <div class="hero-cta">
+            <button class="btn btn-primary" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-download"/></svg> Get the App Now</button>
+            <button class="btn btn-ghost-green" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-badge"/></svg> Become a Certified Guide</button>
+          </div>
+        </div>
+        <div class="cta-phone">
+          <div class="qr" data-seed="13"></div>
+          <strong>Fast Phone Scan</strong>
+          <small>iOS &amp; Android Compatible</small>
+          <div class="cta-phone-icons"><svg class="ic ic-xs"><use href="#i-phone"/></svg><svg class="ic ic-xs"><use href="#i-play"/></svg><svg class="ic ic-xs"><use href="#i-apple"/></svg></div>
+        </div>
+      </div>
     </section>
 
   </main>
 
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="brand"><svg class="brand-mark"><use href="#i-logo"/></svg><span>Plezar</span></a>
+        <p class="muted sm">The verified travel playground connecting spontaneous explorers with certified destination architects worldwide. Crafted for kinetic wanderlust.</p>
+        <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-shield"/></svg> Certified Partner Network</span>
+      </div>
+      <div>
+        <h4>Ecosystem</h4>
+        <a href="#features">Dynamic Itineraries</a>
+        <a href="#features">Nomad Matcher</a>
+        <a href="#agents">Operator Portal</a>
+        <a href="#features">Live Interactive Map</a>
+      </div>
+      <div>
+        <h4>Community</h4>
+        <a href="#community">Wanderer Stories</a>
+        <a href="#community">Safety &amp; Trust</a>
+        <a href="#download">Mobile Releases</a>
+        <a href="#agents">Verification Standards</a>
+      </div>
+      <div class="footer-news">
+        <h4>Stay in the Orbit</h4>
+        <p class="muted sm">Receive hand-curated secret expeditions, flash itinerary drops, and operator dispatches.</p>
+        <form class="inline-form inline-form-sm" onsubmit="handleSubscribe(event)" data-source="footer_newsletter">
+          <input type="email" placeholder="you@example.com" required aria-label="Email address">
+          <button type="submit" class="btn btn-primary btn-sm">Join Dispatch</button>
+        </form>
+        <div class="store-row store-row-sm">
+          <a href="#download" class="store-btn"><svg class="ic"><use href="#i-apple"/></svg><span><small>Download on</small>App Store</span></a>
+          <a href="#download" class="store-btn"><svg class="ic"><use href="#i-play"/></svg><span><small>Get it on</small>Google Play</span></a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>&copy; <span id="year">2026</span> Plezar. Crafted for verified adventures.</span>
+      <nav>
+        <a href="#top">Privacy Policy</a>
+        <a href="#top">Terms of Service</a>
+        <a href="/reset-password">Account Recovery</a>
+      </nav>
+    </div>
+  </footer>
+
   <!-- Sign In Modal -->
-  <div id="loginModal" class="modal-overlay">
-    <div class="modal-card">
+  <div id="loginModal" class="modal-overlay" onclick="if (event.target === this) closeModal('loginModal')">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
       <div class="modal-header">
-        <h3 style="font-size: 1.25rem; font-weight: 700;">Sign In to Your Account</h3>
-        <button class="modal-close" onclick="closeModal('loginModal')">&times;</button>
+        <h3 id="loginTitle">Welcome back, explorer</h3>
+        <button class="modal-close" onclick="closeModal('loginModal')" aria-label="Close">&times;</button>
       </div>
       <form onsubmit="handleLogin(event)">
         <div class="form-group">
-          <label class="form-label">Email Address</label>
-          <input type="email" name="email" class="form-input" placeholder="developer@example.com" required autocomplete="username">
+          <label class="form-label" for="loginEmail">Email Address</label>
+          <input id="loginEmail" type="email" name="email" class="form-input" placeholder="you@example.com" required autocomplete="username">
         </div>
         <div class="form-group">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-            <label class="form-label" style="margin-bottom: 0;">Password</label>
-            <a href="javascript:void(0)" onclick="closeModal('loginModal'); openModal('forgotModal');" style="font-size: 0.82rem;">Forgot password?</a>
+          <div class="label-row">
+            <label class="form-label" for="loginPassword">Password</label>
+            <a href="#" onclick="event.preventDefault(); closeModal('loginModal'); openModal('forgotModal');">Forgot password?</a>
           </div>
-          <input type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+          <input id="loginPassword" type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Sign In</button>
-        <p style="text-align: center; margin-top: 18px; font-size: 0.88rem; color: var(--text-muted);">
-          Don't have an account? <a href="javascript:void(0)" onclick="closeModal('loginModal'); openModal('signupModal');">Sign up</a>
-        </p>
+        <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        <p class="modal-foot">New to Plezar? <a href="#" onclick="event.preventDefault(); closeModal('loginModal'); openModal('signupModal');">Create an account</a></p>
       </form>
     </div>
   </div>
 
   <!-- Sign Up Modal -->
-  <div id="signupModal" class="modal-overlay">
-    <div class="modal-card">
+  <div id="signupModal" class="modal-overlay" onclick="if (event.target === this) closeModal('signupModal')">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="signupTitle">
       <div class="modal-header">
-        <h3 style="font-size: 1.25rem; font-weight: 700;">Create Developer Account</h3>
-        <button class="modal-close" onclick="closeModal('signupModal')">&times;</button>
+        <h3 id="signupTitle">Join the playground</h3>
+        <button class="modal-close" onclick="closeModal('signupModal')" aria-label="Close">&times;</button>
       </div>
       <form onsubmit="handleSignup(event)">
         <div class="form-group">
-          <label class="form-label">Full Name</label>
-          <input type="text" name="name" class="form-input" placeholder="Alex Morgan" required>
+          <label class="form-label" for="signupName">Full Name</label>
+          <input id="signupName" type="text" name="name" class="form-input" placeholder="Alex Morgan" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Email Address</label>
-          <input type="email" name="email" class="form-input" placeholder="alex@example.com" required autocomplete="username">
+          <label class="form-label" for="signupEmail">Email Address</label>
+          <input id="signupEmail" type="email" name="email" class="form-input" placeholder="alex@example.com" required autocomplete="username">
         </div>
         <div class="form-group">
-          <label class="form-label">Password (Min 8 Characters)</label>
-          <input type="password" name="password" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
+          <label class="form-label" for="signupPassword">Password (min 8 characters)</label>
+          <input id="signupPassword" type="password" name="password" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
         </div>
         <div class="form-group">
-          <label class="form-label">Confirm Password</label>
-          <input type="password" name="confirmPassword" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
+          <label class="form-label" for="signupConfirm">Confirm Password</label>
+          <input id="signupConfirm" type="password" name="confirmPassword" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Create Account</button>
-        <p style="text-align: center; margin-top: 18px; font-size: 0.88rem; color: var(--text-muted);">
-          Already registered? <a href="javascript:void(0)" onclick="closeModal('signupModal'); openModal('loginModal');">Sign in</a>
-        </p>
+        <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+        <p class="modal-foot">Already exploring? <a href="#" onclick="event.preventDefault(); closeModal('signupModal'); openModal('loginModal');">Sign in</a></p>
       </form>
     </div>
   </div>
 
   <!-- Forgot Password Modal -->
-  <div id="forgotModal" class="modal-overlay">
-    <div class="modal-card">
+  <div id="forgotModal" class="modal-overlay" onclick="if (event.target === this) closeModal('forgotModal')">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
       <div class="modal-header">
-        <h3 style="font-size: 1.25rem; font-weight: 700;">Reset Password</h3>
-        <button class="modal-close" onclick="closeModal('forgotModal')">&times;</button>
+        <h3 id="forgotTitle">Reset Password</h3>
+        <button class="modal-close" onclick="closeModal('forgotModal')" aria-label="Close">&times;</button>
       </div>
       <form onsubmit="handleForgotPassword(event)">
-        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 16px;">
-          Enter your registered email address and we will dispatch a secure 10-minute reset link.
-        </p>
+        <p class="muted sm" style="margin-bottom: 16px;">Enter your registered email and we'll send a secure reset link, valid for 10 minutes.</p>
         <div class="form-group">
-          <label class="form-label">Email Address</label>
-          <input type="email" name="email" class="form-input" placeholder="user@example.com" required>
+          <label class="form-label" for="forgotEmail">Email Address</label>
+          <input id="forgotEmail" type="email" name="email" class="form-input" placeholder="you@example.com" required>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Send Reset Link</button>
+        <button type="submit" class="btn btn-primary btn-block">Send Reset Link</button>
       </form>
     </div>
   </div>
 
-  <!-- User Profile Modal -->
-  <div id="profileModal" class="modal-overlay">
-    <div class="modal-card">
+  <!-- Profile Modal -->
+  <div id="profileModal" class="modal-overlay" onclick="if (event.target === this) closeModal('profileModal')">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
       <div class="modal-header">
-        <h3 style="font-size: 1.25rem; font-weight: 700;">Account Profile</h3>
-        <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
+        <h3 id="profileTitle">Your Profile</h3>
+        <button class="modal-close" onclick="closeModal('profileModal')" aria-label="Close">&times;</button>
       </div>
-      <div style="margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
-          <div class="brand-icon" style="width: 48px; height: 48px; font-size: 1.2rem;">👤</div>
-          <div>
-            <div id="profileName" style="font-size: 1.1rem; font-weight: 700;">-</div>
-            <div id="profileEmail" style="color: var(--text-muted); font-size: 0.88rem;">-</div>
-          </div>
-        </div>
-
-        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem;">
-          <div>
-            <span style="color: var(--text-dim); display: block;">ROLE</span>
-            <span id="profileRole" style="font-weight: 700;">USER</span>
-          </div>
-          <div>
-            <span style="color: var(--text-dim); display: block;">MEMBER SINCE</span>
-            <span id="profileCreatedAt" style="font-weight: 600;">-</span>
-          </div>
+      <div class="profile-row">
+        <span class="avatar avatar-lg av-a" id="profileInitial">U</span>
+        <div>
+          <div id="profileName" class="profile-name">-</div>
+          <div id="profileEmail" class="muted sm">-</div>
         </div>
       </div>
-      <div style="display: flex; gap: 10px;">
-        <a href="/admin" class="btn btn-secondary" style="flex: 1; text-align: center;">Admin Panel</a>
-        <button class="btn btn-danger" style="flex: 1;" onclick="closeModal('profileModal'); handleLogout();">Sign Out</button>
+      <div class="profile-meta">
+        <div><span>Role</span><strong id="profileRole">USER</strong></div>
+        <div><span>Member since</span><strong id="profileCreatedAt">-</strong></div>
+      </div>
+      <div class="profile-actions">
+        <a href="/admin" id="profileAdminLink" class="btn btn-dark" style="display: none;">Admin Panel</a>
+        <button class="btn btn-danger" onclick="closeModal('profileModal'); handleLogout();">Sign Out</button>
       </div>
     </div>
   </div>
 
-  <!-- Toast Container -->
-  <div id="toastContainer" class="toast-container"></div>
-
-  <!-- Footer -->
-  <footer>
-    <div class="container footer-inner">
-      <div>
-        <strong>Plezar Application Starter</strong> &copy; 2026. Built with Node.js &amp; Express.
-      </div>
-      <div style="display: flex; gap: 20px;">
-        <a href="/api/v1/health" target="_blank" style="color: var(--text-dim);">Health Check</a>
-        <a href="/admin" style="color: var(--text-dim);">Admin Console</a>
-        <a href="/reset-password" style="color: var(--text-dim);">Password Recovery</a>
-      </div>
-    </div>
-  </footer>
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
   <script src="/js/app.js"></script>
 </body>

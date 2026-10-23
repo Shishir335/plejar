@@ -1,24 +1,27 @@
 /**
- * Plezar Starter Application - Core Frontend Logic
+ * Plezar Landing Page - Core Frontend Logic
  */
 
 // Application State
 const state = {
   user: null,
-  token: localStorage.getItem('plezar_token') || null,
-  health: null
+  token: localStorage.getItem('plezar_token') || null
 };
 
 // UI Elements
 const dom = {
-  healthPill: document.getElementById('healthStatusPill'),
   navAuthArea: document.getElementById('navAuthArea'),
   userHeroSection: document.getElementById('userHeroSection'),
   guestHeroSection: document.getElementById('guestHeroSection'),
-  apiConsoleOutput: document.getElementById('apiConsoleOutput'),
-  apiConsoleStatus: document.getElementById('apiConsoleStatus'),
   toastContainer: document.getElementById('toastContainer')
 };
+
+// Escape user-provided text before inserting it as HTML
+function escapeHTML(value) {
+  const div = document.createElement('div');
+  div.textContent = value == null ? '' : String(value);
+  return div.innerHTML;
+}
 
 // Toast notification helper
 function showToast(message, type = 'info') {
@@ -26,8 +29,8 @@ function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerHTML = `
-    <span>${message}</span>
-    <button onclick="this.parentElement.remove()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;">&times;</button>
+    <span>${escapeHTML(message)}</span>
+    <button onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
   `;
   dom.toastContainer.appendChild(toast);
   setTimeout(() => {
@@ -39,13 +42,36 @@ function showToast(message, type = 'info') {
 // Modal management
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) modal.classList.add('active');
+  if (!modal) return;
+  modal.classList.add('active');
+  const firstInput = modal.querySelector('input');
+  if (firstInput) setTimeout(() => firstInput.focus(), 50);
 }
 
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.remove('active');
 }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+  }
+});
+
+// Mobile navigation toggle
+function toggleNav(button) {
+  const links = document.getElementById('navLinks');
+  if (!links) return;
+  const open = links.classList.toggle('open');
+  button.setAttribute('aria-expanded', String(open));
+}
+
+document.querySelectorAll('#navLinks a').forEach(link => {
+  link.addEventListener('click', () => {
+    document.getElementById('navLinks').classList.remove('open');
+  });
+});
 
 // Fetch helper with auth header
 async function apiRequest(endpoint, options = {}) {
@@ -68,77 +94,46 @@ async function apiRequest(endpoint, options = {}) {
   return { status: res.status, ok: res.ok, data };
 }
 
-// Check Backend Health
-async function checkHealth() {
-  try {
-    const { ok, status, data } = await apiRequest('/api/v1/health');
-    state.health = data;
-    if (dom.healthPill) {
-      if (ok && data.status === 'success') {
-        dom.healthPill.innerHTML = `<span class="status-dot"></span> API Operational (${data.environment})`;
-        dom.healthPill.className = 'status-pill';
-      } else {
-        dom.healthPill.innerHTML = `<span class="status-dot" style="background:#ef4444;"></span> Status: ${status}`;
-        dom.healthPill.style.background = 'rgba(239, 68, 68, 0.15)';
-        dom.healthPill.style.color = '#ef4444';
-      }
-    }
-  } catch (err) {
-    if (dom.healthPill) {
-      dom.healthPill.innerHTML = `<span class="status-dot" style="background:#ef4444;"></span> Backend Offline`;
-      dom.healthPill.style.background = 'rgba(239, 68, 68, 0.15)';
-      dom.healthPill.style.color = '#ef4444';
-    }
-  }
-}
-
 // Load Authenticated User Profile
 async function loadCurrentUser() {
   try {
     const { ok, data } = await apiRequest('/api/v1/users/me');
-    if (ok && data.data) {
-      state.user = data.data;
-      renderAuthUI();
-    } else {
-      state.user = null;
-      renderAuthUI();
-    }
+    state.user = ok && data.data ? data.data.user || data.data : null;
   } catch (err) {
     state.user = null;
-    renderAuthUI();
   }
+  renderAuthUI();
 }
+
+const isStaff = user => ['admin', 'manager', 'dev'].includes(user && user.role);
 
 // Render Navigation & Hero depending on Auth State
 function renderAuthUI() {
   if (!dom.navAuthArea) return;
 
   if (state.user) {
-    const roleClass = `role-${state.user.role || 'user'}`;
-    const initial = (state.user.name || 'U').charAt(0).toUpperCase();
+    const name = state.user.name || 'Explorer';
+    const initial = escapeHTML(name.charAt(0).toUpperCase());
 
     dom.navAuthArea.innerHTML = `
-      <div class="user-menu-pill" onclick="openProfileModal()">
-        <div class="user-avatar">${initial}</div>
-        <span class="user-name">${state.user.name || 'User'}</span>
-        <span class="role-badge ${roleClass}">${state.user.role || 'user'}</span>
-      </div>
-      ${['admin', 'manager', 'dev'].includes(state.user.role) ? `
-        <a href="/admin" class="btn btn-outline btn-sm">Admin Console &rarr;</a>
-      ` : ''}
-      <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Logout</button>
+      ${isStaff(state.user) ? '<a href="/admin" class="btn btn-dark btn-sm">Admin</a>' : ''}
+      <button class="user-chip" onclick="openProfileModal()">
+        <span class="avatar av-a">${initial}</span>
+        <span class="user-chip-name">${escapeHTML(name.split(' ')[0])}</span>
+        <span class="tag tag-orange">${escapeHTML(state.user.role || 'user')}</span>
+      </button>
     `;
 
     if (dom.guestHeroSection) dom.guestHeroSection.style.display = 'none';
     if (dom.userHeroSection) {
       dom.userHeroSection.style.display = 'block';
       const welcomeName = document.getElementById('userWelcomeName');
-      if (welcomeName) welcomeName.textContent = state.user.name;
+      if (welcomeName) welcomeName.textContent = name.split(' ')[0];
     }
   } else {
     dom.navAuthArea.innerHTML = `
-      <button class="btn btn-secondary btn-sm" onclick="openModal('loginModal')">Sign In</button>
-      <button class="btn btn-primary btn-sm" onclick="openModal('signupModal')">Create Account</button>
+      <button class="btn btn-dark btn-sm" onclick="openModal('loginModal')">Sign In</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('signupModal')">Get the App</button>
     `;
 
     if (dom.guestHeroSection) dom.guestHeroSection.style.display = 'block';
@@ -155,10 +150,10 @@ async function handleLogin(e) {
   const submitBtn = form.querySelector('button[type="submit"]');
 
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Authenticating...';
+  submitBtn.textContent = 'Signing in...';
 
   try {
-    const { ok, status, data } = await apiRequest('/api/v1/users/login', {
+    const { ok, data } = await apiRequest('/api/v1/users/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
@@ -200,7 +195,7 @@ async function handleSignup(e) {
   submitBtn.textContent = 'Creating account...';
 
   try {
-    const { ok, status, data } = await apiRequest('/api/v1/users/signup', {
+    const { ok, data } = await apiRequest('/api/v1/users/signup', {
       method: 'POST',
       body: JSON.stringify({ name, email, password, confirmPassword })
     });
@@ -209,7 +204,7 @@ async function handleSignup(e) {
       state.token = data.token;
       state.user = data.data;
       localStorage.setItem('plezar_token', data.token);
-      showToast('Account created successfully!', 'success');
+      showToast('Welcome to Plezar! Your account is ready.', 'success');
       closeModal('signupModal');
       renderAuthUI();
       form.reset();
@@ -266,18 +261,21 @@ async function handleForgotPassword(e) {
   }
 }
 
-// Newsletter Subscription Handler
+// Newsletter / download-link subscription handler (source comes from the form's data-source)
 async function handleSubscribe(e) {
   e.preventDefault();
   const form = e.target;
   const emailInput = form.querySelector('input[type="email"]');
+  const submitBtn = form.querySelector('button[type="submit"]');
   const email = emailInput?.value;
   if (!email) return;
+
+  if (submitBtn) submitBtn.disabled = true;
 
   try {
     const { ok, data } = await apiRequest('/api/v1/subscribers', {
       method: 'POST',
-      body: JSON.stringify({ email, source: 'starter_landing' })
+      body: JSON.stringify({ email, source: form.dataset.source || 'landing' })
     });
 
     if (ok) {
@@ -287,106 +285,75 @@ async function handleSubscribe(e) {
       showToast(data.message || 'Subscription failed.', 'error');
     }
   } catch (err) {
-    showToast('Error subscribing to newsletter.', 'error');
-  }
-}
-
-// Interactive API Explorer Runner
-const apiEndpoints = {
-  health: {
-    name: 'Health Check',
-    method: 'GET',
-    url: '/api/v1/health',
-    body: null
-  },
-  me: {
-    name: 'Current User Profile',
-    method: 'GET',
-    url: '/api/v1/users/me',
-    body: null
-  },
-  usersList: {
-    name: 'List Users (Admin)',
-    method: 'GET',
-    url: '/api/v1/users',
-    body: null
-  },
-  subscribe: {
-    name: 'Newsletter Subscribe',
-    method: 'POST',
-    url: '/api/v1/subscribers',
-    body: { email: 'dev@example.com', source: 'api_explorer' }
-  }
-};
-
-async function testEndpoint(key) {
-  const ep = apiEndpoints[key];
-  if (!ep) return;
-
-  // Update tabs active state
-  document.querySelectorAll('.endpoint-tab').forEach(t => t.classList.remove('active'));
-  const activeTab = document.querySelector(`[data-endpoint="${key}"]`);
-  if (activeTab) activeTab.classList.add('active');
-
-  if (dom.apiConsoleOutput) {
-    dom.apiConsoleOutput.textContent = `// Sending ${ep.method} ${ep.url}...\n// Awaiting response...`;
-  }
-  if (dom.apiConsoleStatus) {
-    dom.apiConsoleStatus.textContent = 'Status: Pending';
-    dom.apiConsoleStatus.style.color = '#94a3b8';
-  }
-
-  const startTime = performance.now();
-  try {
-    const opts = { method: ep.method };
-    if (ep.body) opts.body = JSON.stringify(ep.body);
-
-    const { status, ok, data } = await apiRequest(ep.url, opts);
-    const duration = Math.round(performance.now() - startTime);
-
-    if (dom.apiConsoleStatus) {
-      dom.apiConsoleStatus.textContent = `HTTP ${status} (${duration}ms)`;
-      dom.apiConsoleStatus.style.color = ok ? '#10b981' : '#ef4444';
-    }
-
-    if (dom.apiConsoleOutput) {
-      dom.apiConsoleOutput.textContent = JSON.stringify(data, null, 2);
-    }
-  } catch (err) {
-    if (dom.apiConsoleStatus) {
-      dom.apiConsoleStatus.textContent = 'Error: Failed to fetch';
-      dom.apiConsoleStatus.style.color = '#ef4444';
-    }
-    if (dom.apiConsoleOutput) {
-      dom.apiConsoleOutput.textContent = `// Exception caught:\n${err.message}`;
-    }
+    showToast('Error subscribing. Please try again.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
 // Profile Modal Details
 function openProfileModal() {
   if (!state.user) return;
-  const modal = document.getElementById('profileModal');
-  if (!modal) return;
 
-  const nameEl = document.getElementById('profileName');
-  const emailEl = document.getElementById('profileEmail');
-  const roleEl = document.getElementById('profileRole');
-  const createdEl = document.getElementById('profileCreatedAt');
+  const name = state.user.name || 'Explorer';
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
 
-  if (nameEl) nameEl.textContent = state.user.name || 'User';
-  if (emailEl) emailEl.textContent = state.user.email || '';
-  if (roleEl) roleEl.textContent = (state.user.role || 'user').toUpperCase();
-  if (createdEl) createdEl.textContent = state.user.createdAt ? new Date(state.user.createdAt).toLocaleDateString() : 'N/A';
+  set('profileInitial', name.charAt(0).toUpperCase());
+  set('profileName', name);
+  set('profileEmail', state.user.email || '');
+  set('profileRole', (state.user.role || 'user').toUpperCase());
+  set('profileCreatedAt', state.user.createdAt ? new Date(state.user.createdAt).toLocaleDateString() : 'N/A');
+
+  const adminLink = document.getElementById('profileAdminLink');
+  if (adminLink) adminLink.style.display = isStaff(state.user) ? '' : 'none';
 
   openModal('profileModal');
 }
 
-// Initialization on DOMContentLoaded
-window.addEventListener('DOMContentLoaded', () => {
-  checkHealth();
-  loadCurrentUser();
+// Decorative QR-style codes (deterministic pattern with finder squares)
+function renderQRCodes() {
+  const size = 21;
+  const inFinder = (r, c) => {
+    const corners = [[0, 0], [0, size - 7], [size - 7, 0]];
+    return corners.some(([fr, fc]) => r >= fr && r < fr + 7 && c >= fc && c < fc + 7);
+  };
+  const finderOn = (r, c) => {
+    const lr = r % (size - 7) === r ? r : r - (size - 7);
+    const lc = c % (size - 7) === c ? c : c - (size - 7);
+    const edge = lr === 0 || lr === 6 || lc === 0 || lc === 6;
+    const core = lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4;
+    return edge || core;
+  };
 
-  // Run initial health check in explorer
-  testEndpoint('health');
+  document.querySelectorAll('.qr').forEach(el => {
+    let seed = Number(el.dataset.seed) || 1;
+    const rand = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+    const center = Math.floor(size / 2);
+    let cells = '';
+    for (let r = 0; r < size; r += 1) {
+      for (let c = 0; c < size; c += 1) {
+        let cls = '';
+        if (inFinder(r, c)) cls = finderOn(r, c) ? 'on' : '';
+        else if (Math.abs(r - center) <= 1 && Math.abs(c - center) <= 1) cls = 'hot';
+        else cls = rand() > 0.52 ? 'on' : '';
+        cells += `<i class="${cls}"></i>`;
+      }
+    }
+    el.innerHTML = cells;
+  });
+}
+
+// Initialization
+window.addEventListener('DOMContentLoaded', () => {
+  renderQRCodes();
+  const year = document.getElementById('year');
+  if (year) year.textContent = new Date().getFullYear();
+  renderAuthUI();
+  loadCurrentUser();
 });

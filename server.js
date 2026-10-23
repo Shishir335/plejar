@@ -50,8 +50,11 @@ if (isDev) {
   dbLabel = 'plezar [PRODUCTION DATABASE]';
 }
 
-if (process.env.DATABASE_PASSWORD && dbUri.includes('<PASSWORD>')) {
-  dbUri = dbUri.replace('<PASSWORD>', process.env.DATABASE_PASSWORD);
+// Accept both our <PASSWORD> placeholder and Atlas's default <db_password>
+if (process.env.DATABASE_PASSWORD) {
+  dbUri = dbUri
+    .replace('<PASSWORD>', encodeURIComponent(process.env.DATABASE_PASSWORD))
+    .replace('<db_password>', encodeURIComponent(process.env.DATABASE_PASSWORD));
 }
 
 const isPlaceholderUri = !dbUri || dbUri.includes('<USERNAME>') || dbUri.includes('<NEW_CLUSTER_HOST>');
