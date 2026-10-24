@@ -62,6 +62,12 @@
           <span class="sidebar-text">Newsletter Leads</span>
         </button>
 
+        <button class="nav-link-btn" data-tab="agentLeads" onclick="switchTab('agentLeads')">
+          <span>🧭</span>
+          <span class="sidebar-text">Agent Leads</span>
+          <span id="agentLeadsNewCount" class="nav-count" hidden>0</span>
+        </button>
+
         <button class="nav-link-btn" data-tab="system" onclick="switchTab('system')">
           <span>⚙️</span>
           <span class="sidebar-text">System Status</span>
@@ -201,7 +207,44 @@
           </div>
         </section>
 
-        <!-- 3. SYSTEM DIAGNOSTICS TAB -->
+        <!-- 3. AGENT LEADS TAB -->
+        <section id="tab-agentLeads" class="tab-pane">
+          <div class="control-bar">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <h2 style="font-size: 1.1rem; font-weight: 600;">Tour Agent Leads</h2>
+              <select id="agentLeadStatusFilter" class="form-select" style="max-width: 170px;" onchange="renderAgentLeadsTable()">
+                <option value="all">All statuses</option>
+                <option value="new" selected>New</option>
+                <option value="contacted">Contacted</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" onclick="loadAgentLeads()">↻ Refresh</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="admin-table lead-table">
+              <thead>
+                <tr>
+                  <th>Agency &amp; contact</th>
+                  <th>Phone &amp; email</th>
+                  <th>Tours &amp; link</th>
+                  <th>Message</th>
+                  <th>Received</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="agentLeadsTableBody">
+                <!-- Dynamically populated by admin.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 4. SYSTEM DIAGNOSTICS TAB -->
         <section id="tab-system" class="tab-pane">
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
             <div class="stat-card">

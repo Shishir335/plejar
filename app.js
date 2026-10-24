@@ -21,6 +21,7 @@ const cors = require('cors');
 
 const userRouter = require('./routes/userRoutes');
 const subscriberRouter = require('./routes/subscriberRoutes');
+const agentLeadRouter = require('./routes/agentLeadRoutes');
 
 const AppError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
@@ -81,6 +82,15 @@ app.use('/api/v1/users/signup', authLimiter);
 app.use('/api/v1/users/google-login', authLimiter);
 app.use('/api/v1/users/forgotPassword', authLimiter);
 app.use('/api/v1/users/resetPassword', authLimiter);
+
+// PUBLIC FORM RATE LIMITER (10 agent enquiries / hour per IP to limit spam)
+const leadLimiter = rateLimit({
+    max: 10,
+    windowMs: 60 * 60 * 1000,
+    validate: { trustProxy: false },
+    message: { status: 'fail', message: 'Too many submissions from this IP. Please try again in an hour.' }
+});
+app.post('/api/v1/agent-leads', leadLimiter);
 
 // BODY PARSER, READING DATA FROM req.body
 app.use(express.json({ limit: '10mb' }));
@@ -144,6 +154,7 @@ app.get('/reset-password', (req, res) => {
 // API ROUTES
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/subscribers', subscriberRouter);
+app.use('/api/v1/agent-leads', agentLeadRouter);
 
 // 404 UNHANDLED ROUTE CATCHER
 app.all('*', (req, res, next) => {

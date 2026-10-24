@@ -7,8 +7,16 @@ const adminState = {
   token: localStorage.getItem('plezar_token') || null,
   users: [],
   subscribers: [],
+  agentLeads: [],
   filteredUsers: []
 };
+
+// Escape user-submitted text before inserting it as HTML
+function escapeHTML(value) {
+  const div = document.createElement('div');
+  div.textContent = value == null ? '' : String(value);
+  return div.innerHTML;
+}
 
 // Toast helper
 function showAdminToast(msg, type = 'info') {
@@ -59,11 +67,14 @@ async function adminFetch(endpoint, options = {}) {
 async function checkAdminAuth() {
   try {
     const { ok, data } = await adminFetch('/api/v1/users/me');
-    if (ok && data.data && ['admin', 'manager', 'dev'].includes(data.data.role)) {
-      adminState.currentUser = data.data;
+    // /me responds with { data: { user } }
+    const me = data.data && (data.data.user || data.data);
+    if (ok && me && ['admin', 'manager', 'dev'].includes(me.role)) {
+      adminState.currentUser = me;
       showDashboard();
       loadUsers();
       loadSubscribers();
+      loadAgentLeads();
     } else {
       showLogin();
     }
@@ -119,6 +130,7 @@ async function handleAdminLogin(e) {
       showDashboard();
       loadUsers();
       loadSubscribers();
+      loadAgentLeads();
     } else {
       showAdminToast(data.message || 'Login failed.', 'error');
     }
@@ -444,6 +456,132 @@ async function handleDeleteSubscriber(subId) {
 // Export CSV
 function exportSubscribersCSV() {
   window.open('/api/v1/subscribers/export', '_blank');
+}
+
+// Agent Leads
+const LEAD_BADGES = { new: 'badge-manager', contacted: 'badge-active', archived: 'badge-inactive' };
+
+function agentLeadsMessage(text, color = 'var(--text-dim)') {
+  const tbody = document.getElementById('agentLeadsTableBody');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: ${color};">${escapeHTML(text)}</td></tr>`;
+}
+
+async function loadAgentLeads() {
+  agentLeadsMessage('Loading agent leads...');
+
+  try {
+    const { ok, data } = await adminFetch('/api/v1/agent-leads');
+    if (ok && Array.isArray(data.data?.leads)) {
+      adminState.agentLeads = data.data.leads;
+      updateAgentLeadsCount();
+      renderAgentLeadsTable();
+    } else {
+      agentLeadsMessage(data.message || 'Could not load agent leads.', 'var(--color-danger)');
+    }
+  } catch (err) {
+    agentLeadsMessage('Failed to load agent leads.', 'var(--color-danger)');
+  }
+}
+
+function updateAgentLeadsCount() {
+  const badge = document.getElementById('agentLeadsNewCount');
+  if (!badge) return;
+  const count = adminState.agentLeads.filter(l => l.status === 'new').length;
+  badge.textContent = count;
+  badge.hidden = count === 0;
+}
+
+// Only link websites that are plain http(s) URLs or bare domains
+function leadLink(website) {
+  if (!website) return '';
+  const url = /^https?:\/\//i.test(website) ? website : `https://${website}`;
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return escapeHTML(website);
+    return `<a href="${escapeHTML(parsed.href)}" target="_blank" rel="noopener noreferrer">${escapeHTML(website)}</a>`;
+  } catch (e) {
+    return escapeHTML(website);
+  }
+}
+
+function renderAgentLeadsTable() {
+  const tbody = document.getElementById('agentLeadsTableBody');
+  if (!tbody) return;
+
+  const filter = document.getElementById('agentLeadStatusFilter')?.value || 'all';
+  const leads = filter === 'all'
+    ? adminState.agentLeads
+    : adminState.agentLeads.filter(l => l.status === filter);
+
+  if (leads.length === 0) {
+    agentLeadsMessage(filter === 'all'
+      ? 'No agent leads yet. They appear here when agents send the form on the website.'
+      : `No ${filter} leads.`);
+    return;
+  }
+
+  tbody.innerHTML = leads.map(lead => {
+    const id = escapeHTML(lead._id);
+    const date = lead.createdAt ? new Date(lead.createdAt).toLocaleString() : 'N/A';
+    const status = LEAD_BADGES[lead.status] ? lead.status : 'new';
+    const actions = [];
+    if (status !== 'contacted') actions.push(`<button class="btn btn-primary btn-sm" onclick="setAgentLeadStatus('${id}', 'contacted')">Mark contacted</button>`);
+    if (status !== 'new') actions.push(`<button class="btn btn-secondary btn-sm" onclick="setAgentLeadStatus('${id}', 'new')">Mark new</button>`);
+    if (status !== 'archived') actions.push(`<button class="btn btn-secondary btn-sm" onclick="setAgentLeadStatus('${id}', 'archived')">Archive</button>`);
+    actions.push(`<button class="btn btn-danger btn-sm" onclick="deleteAgentLead('${id}')">Delete</button>`);
+
+    return `
+      <tr>
+        <td><span class="lead-main">${escapeHTML(lead.agencyName)}</span><span class="lead-sub">${escapeHTML(lead.contactName)}</span></td>
+        <td><a class="lead-main" href="tel:${escapeHTML(lead.phone)}">${escapeHTML(lead.phone)}</a><span class="lead-sub"><a href="mailto:${escapeHTML(lead.email)}">${escapeHTML(lead.email)}</a></span></td>
+        <td><span class="lead-sub" style="margin-top:0">${escapeHTML(lead.regions) || '—'}</span><span class="lead-sub">${leadLink(lead.website)}</span></td>
+        <td><div class="lead-message">${escapeHTML(lead.message) || '—'}</div></td>
+        <td style="color: var(--text-muted); white-space: nowrap;">${escapeHTML(date)}</td>
+        <td><span class="badge ${LEAD_BADGES[status]}">${status}</span></td>
+        <td><div class="lead-actions">${actions.join('')}</div></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function setAgentLeadStatus(leadId, status) {
+  try {
+    const { ok, data } = await adminFetch(`/api/v1/agent-leads/${leadId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+    if (ok) {
+      const lead = adminState.agentLeads.find(l => l._id === leadId);
+      if (lead) lead.status = status;
+      updateAgentLeadsCount();
+      renderAgentLeadsTable();
+      showAdminToast(`Lead marked as ${status}.`, 'success');
+    } else {
+      showAdminToast(data.message || 'Could not update the lead.', 'error');
+    }
+  } catch (e) {
+    showAdminToast('Could not update the lead.', 'error');
+  }
+}
+
+async function deleteAgentLead(leadId) {
+  const lead = adminState.agentLeads.find(l => l._id === leadId);
+  const name = lead ? lead.agencyName : 'this lead';
+  if (!confirm(`Delete ${name}? This can't be undone.`)) return;
+
+  try {
+    const { ok, status, data } = await adminFetch(`/api/v1/agent-leads/${leadId}`, { method: 'DELETE' });
+    if (ok || status === 204) {
+      adminState.agentLeads = adminState.agentLeads.filter(l => l._id !== leadId);
+      updateAgentLeadsCount();
+      renderAgentLeadsTable();
+      showAdminToast(`Deleted ${name}.`, 'info');
+    } else {
+      showAdminToast(data.message || 'Could not delete the lead.', 'error');
+    }
+  } catch (e) {
+    showAdminToast('Could not delete the lead.', 'error');
+  }
 }
 
 // Init

@@ -459,3 +459,21 @@ body {
   .admin-main { margin-left: 70px; }
   .admin-topbar, .admin-content { padding: 16px; }
 }
+
+/* Agent leads */
+.nav-count {
+  margin-left: auto; min-width: 20px; padding: 1px 7px; border-radius: 999px;
+  background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-size: 0.72rem; font-weight: 700; text-align: center;
+}
+.lead-table td { vertical-align: top; }
+.lead-main { font-weight: 600; }
+.lead-sub { display: block; color: var(--text-muted); font-size: 0.82rem; margin-top: 2px; word-break: break-word; }
+.lead-sub a { color: inherit; }
+.lead-message { max-width: 280px; color: var(--text-muted); font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
+.lead-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.lead-table a { color: var(--text-main); text-decoration: none; }
+.lead-table a:hover { text-decoration: underline; }
+.lead-table .lead-sub a { color: var(--text-muted); }
+.lead-table td:nth-child(2) { white-space: nowrap; }
+.lead-table td:nth-child(3) { min-width: 180px; }
+.lead-table td:nth-child(7) { min-width: 130px; }

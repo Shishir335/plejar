@@ -3,69 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plezar — Where Explorers Meet Their Local Curators</title>
-  <meta name="description" content="Plezar is a travel social network and marketplace where spontaneous travelers post trip bounties, discover secret spots, and plan custom adventures with certified local guides.">
+  <title>Plezar — Bangladesh, shared by the people who travel it</title>
+  <meta name="description" content="Plezar is a social app for travel in Bangladesh. Travelers share their trips, local tour agents show their work, and everyone plans from real photos and honest reviews.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Tiro+Bangla&display=swap">
   <link rel="stylesheet" href="/css/landing.css">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
 </head>
 <body>
 
-  <!-- Icon sprite -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
-      <symbol id="i-logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="currentColor"/><path d="M8 17V7h4.6a3.3 3.3 0 0 1 0 6.6H10.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
-      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
-      <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></symbol>
-      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
-      <symbol id="i-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.7 1 2.7-2.4 1.8-.9 2.9-3-.2L12 21l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.7-1-2.7 2.4-1.8.9-2.9 3 .2z"/><path d="m9 12 2 2 4-4"/></symbol>
-      <symbol id="i-plane" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16.5 22 9.5l-3-2-7 2.5-5-3.5-2 .8 3.5 4.2L4 13l-1.5-1-1 .6 2.5 3.4z"/><path d="M3 21h18"/></symbol>
-      <symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16l-1.5-5h-13zM5 9v11h14V9M9 20v-6h6v6"/></symbol>
-      <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></symbol>
-      <symbol id="i-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></symbol>
-      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
-      <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
-      <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></symbol>
-      <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></symbol>
-      <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9s-2-.9-3.4-.9C5.9 6.8 4.2 7.8 3.3 9.4c-1.9 3.3-.5 8.1 1.3 10.8.9 1.3 1.9 2.7 3.3 2.7 1.3-.1 1.8-.9 3.4-.9s2 .9 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.9-1.1-2.9-4.6zM13.8 4.9c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/></symbol>
-      <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M4.6 2.4c-.3.3-.4.7-.4 1.2v16.8c0 .5.1.9.4 1.2l9.4-9.6zm10.4 8.6 2.9-3L6.2 1.4c-.4-.2-.8-.2-1.1-.1zm0 2-9.9 9.7c.3.1.7.1 1.1-.1l11.7-6.6zm4.3-4.2-3.3 3.2 3.3 3.2 2.3-1.3c1.1-.6 1.1-1.6 0-2.3z"/></symbol>
-      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-verified" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.8 14.6 4l3.4-.3.9 3.3 3 1.7-1.3 3.2 1.3 3.2-3 1.7-.9 3.3-3.4-.3L12 22.2 9.4 20l-3.4.3-.9-3.3-3-1.7L3.4 12 2.1 8.8l3-1.7.9-3.3 3.4.3z"/><path d="m8 12.2 2.7 2.7L16 9.6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/></symbol>
+      <symbol id="i-comment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-11.7 7.1L4 20l1-4.1A8 8 0 1 1 20 12z"/></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6.5 3.5h11v17L12 16.5l-5.5 4z"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-6.5-6-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 15 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.3"/></symbol>
       <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
-      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
-      <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
     </defs>
   </svg>
 
-  <!-- Navigation -->
-  <header class="nav" id="top">
-    <div class="container nav-inner">
-      <a href="/" class="brand" aria-label="Plezar home">
-        <svg class="brand-mark"><use href="#i-logo"/></svg>
-        <span>Plezar</span>
-      </a>
+  <a class="skip" href="#what">Skip to content</a>
 
-      <nav class="nav-links" id="navLinks">
+  <header class="nav" id="nav">
+    <div class="wrap nav-inner">
+      <a href="/" class="logo" aria-label="Plezar home">plezar<span class="logo-dot"></span></a>
+      <nav class="nav-links" id="navLinks" aria-label="Main">
+        <a href="#what">The app</a>
         <a href="#features">Features</a>
-        <a href="#travelers">For Travelers</a>
-        <a href="#agents">For Agents</a>
-        <a href="#community">Community</a>
-        <a href="#download">App Download</a>
+        <a href="#places">Places</a>
+        <a href="#travelers">For travelers</a>
+        <a href="#agents">For agents</a>
       </nav>
-
-      <div class="nav-actions">
-        <a href="#features" class="btn btn-ghost-green btn-sm hide-sm"><svg class="ic"><use href="#i-map"/></svg> Explore Map</a>
-        <div id="navAuthArea" class="nav-auth">
-          <!-- Populated by app.js -->
-        </div>
-        <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" onclick="toggleNav(this)">
-          <svg class="ic"><use href="#i-menu"/></svg>
-        </button>
-      </div>
+      <a href="#updates" class="btn btn-light nav-cta">Get updates</a>
+      <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks" onclick="toggleNav(this)">
+        <svg><use href="#i-menu"/></svg>
+      </button>
     </div>
   </header>
 
@@ -73,418 +48,303 @@
 
     <!-- Hero -->
     <section class="hero">
-      <div class="container hero-grid">
-        <div class="hero-copy">
-          <!-- Guest hero -->
-          <div id="guestHeroSection">
-            <span class="eyebrow"><span class="pulse"></span> The next-gen travel social network &amp; marketplace</span>
-            <h1 class="hero-title">Where Explorers Meet Their <span class="grad">Local Curators</span></h1>
-            <p class="hero-text">
-              Step into a gamified travel playground where spontaneous travelers post real-time trip bounties, discover secret coordinates, and plan custom adventures with certified destination architects worldwide.
-            </p>
-            <div class="hero-cta">
-              <button class="btn btn-primary" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-download"/></svg> Download App &amp; Play</button>
-              <a href="#features" class="btn btn-dark">Explore Playground <svg class="ic"><use href="#i-arrow"/></svg></a>
-            </div>
-          </div>
+      <img class="hero-img" src="/img/places/jaflong-tea-garden.jpg" alt="Tea pickers working on a hillside garden at Jaflong, Sylhet, with misty hills behind" fetchpriority="high">
+      <div class="hero-shade"></div>
+      <div class="wrap hero-inner">
+        <h1 class="hero-title">Bangladesh, shared by the people who travel it.</h1>
+        <p class="hero-text">Plezar is a social app for travel in Bangladesh. Travelers share their trips, local tour agents show their work, and everyone plans the next one from real photos and honest reviews.</p>
+        <div class="hero-actions">
+          <a href="#what" class="btn btn-light">See what the app does</a>
+          <a href="#updates" class="btn btn-ghost">Follow the project</a>
+        </div>
+      </div>
+      <p class="hero-place"><span class="bn">জাফলং, সিলেট</span><span>Tea garden at Jaflong, Sylhet</span></p>
+    </section>
 
-          <!-- Signed-in hero -->
-          <div id="userHeroSection" style="display: none;">
-            <span class="eyebrow"><span class="pulse"></span> Welcome back, explorer</span>
-            <h1 class="hero-title">Ready for your next drop, <span class="grad" id="userWelcomeName">Explorer</span>?</h1>
-            <p class="hero-text">
-              Your session is active. Post a new trip bounty, check pitches from local curators, or review your profile and badges.
-            </p>
-            <div class="hero-cta">
-              <a href="#features" class="btn btn-primary">Post a Trip Bounty <svg class="ic"><use href="#i-arrow"/></svg></a>
-              <button class="btn btn-dark" onclick="openProfileModal()">View Profile</button>
-            </div>
-          </div>
-
-          <dl class="hero-stats">
-            <div><dt>50k</dt><dd>Active Explorers</dd></div>
-            <div><dt class="t-orange">1,200</dt><dd>Verified Guides</dd></div>
-            <div><dt>45</dt><dd>Countries</dd></div>
+    <!-- What it is -->
+    <section class="what" id="what">
+      <div class="wrap what-inner">
+        <div class="what-copy">
+          <h2 class="h2">One place for every trip worth taking in Bangladesh</h2>
+          <p class="lead">Today, trip ideas are scattered across Facebook groups, YouTube vlogs and friends' photo albums. Tour agents post in a hundred groups and hope someone notices. Plezar brings both together in one feed.</p>
+          <dl class="facts">
+            <div><dt>For travelers</dt><dd>Discover places through real trips, follow agents you like, and keep a plan for where you want to go next.</dd></div>
+            <div><dt>For tour agents</dt><dd>Build a profile with your past trips, photos and reviews, so people can see who you are before they call.</dd></div>
           </dl>
         </div>
 
-        <!-- Phone mockup -->
-        <div class="hero-visual">
-          <div class="phone">
-            <div class="phone-top">
-              <span class="phone-pill">Live Dispatch Feed</span>
-            </div>
-
-            <div class="feed-card">
-              <div class="feed-head">
-                <span class="avatar av-a">S</span>
-                <div class="feed-meta">
-                  <strong>Sarah K. <span class="tag tag-orange">Solo Explorer</span></strong>
-                  <small>Ubud, Bali</small>
-                </div>
-                <small class="muted">3 min ago</small>
-              </div>
-              <p class="feed-quote">"Looking for an uncrowded sunset cliff with a tidal cave entrance before 6 PM today! Any certified locals free?"</p>
-            </div>
-
-            <div class="feed-card feed-card-reply">
-              <div class="feed-head">
-                <span class="avatar av-b">W</span>
-                <div class="feed-meta">
-                  <strong>Wayan Sudita <span class="tag tag-green">Verified Guide</span></strong>
-                  <small><svg class="ic ic-xs t-orange"><use href="#i-star"/></svg> 4.98 (314 tours)</small>
-                </div>
-              </div>
-              <p class="feed-text">"Hey Sarah! Suluban secret cove has open tidal access until 5:40 PM. I have a custom itinerary pinned with route safety &amp; scooter park coordinates ready."</p>
-              <div class="offer">
-                <span class="offer-icon"><svg class="ic"><use href="#i-compass"/></svg></span>
-                <div>
-                  <strong>Hidden Grotto Sunset &amp; Cave Walk</strong>
-                  <small>Private · 2.5h · Escrow · Scooter route</small>
-                </div>
-                <span class="offer-price">$38</span>
-              </div>
-              <button class="offer-cta" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-check"/></svg> 1-Click Escrow Booking ($38 USD)</button>
-            </div>
-
-            <div class="phone-foot">
-              <span><svg class="ic ic-xs"><use href="#i-lock"/></svg> End-to-End Escrow Protection</span>
-              <span>Avg response: 2.4 min</span>
-            </div>
+        <div class="phone" aria-label="The Plezar app feed">
+          <div class="phone-screen">
+            <div class="app-bar"><span class="logo logo-sm">plezar<span class="logo-dot"></span></span><span class="app-tabs"><b>Following</b><span>Nearby</span></span></div>
+            <article class="app-post">
+              <header><span class="avatar" style="--hue: 152">PT</span><div><strong>Pahari Trails <svg class="v"><use href="#i-verified"/></svg></strong><small><svg class="pin"><use href="#i-pin"/></svg> Sajek Valley</small></div></header>
+              <img src="/img/places/sajek-sunrise.jpg" alt="Sunrise over cloud-filled valleys at Sajek" loading="lazy">
+              <div class="app-actions"><svg><use href="#i-heart"/></svg><svg><use href="#i-comment"/></svg><svg class="push"><use href="#i-save"/></svg></div>
+              <p><b>1,204 likes</b> Clouds rolled into the valley at 5:40 this morning. Our group of 18 watched it from Konglak Para.</p>
+            </article>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- App download card -->
-    <section class="container section-tight" id="download">
-      <div class="download-card">
-        <div class="qr-frame">
-          <div class="qr" data-seed="7"></div>
-          <div class="qr-copy">
-            <span class="eyebrow-sm t-orange"><svg class="ic ic-xs"><use href="#i-bolt"/></svg> Instant Pair</span>
-            <strong>Scan to Launch</strong>
-            <small>Point your phone camera to jump straight into the App Store or Google Play.</small>
-          </div>
-        </div>
-
-        <div class="download-copy">
-          <div class="rating-row">
-            <span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span>
-            <span><strong>4.9 / 5.0</strong> (18,400+ reviews)</span>
-            <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-shield"/></svg> Stripe Escrow Verified</span>
-          </div>
-          <h2 class="h2">Carry the World's Local Knowledge in Your Pocket</h2>
-          <p class="muted">Available worldwide in 24 languages. Connect in real time with certified local guides or monetize your hometown expertise.</p>
-          <div class="store-row">
-            <a href="#download" class="store-btn"><svg class="ic"><use href="#i-apple"/></svg><span><small>Available on the</small>App Store</span></a>
-            <a href="#download" class="store-btn"><svg class="ic"><use href="#i-play"/></svg><span><small>Get it on</small>Google Play</span></a>
-          </div>
-          <form class="inline-form" onsubmit="handleSubscribe(event)" data-source="app_link">
-            <svg class="ic muted"><use href="#i-phone"/></svg>
-            <input type="email" placeholder="Enter your email for a download link" required aria-label="Email address">
-            <button type="submit" class="btn btn-primary btn-sm">Send Magic Link</button>
-          </form>
-        </div>
-      </div>
-    </section>
-
-    <!-- Two sides -->
-    <section class="container section" id="travelers">
-      <div class="section-head center">
-        <span class="pill">Dual Advantage Ecosystem</span>
-        <h2 class="h2">Two Sides of the Same Playground</h2>
-        <p class="muted">Whether you are crossing oceans with a backpack or leading boutique expeditions in your home city, Plezar eliminates intermediaries.</p>
-      </div>
-
-      <div class="duo">
-        <article class="duo-card duo-green">
-          <div class="duo-top">
-            <span class="duo-icon"><svg class="ic"><use href="#i-plane"/></svg></span>
-            <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-check"/></svg> For Adventurers &amp; Nomads</span>
-          </div>
-          <h3 class="h3">Explore Without the Hassle</h3>
-          <p class="muted">Eliminate cookie-cutter tour buses. Post your travel dreams and get curated bids from local curators who know every rooftop, reef, and hidden kitchen.</p>
-          <ul class="checklist">
-            <li><strong>Post Trip Bounties &amp; Receive Pitches</strong><span>Request specific itineraries, dietary needs, or adventure thresholds; guides reply with tailored plans.</span></li>
-            <li><strong>0% Hidden Tourist Markups</strong><span>Transparent wholesale pricing directly from licensed independent operators without 30% aggregator bloat.</span></li>
-            <li><strong>100% Escrow Protection</strong><span>Funds are held securely and released only after your experience is completed to full satisfaction.</span></li>
-            <li><strong>Direct Voice &amp; Video Messaging</strong><span>Coordinate pickup spots, dietary adjustments, and schedule updates in real time.</span></li>
-          </ul>
-          <button class="btn btn-block btn-dark" onclick="openModal('signupModal')">Start Exploring Trips <svg class="ic"><use href="#i-arrow"/></svg></button>
-        </article>
-
-        <article class="duo-card duo-orange" id="agents">
-          <div class="duo-top">
-            <span class="duo-icon"><svg class="ic"><use href="#i-store"/></svg></span>
-            <span class="tag tag-orange"><svg class="ic ic-xs"><use href="#i-check"/></svg> For Certified Operators &amp; Guides</span>
-          </div>
-          <h3 class="h3">Monetize Your Local Passion</h3>
-          <p class="muted">Stop fighting SEO algorithms. Plezar brings ready-to-book global travelers straight to your inbox with zero listing fees.</p>
-          <ul class="checklist">
-            <li><strong>Inbound High-Intent Global Nomads</strong><span>Receive pre-qualified traveler inquiries matching your exact destination coverage and niche expertise.</span></li>
-            <li><strong>Verified Identity Badge &amp; Global Trust</strong><span>Showcase regional tourism licensing, safety certifications, and audited 5-star traveler reviews.</span></li>
-            <li><strong>Built-in Invoicing &amp; Multi-Currency Payouts</strong><span>Accept USD, EUR, JPY, and GBP with instant bank transfers directly into your local account.</span></li>
-            <li><strong>Smart Schedule &amp; Capacity Management</strong><span>Sync with Google Calendar and manage private, small-group, and VIP departures with one dashboard.</span></li>
-          </ul>
-          <button class="btn btn-block btn-primary" onclick="openModal('signupModal')">Apply as Certified Operator <svg class="ic"><use href="#i-arrow"/></svg></button>
-        </article>
       </div>
     </section>
 
     <!-- Features -->
-    <section class="container section" id="features">
-      <div class="split-head">
-        <div>
-          <span class="eyebrow-sm t-green">Engineered for Freedom</span>
-          <h2 class="h2">Crafted for Spontaneous Wandering</h2>
-        </div>
-        <p class="muted">Designed from the ground up to replace static PDFs and opaque agency phone calls with fluid, real-time social dynamics.</p>
-      </div>
+    <section class="features" id="features">
+      <div class="wrap">
+        <h2 class="h2 features-title">What you can do in Plezar</h2>
 
-      <div class="feature-grid">
-        <article class="feature-card">
-          <div class="mock">
-            <div class="mock-bar"><span class="tag tag-green"><span class="dot"></span> Active Encrypted Channel</span><svg class="ic ic-xs muted"><use href="#i-mic"/></svg></div>
-            <div class="mock-bubble">"Dropping audio notes for the morning sunrise ascent..."</div>
-            <div class="mock-right"><span class="tag tag-solid-orange"><svg class="ic ic-xs"><use href="#i-mic"/></svg> Voice Memo (0:24)</span></div>
+        <article class="feature">
+          <div class="feature-copy">
+            <h3>Share trips in a travel feed</h3>
+            <p>Post photos, videos and short notes from wherever you are. Every post is tagged with a place, so the feed doubles as a living map of Bangladesh: what Ratargul looks like this week, how high the water is at the haor, whether the Sajek road is open.</p>
+            <ul class="ticks">
+              <li>Follow travelers and agents whose trips you like</li>
+              <li>Like, comment and save posts for later</li>
+              <li>Browse by place, season or type of trip</li>
+            </ul>
           </div>
-          <h3 class="h4"><span class="feat-icon t-orange"><svg class="ic"><use href="#i-chat"/></svg></span> Direct Tourist ↔ Agent Chat</h3>
-          <p class="muted sm">Send high-definition voice memos, pin live waypoints on shared offline maps, and finalize bookings with escrow locks without leaving the conversation.</p>
-          <a href="#download" class="link-orange">Voice memos &amp; live map sync <svg class="ic ic-xs"><use href="#i-arrow"/></svg></a>
+          <figure class="feature-shot shot-photo">
+            <img src="/img/places/ratargul-boat.jpg" alt="A wooden boat moving through the flooded green trees of Ratargul swamp forest" loading="lazy">
+            <figcaption class="overlay-post">
+              <span class="avatar" style="--hue: 340">NR</span>
+              <span><strong>Nusrat Rahman</strong> is at <strong>Ratargul Swamp Forest</strong><small>Water is high and clear right now. Go before August.</small></span>
+            </figcaption>
+          </figure>
         </article>
 
-        <article class="feature-card">
-          <div class="mock">
-            <div class="mock-bar"><span class="tag tag-orange">Trending Challenge</span><small class="muted">+120 PlezarCoins</small></div>
-            <div class="mock-task">
-              <span class="mock-task-icon"><svg class="ic"><use href="#i-map"/></svg></span>
-              <div><strong>Find Old Town Blue Door</strong><small>12 explorers checked in today</small></div>
-              <svg class="ic t-green"><use href="#i-check"/></svg>
-            </div>
+        <article class="feature feature-flip">
+          <div class="feature-copy">
+            <h3>Check the agent before you call</h3>
+            <p>Every tour agent gets a profile with the trips they have run, photos from those trips and reviews from travelers who went. Agents who show a trade license and national ID get a verified mark.</p>
+            <ul class="ticks">
+              <li>See an agent's past trips, not just their ads</li>
+              <li>Read reviews from people who travelled with them</li>
+              <li>Message the agent directly from their profile</li>
+            </ul>
           </div>
-          <h3 class="h4"><span class="feat-icon t-green"><svg class="ic"><use href="#i-compass"/></svg></span> Interactive Travel Playground</h3>
-          <p class="muted sm">Unlock secret viewpoints, collect localized passport badges, vote on community-verified hidden culinary gems, and participate in location-based photo challenges.</p>
-          <a href="#community" class="link-green">Earn PlezarXP on every trip <svg class="ic ic-xs"><use href="#i-arrow"/></svg></a>
+          <figure class="feature-shot shot-profile">
+            <img class="profile-cover" src="/img/places/tanguar-haor-houseboat.jpg" alt="A wooden houseboat on the open water of Tanguar Haor under a blue sky" loading="lazy">
+            <div class="profile-body">
+              <span class="avatar avatar-lg" style="--hue: 200">HH</span>
+              <div class="profile-name"><strong>Haor Houseboat Co. <svg class="v"><use href="#i-verified"/></svg></strong><small>Houseboat trips on Tanguar Haor since 2019</small></div>
+              <dl class="profile-stats">
+                <div><dt>9.6k</dt><dd>followers</dd></div>
+                <div><dt>142</dt><dd>trips shared</dd></div>
+                <div><dt>4.8</dt><dd>from 380 reviews</dd></div>
+              </dl>
+              <blockquote class="profile-review">"Cleaner than the photos, life jackets for everyone, and the cook made fresh fish every meal." <cite>Nusrat, travelled in March</cite></blockquote>
+            </div>
+          </figure>
         </article>
 
-        <article class="feature-card">
-          <div class="mock">
-            <div class="mock-bar"><span class="muted xs"><svg class="ic ic-xs"><use href="#i-filter"/></svg> Smart Filter Match</span></div>
-            <div class="chips">
-              <span class="chip chip-orange">Alpine Climber</span>
-              <span class="chip">Italian &amp; English</span>
-              <span class="chip">Gluten-Free Specialist</span>
-              <span class="chip">Certified Skipper</span>
-            </div>
+        <article class="feature">
+          <div class="feature-copy">
+            <h3>Guides for every place</h3>
+            <p>Each destination has its own page, built from what travelers post: the best months to go, how to get there from Dhaka, what to pack, and the latest photos. Nafakhum in the dry season is a different trip from Nafakhum in the monsoon, and the page shows both.</p>
+            <ul class="ticks">
+              <li>Best season and current conditions</li>
+              <li>Routes and travel time from Dhaka</li>
+              <li>Agents who run trips there</li>
+            </ul>
           </div>
-          <h3 class="h4"><span class="feat-icon t-orange"><svg class="ic"><use href="#i-badge"/></svg></span> Verified Agent Directory</h3>
-          <p class="muted sm">Filter certified operators by native dialect, specialized certifications (scuba divemaster, culinary chef, alpine guide), or instant departure availability.</p>
-          <a href="#agents" class="link-orange">Search 1,200+ certified guides <svg class="ic ic-xs"><use href="#i-arrow"/></svg></a>
+          <figure class="feature-shot shot-guide">
+            <img src="/img/places/nafakhum-falls.jpg" alt="Nafakhum waterfall pouring over a wide rock ledge in Bandarban" loading="lazy">
+            <figcaption class="guide-card">
+              <span class="bn">নাফাখুম</span>
+              <strong>Nafakhum Falls, Bandarban</strong>
+              <dl>
+                <div><dt>Best time</dt><dd>October to February</dd></div>
+                <div><dt>From Dhaka</dt><dd>Bus to Bandarban, then Thanchi and a boat up the Sangu</dd></div>
+                <div><dt>Recent posts</dt><dd>312 this month</dd></div>
+              </dl>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article class="feature feature-flip">
+          <div class="feature-copy">
+            <h3>Plan trips with friends</h3>
+            <p>Save places and posts into a trip plan, arrange them day by day, and share the plan with the people you are going with. Everyone can add ideas, so the group chat doesn't have to hold the whole plan.</p>
+            <ul class="ticks">
+              <li>Collect saved places into one plan</li>
+              <li>Organise it by day</li>
+              <li>Share and edit it together</li>
+            </ul>
+          </div>
+          <figure class="feature-shot shot-plan">
+            <img src="/img/places/sreemangal-tea-garden.jpg" alt="Rows of green tea bushes under shade trees in a Sreemangal tea garden" loading="lazy">
+            <div class="plan-card">
+              <div class="plan-head"><strong>Sylhet with the cousins</strong><span class="faces"><span class="avatar" style="--hue: 30">R</span><span class="avatar" style="--hue: 152">S</span><span class="avatar" style="--hue: 260">T</span></span></div>
+              <ol>
+                <li><span>Day 1</span>Sreemangal tea gardens, seven-layer tea at Nilkantha</li>
+                <li><span>Day 2</span>Lawachara forest walk, then Ratargul by boat</li>
+                <li><span>Day 3</span>Jaflong and the Piyain river</li>
+              </ol>
+            </div>
+          </figure>
         </article>
       </div>
     </section>
 
-    <!-- Testimonials -->
-    <section class="container section" id="community">
-      <div class="section-head center">
-        <span class="eyebrow-sm t-orange">Unfiltered Community Stories</span>
-        <h2 class="h2">Real Travelers. Real Guides<span class="t-orange">.</span></h2>
+    <!-- Places gallery -->
+    <section class="places" id="places">
+      <div class="wrap">
+        <div class="places-head">
+          <h2 class="h2">Places people share most</h2>
+          <p>From the longest sea beach in the world to the largest mangrove forest, Bangladesh fits a lot of country into a weekend trip.</p>
+        </div>
+        <ul class="gallery">
+          <li class="g-cox">
+            <img src="/img/places/coxs-bazar-sunset.jpg" alt="People walking on wet sand at Cox's Bazar beach at sunset" loading="lazy">
+            <span class="g-label"><span class="bn">কক্সবাজার</span>Cox's Bazar</span>
+          </li>
+          <li class="g-sund">
+            <img src="/img/places/sundarbans-canal.jpg" alt="A calm canal lined with dense mangrove trees in the Sundarbans" loading="lazy">
+            <span class="g-label"><span class="bn">সুন্দরবন</span>Sundarbans</span>
+          </li>
+          <li class="g-sajek">
+            <img src="/img/places/sajek-sunrise.jpg" alt="Sunrise over cloud-filled valleys at Sajek" loading="lazy">
+            <span class="g-label"><span class="bn">সাজেক</span>Sajek Valley</span>
+          </li>
+          <li class="g-stm">
+            <img src="/img/places/saint-martins-island.jpg" alt="Pink flowers and coconut palms on the shore of Saint Martin's Island" loading="lazy">
+            <span class="g-label"><span class="bn">সেন্টমার্টিন</span>Saint Martin's Island</span>
+          </li>
+          <li class="g-haor">
+            <img src="/img/places/tanguar-haor-boat.jpg" alt="People crossing Tanguar Haor in a small boat past a half-submerged tree" loading="lazy">
+            <span class="g-label"><span class="bn">টাঙ্গুয়ার হাওর</span>Tanguar Haor</span>
+          </li>
+        </ul>
       </div>
-
-      <div class="quote-grid">
-        <figure class="quote-card">
-          <div class="quote-top"><span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span><span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-check"/></svg> Verified Trip</span></div>
-          <blockquote>"I posted a bounty looking for a traditional tea master in Uji who could host a quiet tea ceremony with zero other tourists. Within 45 minutes, Kenji connected with an authentic 5th generation artisan. Absolutely transformed our trip to Japan."</blockquote>
-          <figcaption><span class="avatar av-c">M</span><div><strong>Mateo Rossi</strong><small>Traveled to Kyoto, Japan</small></div></figcaption>
-        </figure>
-
-        <figure class="quote-card">
-          <div class="quote-top"><span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span><span class="tag tag-orange">Certified Guide</span></div>
-          <blockquote>"As an independent sailing skipper in the Greek islands, I used to give up 35% commission to big booking sites. Plezar lets me chat directly with sailors, quote customized sea routes, and receive payment safely through escrow."</blockquote>
-          <figcaption><span class="avatar av-d">E</span><div><strong>Elena Vasquez</strong><small>Skipper · Cyclades, Greece</small></div></figcaption>
-        </figure>
-
-        <figure class="quote-card">
-          <div class="quote-top"><span class="stars"><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg><svg class="ic ic-xs"><use href="#i-star"/></svg></span><span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-check"/></svg> Verified Trip</span></div>
-          <blockquote>"We were traveling with two toddlers in the Canadian Rockies and felt overwhelmed by trail logistics. Liam built us an interactive daily trail schedule adapted for stroller access and weather alerts. Invaluable peace of mind!"</blockquote>
-          <figcaption><span class="avatar av-e">M</span><div><strong>Marcus &amp; Chloe Vance</strong><small>Family Explorers · Alberta, Canada</small></div></figcaption>
-        </figure>
-      </div>
-
-      <dl class="metric-row">
-        <div><dt class="t-green">98.4%</dt><dd>5-Star Satisfaction</dd></div>
-        <div><dt>100%</dt><dd>Identity Audited</dd></div>
-        <div><dt class="t-orange">$0</dt><dd>Hidden Agency Fees</dd></div>
-        <div><dt>&lt; 5 min</dt><dd>Average Guide Match</dd></div>
-      </dl>
     </section>
 
-    <!-- Final CTA -->
-    <section class="container section-tight">
-      <div class="cta-band">
-        <div class="cta-copy">
-          <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-bolt"/></svg> Instant Access Today</span>
-          <h2 class="h1">Ready to Play &amp; Roam?</h2>
-          <p class="muted">Your next unforgettable adventure starts with a single tap. Join 50,000+ wanderers and discover the world through the eyes of certified locals.</p>
-          <div class="hero-cta">
-            <button class="btn btn-primary" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-download"/></svg> Get the App Now</button>
-            <button class="btn btn-ghost-green" onclick="openModal('signupModal')"><svg class="ic"><use href="#i-badge"/></svg> Become a Certified Guide</button>
+    <!-- For travelers -->
+    <section class="travelers" id="travelers">
+      <div class="wrap">
+        <div class="travelers-head">
+          <h2 class="h2">For travelers</h2>
+          <p>Plezar is free for travelers. Use it to find where to go next, and to see what a trip is really like before you leave Dhaka.</p>
+        </div>
+        <ul class="traveler-points">
+          <li><strong>Find ideas from real trips</strong><span>See where people actually went last weekend, not a five-year-old blog post.</span></li>
+          <li><strong>Know what to expect</strong><span>Photos and notes show the road, the rooms and the weather before you leave.</span></li>
+          <li><strong>Choose agents with confidence</strong><span>Compare their past trips and reviews side by side.</span></li>
+          <li><strong>Keep your travel story</strong><span>Your posts become a map of everywhere you have been in Bangladesh.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- For tour agents -->
+    <section class="agents" id="agents">
+      <div class="wrap agents-inner">
+        <div class="agents-copy">
+          <h2 class="h2">For tour agents</h2>
+          <p class="agents-lead">We are inviting a first group of tour agents to set up their profiles before Plezar opens to everyone. Tell us about your agency and our team will get in touch.</p>
+          <ul class="agent-points">
+            <li><strong>Show your work.</strong> Every trip you post adds to a portfolio people can browse any time.</li>
+            <li><strong>Grow followers who care.</strong> People who follow you see your new trips first.</li>
+            <li><strong>Earn trust with reviews.</strong> Honest reviews from real travelers stay on your profile.</li>
+            <li><strong>Get verified.</strong> Show your trade license once and stand out from unknown pages.</li>
+          </ul>
+        </div>
+
+        <div class="agent-form-card">
+          <form id="agentForm" class="agent-form" onsubmit="handleAgentLead(event)" novalidate>
+            <h3>Tell us about your agency</h3>
+            <p class="form-hint">Fields marked * are required. We only use these details to contact you about Plezar.</p>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="agencyName">Agency name *</label>
+                <input id="agencyName" name="agencyName" type="text" required maxlength="120" autocomplete="organization">
+              </div>
+              <div class="field">
+                <label for="contactName">Your name *</label>
+                <input id="contactName" name="contactName" type="text" required maxlength="80" autocomplete="name">
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="agentPhone">Mobile number *</label>
+                <input id="agentPhone" name="phone" type="tel" required inputmode="tel" placeholder="01712345678" autocomplete="tel">
+              </div>
+              <div class="field">
+                <label for="agentEmail">Email *</label>
+                <input id="agentEmail" name="email" type="email" required placeholder="you@agency.com" autocomplete="email">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="agentRegions">Where do you run tours?</label>
+              <input id="agentRegions" name="regions" type="text" maxlength="200" placeholder="Sajek, Bandarban, Cox's Bazar">
+            </div>
+
+            <div class="field">
+              <label for="agentWebsite">Facebook page or website</label>
+              <input id="agentWebsite" name="website" type="text" maxlength="200" placeholder="facebook.com/youragency">
+            </div>
+
+            <div class="field">
+              <label for="agentMessage">Anything else we should know?</label>
+              <textarea id="agentMessage" name="message" rows="3" maxlength="1000" placeholder="How long you have been running tours, group sizes, questions for us"></textarea>
+            </div>
+
+            <p class="form-error" id="agentFormError" role="alert" hidden></p>
+            <button type="submit" class="btn btn-dark btn-block">Send my details</button>
+          </form>
+
+          <div class="agent-done" id="agentDone" hidden tabindex="-1">
+            <h3>Thanks, we have your details</h3>
+            <p id="agentDoneText">Our team will contact you within 2 working days.</p>
+            <button type="button" class="btn btn-outline" onclick="resetAgentForm()">Send another agency</button>
           </div>
         </div>
-        <div class="cta-phone">
-          <div class="qr" data-seed="13"></div>
-          <strong>Fast Phone Scan</strong>
-          <small>iOS &amp; Android Compatible</small>
-          <div class="cta-phone-icons"><svg class="ic ic-xs"><use href="#i-phone"/></svg><svg class="ic ic-xs"><use href="#i-play"/></svg><svg class="ic ic-xs"><use href="#i-apple"/></svg></div>
-        </div>
+      </div>
+    </section>
+
+    <!-- Updates -->
+    <section class="updates" id="updates">
+      <img class="updates-img" src="/img/places/ratargul-morning.jpg" alt="" loading="lazy">
+      <div class="updates-shade"></div>
+      <div class="wrap updates-inner">
+        <h2 class="h2">Follow Plezar as it grows</h2>
+        <p>Get an occasional email when there is something new to see: new features, early access, and the places our community is sharing.</p>
+        <form class="updates-form" onsubmit="handleSubscribe(event)" data-source="portfolio_updates">
+          <label class="sr-only" for="updatesEmail">Email address</label>
+          <input id="updatesEmail" type="email" placeholder="you@example.com" required>
+          <button type="submit" class="btn btn-light">Send me updates</button>
+        </form>
+        <p class="updates-note">No spam. Unsubscribe with one click.</p>
       </div>
     </section>
 
   </main>
 
-  <!-- Footer -->
   <footer class="footer">
-    <div class="container footer-grid">
+    <div class="wrap footer-inner">
       <div class="footer-brand">
-        <a href="/" class="brand"><svg class="brand-mark"><use href="#i-logo"/></svg><span>Plezar</span></a>
-        <p class="muted sm">The verified travel playground connecting spontaneous explorers with certified destination architects worldwide. Crafted for kinetic wanderlust.</p>
-        <span class="tag tag-green"><svg class="ic ic-xs"><use href="#i-shield"/></svg> Certified Partner Network</span>
+        <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+        <p>A social app for travel in Bangladesh.</p>
+        <p class="footer-copy">© <span id="year">2026</span> Plezar, Dhaka</p>
       </div>
-      <div>
-        <h4>Ecosystem</h4>
-        <a href="#features">Dynamic Itineraries</a>
-        <a href="#features">Nomad Matcher</a>
-        <a href="#agents">Operator Portal</a>
-        <a href="#features">Live Interactive Map</a>
+      <div class="credits">
+        <h3>Photos</h3>
+        <p>All photos are from Wikimedia Commons, used under their licences.</p>
+        <ul>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Jaflong_Sylhet.jpg" rel="noopener" target="_blank">Jaflong</a> by Abdul Momin, CC BY-SA 4.0</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Sunrise_at_Sajek_Valley.jpg" rel="noopener" target="_blank">Sajek Valley</a> by Rocky Masum, CC BY-SA 4.0</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Ratargul_Swamp_Forest,_Sylhet..jpg" rel="noopener" target="_blank">Ratargul</a> by Sumon Mallick, CC BY-SA 4.0</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Tanguar_Haor_Houseboat.jpg" rel="noopener" target="_blank">Tanguar Haor houseboat</a> and <a href="https://commons.wikimedia.org/wiki/File:People_crossing_Tanguar_Haor_in_a_boat.jpg" rel="noopener" target="_blank">boat crossing</a> by Ahnaf Tahmid Manan, CC BY-SA 4.0</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Nafakhum_Falls.JPG" rel="noopener" target="_blank">Nafakhum Falls</a> by Abu Md. Jakaria, public domain</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Tea_gardens_in_Sreemangal_04.jpg" rel="noopener" target="_blank">Sreemangal tea garden</a> by Kritzolina, CC BY-SA 4.0</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Cox%27s_Bazar_sea_beach_01.jpg" rel="noopener" target="_blank">Cox's Bazar</a> by Tanweer Morshed, CC BY-SA 3.0</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:A_Sundarbans_Canal.jpg" rel="noopener" target="_blank">Sundarbans canal</a> by Hrihu Raiyan Khan, CC BY-SA 4.0</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:Saint_Martin%27s_Island.JPG" rel="noopener" target="_blank">Saint Martin's Island</a> by Niaz Morshed Shovon, public domain</li>
+          <li><a href="https://commons.wikimedia.org/wiki/File:%E0%A6%B0%E0%A6%B9%E0%A6%B8%E0%A7%8D%E0%A6%AF%E0%A7%87_%E0%A6%98%E0%A7%87%E0%A6%B0%E0%A6%BE_%E0%A6%9C%E0%A6%B2%E0%A6%BE%E0%A6%AC%E0%A6%A8.jpg" rel="noopener" target="_blank">Ratargul in the morning</a> by Nawas Sharif, CC BY-SA 4.0</li>
+        </ul>
       </div>
-      <div>
-        <h4>Community</h4>
-        <a href="#community">Wanderer Stories</a>
-        <a href="#community">Safety &amp; Trust</a>
-        <a href="#download">Mobile Releases</a>
-        <a href="#agents">Verification Standards</a>
-      </div>
-      <div class="footer-news">
-        <h4>Stay in the Orbit</h4>
-        <p class="muted sm">Receive hand-curated secret expeditions, flash itinerary drops, and operator dispatches.</p>
-        <form class="inline-form inline-form-sm" onsubmit="handleSubscribe(event)" data-source="footer_newsletter">
-          <input type="email" placeholder="you@example.com" required aria-label="Email address">
-          <button type="submit" class="btn btn-primary btn-sm">Join Dispatch</button>
-        </form>
-        <div class="store-row store-row-sm">
-          <a href="#download" class="store-btn"><svg class="ic"><use href="#i-apple"/></svg><span><small>Download on</small>App Store</span></a>
-          <a href="#download" class="store-btn"><svg class="ic"><use href="#i-play"/></svg><span><small>Get it on</small>Google Play</span></a>
-        </div>
-      </div>
-    </div>
-    <div class="container footer-bottom">
-      <span>&copy; <span id="year">2026</span> Plezar. Crafted for verified adventures.</span>
-      <nav>
-        <a href="#top">Privacy Policy</a>
-        <a href="#top">Terms of Service</a>
-        <a href="/reset-password">Account Recovery</a>
-      </nav>
     </div>
   </footer>
-
-  <!-- Sign In Modal -->
-  <div id="loginModal" class="modal-overlay" onclick="if (event.target === this) closeModal('loginModal')">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-      <div class="modal-header">
-        <h3 id="loginTitle">Welcome back, explorer</h3>
-        <button class="modal-close" onclick="closeModal('loginModal')" aria-label="Close">&times;</button>
-      </div>
-      <form onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label class="form-label" for="loginEmail">Email Address</label>
-          <input id="loginEmail" type="email" name="email" class="form-input" placeholder="you@example.com" required autocomplete="username">
-        </div>
-        <div class="form-group">
-          <div class="label-row">
-            <label class="form-label" for="loginPassword">Password</label>
-            <a href="#" onclick="event.preventDefault(); closeModal('loginModal'); openModal('forgotModal');">Forgot password?</a>
-          </div>
-          <input id="loginPassword" type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Sign In</button>
-        <p class="modal-foot">New to Plezar? <a href="#" onclick="event.preventDefault(); closeModal('loginModal'); openModal('signupModal');">Create an account</a></p>
-      </form>
-    </div>
-  </div>
-
-  <!-- Sign Up Modal -->
-  <div id="signupModal" class="modal-overlay" onclick="if (event.target === this) closeModal('signupModal')">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="signupTitle">
-      <div class="modal-header">
-        <h3 id="signupTitle">Join the playground</h3>
-        <button class="modal-close" onclick="closeModal('signupModal')" aria-label="Close">&times;</button>
-      </div>
-      <form onsubmit="handleSignup(event)">
-        <div class="form-group">
-          <label class="form-label" for="signupName">Full Name</label>
-          <input id="signupName" type="text" name="name" class="form-input" placeholder="Alex Morgan" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="signupEmail">Email Address</label>
-          <input id="signupEmail" type="email" name="email" class="form-input" placeholder="alex@example.com" required autocomplete="username">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="signupPassword">Password (min 8 characters)</label>
-          <input id="signupPassword" type="password" name="password" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="signupConfirm">Confirm Password</label>
-          <input id="signupConfirm" type="password" name="confirmPassword" class="form-input" placeholder="••••••••" minlength="8" required autocomplete="new-password">
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Create Account</button>
-        <p class="modal-foot">Already exploring? <a href="#" onclick="event.preventDefault(); closeModal('signupModal'); openModal('loginModal');">Sign in</a></p>
-      </form>
-    </div>
-  </div>
-
-  <!-- Forgot Password Modal -->
-  <div id="forgotModal" class="modal-overlay" onclick="if (event.target === this) closeModal('forgotModal')">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
-      <div class="modal-header">
-        <h3 id="forgotTitle">Reset Password</h3>
-        <button class="modal-close" onclick="closeModal('forgotModal')" aria-label="Close">&times;</button>
-      </div>
-      <form onsubmit="handleForgotPassword(event)">
-        <p class="muted sm" style="margin-bottom: 16px;">Enter your registered email and we'll send a secure reset link, valid for 10 minutes.</p>
-        <div class="form-group">
-          <label class="form-label" for="forgotEmail">Email Address</label>
-          <input id="forgotEmail" type="email" name="email" class="form-input" placeholder="you@example.com" required>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Send Reset Link</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Profile Modal -->
-  <div id="profileModal" class="modal-overlay" onclick="if (event.target === this) closeModal('profileModal')">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
-      <div class="modal-header">
-        <h3 id="profileTitle">Your Profile</h3>
-        <button class="modal-close" onclick="closeModal('profileModal')" aria-label="Close">&times;</button>
-      </div>
-      <div class="profile-row">
-        <span class="avatar avatar-lg av-a" id="profileInitial">U</span>
-        <div>
-          <div id="profileName" class="profile-name">-</div>
-          <div id="profileEmail" class="muted sm">-</div>
-        </div>
-      </div>
-      <div class="profile-meta">
-        <div><span>Role</span><strong id="profileRole">USER</strong></div>
-        <div><span>Member since</span><strong id="profileCreatedAt">-</strong></div>
-      </div>
-      <div class="profile-actions">
-        <a href="/admin" id="profileAdminLink" class="btn btn-dark" style="display: none;">Admin Panel</a>
-        <button class="btn btn-danger" onclick="closeModal('profileModal'); handleLogout();">Sign Out</button>
-      </div>
-    </div>
-  </div>
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
