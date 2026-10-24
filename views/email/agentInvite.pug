@@ -1,0 +1,15 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  p You have been invited to manage #{agencyName || 'your agency'} on #{appName}. Set a password to open your agency panel, where you can update your profile, add tour packages and invite your team.
+  table.btn.btn-primary(role='presentation', border='0', cellpadding='0', cellspacing='0')
+    tbody
+      tr
+        td(align='left')
+          table(role='presentation', border='0', cellpadding='0', cellspacing='0')
+            tbody
+              tr
+                td
+                  a(href=`${url}`, target='_blank') Set your password
+  p This link works for 7 days. If you weren't expecting this email, you can ignore it.

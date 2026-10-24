@@ -7,7 +7,7 @@
   <meta name="description" content="Plezar is a social app for travel in Bangladesh. Travelers share their trips, local tour agents show their work, and everyone plans from real photos and honest reviews.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Tiro+Bangla&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Tiro+Bangla&display=swap">
   <link rel="stylesheet" href="/css/landing.css">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
@@ -25,20 +25,21 @@
     </defs>
   </svg>
 
-  <a class="skip" href="#what">Skip to content</a>
+  <a class="skip" href="#what" data-i18n="skip">Skip to content</a>
 
   <header class="nav" id="nav">
     <div class="wrap nav-inner">
-      <a href="/" class="logo" aria-label="Plezar home">plezar<span class="logo-dot"></span></a>
+      <a href="/" class="logo" aria-label="Plezar home" data-i18n-attr="aria-label:logoLabel">plezar<span class="logo-dot"></span></a>
       <nav class="nav-links" id="navLinks" aria-label="Main">
-        <a href="#what">The app</a>
-        <a href="#features">Features</a>
-        <a href="#places">Places</a>
-        <a href="#travelers">For travelers</a>
-        <a href="#agents">For agents</a>
+        <a href="#what" data-i18n="navApp">The app</a>
+        <a href="#features" data-i18n="navFeatures">Features</a>
+        <a href="#places" data-i18n="navPlaces">Places</a>
+        <a href="#travelers" data-i18n="navTravelers">For travelers</a>
+        <a href="#agents" data-i18n="navAgents">For agents</a>
       </nav>
-      <a href="#updates" class="btn btn-light nav-cta">Get updates</a>
-      <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks" onclick="toggleNav(this)">
+      <button class="lang-toggle" id="langToggle" type="button" onclick="toggleLang()" lang="bn" aria-label="বাংলায় দেখুন">বাংলা</button>
+      <a href="#updates" class="btn btn-light nav-cta" data-i18n="navCta">Get updates</a>
+      <button class="nav-toggle" aria-label="Menu" data-i18n-attr="aria-label:menuLabel" aria-expanded="false" aria-controls="navLinks" onclick="toggleNav(this)">
         <svg><use href="#i-menu"/></svg>
       </button>
     </div>
@@ -48,39 +49,39 @@
 
     <!-- Hero -->
     <section class="hero">
-      <img class="hero-img" src="/img/places/jaflong-tea-garden.jpg" alt="Tea pickers working on a hillside garden at Jaflong, Sylhet, with misty hills behind" fetchpriority="high">
+      <img class="hero-img" src="/img/places/jaflong-tea-garden.jpg" alt="Tea pickers working on a hillside garden at Jaflong, Sylhet, with misty hills behind" data-i18n-attr="alt:altJaflong" fetchpriority="high">
       <div class="hero-shade"></div>
       <div class="wrap hero-inner">
-        <h1 class="hero-title">Bangladesh, shared by the people who travel it.</h1>
-        <p class="hero-text">Plezar is a social app for travel in Bangladesh. Travelers share their trips, local tour agents show their work, and everyone plans the next one from real photos and honest reviews.</p>
+        <h1 class="hero-title" data-i18n="heroTitle">Bangladesh, shared by the people who travel it.</h1>
+        <p class="hero-text" data-i18n="heroText">Plezar is a social app for travel in Bangladesh. Travelers share their trips, local tour agents show their work, and everyone plans the next one from real photos and honest reviews.</p>
         <div class="hero-actions">
-          <a href="#what" class="btn btn-light">See what the app does</a>
-          <a href="#updates" class="btn btn-ghost">Follow the project</a>
+          <a href="#what" class="btn btn-light" data-i18n="heroCta1">See what the app does</a>
+          <a href="#updates" class="btn btn-ghost" data-i18n="heroCta2">Follow the project</a>
         </div>
       </div>
-      <p class="hero-place"><span class="bn">জাফলং, সিলেট</span><span>Tea garden at Jaflong, Sylhet</span></p>
+      <p class="hero-place"><span class="bn">জাফলং, সিলেট</span><span data-i18n="heroPlace">Tea garden at Jaflong, Sylhet</span></p>
     </section>
 
     <!-- What it is -->
     <section class="what" id="what">
       <div class="wrap what-inner">
         <div class="what-copy">
-          <h2 class="h2">One place for every trip worth taking in Bangladesh</h2>
-          <p class="lead">Today, trip ideas are scattered across Facebook groups, YouTube vlogs and friends' photo albums. Tour agents post in a hundred groups and hope someone notices. Plezar brings both together in one feed.</p>
+          <h2 class="h2" data-i18n="whatTitle">One place for every trip worth taking in Bangladesh</h2>
+          <p class="lead" data-i18n="whatLead">Today, trip ideas are scattered across Facebook groups, YouTube vlogs and friends' photo albums. Tour agents post in a hundred groups and hope someone notices. Plezar brings both together in one feed.</p>
           <dl class="facts">
-            <div><dt>For travelers</dt><dd>Discover places through real trips, follow agents you like, and keep a plan for where you want to go next.</dd></div>
-            <div><dt>For tour agents</dt><dd>Build a profile with your past trips, photos and reviews, so people can see who you are before they call.</dd></div>
+            <div><dt data-i18n="factTravelersTitle">For travelers</dt><dd data-i18n="factTravelersText">Discover places through real trips, follow agents you like, and keep a plan for where you want to go next.</dd></div>
+            <div><dt data-i18n="factAgentsTitle">For tour agents</dt><dd data-i18n="factAgentsText">Build a profile with your past trips, photos and reviews, so people can see who you are before they call.</dd></div>
           </dl>
         </div>
 
-        <div class="phone" aria-label="The Plezar app feed">
+        <div class="phone" aria-label="The Plezar app feed" data-i18n-attr="aria-label:phoneLabel">
           <div class="phone-screen">
-            <div class="app-bar"><span class="logo logo-sm">plezar<span class="logo-dot"></span></span><span class="app-tabs"><b>Following</b><span>Nearby</span></span></div>
+            <div class="app-bar"><span class="logo logo-sm">plezar<span class="logo-dot"></span></span><span class="app-tabs"><b data-i18n="appFollowing">Following</b><span data-i18n="appNearby">Nearby</span></span></div>
             <article class="app-post">
-              <header><span class="avatar" style="--hue: 152">PT</span><div><strong>Pahari Trails <svg class="v"><use href="#i-verified"/></svg></strong><small><svg class="pin"><use href="#i-pin"/></svg> Sajek Valley</small></div></header>
-              <img src="/img/places/sajek-sunrise.jpg" alt="Sunrise over cloud-filled valleys at Sajek" loading="lazy">
+              <header><span class="avatar" style="--hue: 152">PT</span><div><strong>Pahari Trails <svg class="v"><use href="#i-verified"/></svg></strong><small><svg class="pin"><use href="#i-pin"/></svg> <span data-i18n="placeSajek">Sajek Valley</span></small></div></header>
+              <img src="/img/places/sajek-sunrise.jpg" alt="Sunrise over cloud-filled valleys at Sajek" data-i18n-attr="alt:altSajek" loading="lazy">
               <div class="app-actions"><svg><use href="#i-heart"/></svg><svg><use href="#i-comment"/></svg><svg class="push"><use href="#i-save"/></svg></div>
-              <p><b>1,204 likes</b> Clouds rolled into the valley at 5:40 this morning. Our group of 18 watched it from Konglak Para.</p>
+              <p data-i18n-html="appPost"><b>1,204 likes</b> Clouds rolled into the valley at 5:40 this morning. Our group of 18 watched it from Konglak Para.</p>
             </article>
           </div>
         </div>
@@ -90,71 +91,71 @@
     <!-- Features -->
     <section class="features" id="features">
       <div class="wrap">
-        <h2 class="h2 features-title">What you can do in Plezar</h2>
+        <h2 class="h2 features-title" data-i18n="featuresTitle">What you can do in Plezar</h2>
 
         <article class="feature">
           <div class="feature-copy">
-            <h3>Share trips in a travel feed</h3>
-            <p>Post photos, videos and short notes from wherever you are. Every post is tagged with a place, so the feed doubles as a living map of Bangladesh: what Ratargul looks like this week, how high the water is at the haor, whether the Sajek road is open.</p>
+            <h3 data-i18n="f1Title">Share trips in a travel feed</h3>
+            <p data-i18n="f1Text">Post photos, videos and short notes from wherever you are. Every post is tagged with a place, so the feed doubles as a living map of Bangladesh: what Ratargul looks like this week, how high the water is at the haor, whether the Sajek road is open.</p>
             <ul class="ticks">
-              <li>Follow travelers and agents whose trips you like</li>
-              <li>Like, comment and save posts for later</li>
-              <li>Browse by place, season or type of trip</li>
+              <li data-i18n="f1Li1">Follow travelers and agents whose trips you like</li>
+              <li data-i18n="f1Li2">Like, comment and save posts for later</li>
+              <li data-i18n="f1Li3">Browse by place, season or type of trip</li>
             </ul>
           </div>
           <figure class="feature-shot shot-photo">
-            <img src="/img/places/ratargul-boat.jpg" alt="A wooden boat moving through the flooded green trees of Ratargul swamp forest" loading="lazy">
+            <img src="/img/places/ratargul-boat.jpg" alt="A wooden boat moving through the flooded green trees of Ratargul swamp forest" data-i18n-attr="alt:altRatargulBoat" loading="lazy">
             <figcaption class="overlay-post">
               <span class="avatar" style="--hue: 340">NR</span>
-              <span><strong>Nusrat Rahman</strong> is at <strong>Ratargul Swamp Forest</strong><small>Water is high and clear right now. Go before August.</small></span>
+              <span data-i18n-html="f1Overlay"><strong>Nusrat Rahman</strong> is at <strong>Ratargul Swamp Forest</strong><small>Water is high and clear right now. Go before August.</small></span>
             </figcaption>
           </figure>
         </article>
 
         <article class="feature feature-flip">
           <div class="feature-copy">
-            <h3>Check the agent before you call</h3>
-            <p>Every tour agent gets a profile with the trips they have run, photos from those trips and reviews from travelers who went. Agents who show a trade license and national ID get a verified mark.</p>
+            <h3 data-i18n="f2Title">Check the agent before you call</h3>
+            <p data-i18n="f2Text">Every tour agent gets a profile with the trips they have run, photos from those trips and reviews from travelers who went. Agents who show a trade license and national ID get a verified mark.</p>
             <ul class="ticks">
-              <li>See an agent's past trips, not just their ads</li>
-              <li>Read reviews from people who travelled with them</li>
-              <li>Message the agent directly from their profile</li>
+              <li data-i18n="f2Li1">See an agent's past trips, not just their ads</li>
+              <li data-i18n="f2Li2">Read reviews from people who travelled with them</li>
+              <li data-i18n="f2Li3">Message the agent directly from their profile</li>
             </ul>
           </div>
           <figure class="feature-shot shot-profile">
-            <img class="profile-cover" src="/img/places/tanguar-haor-houseboat.jpg" alt="A wooden houseboat on the open water of Tanguar Haor under a blue sky" loading="lazy">
+            <img class="profile-cover" src="/img/places/tanguar-haor-houseboat.jpg" alt="A wooden houseboat on the open water of Tanguar Haor under a blue sky" data-i18n-attr="alt:altHouseboat" loading="lazy">
             <div class="profile-body">
               <span class="avatar avatar-lg" style="--hue: 200">HH</span>
-              <div class="profile-name"><strong>Haor Houseboat Co. <svg class="v"><use href="#i-verified"/></svg></strong><small>Houseboat trips on Tanguar Haor since 2019</small></div>
+              <div class="profile-name"><strong>Haor Houseboat Co. <svg class="v"><use href="#i-verified"/></svg></strong><small data-i18n="f2Since">Houseboat trips on Tanguar Haor since 2019</small></div>
               <dl class="profile-stats">
-                <div><dt>9.6k</dt><dd>followers</dd></div>
-                <div><dt>142</dt><dd>trips shared</dd></div>
-                <div><dt>4.8</dt><dd>from 380 reviews</dd></div>
+                <div><dt data-i18n="f2Stat1">9.6k</dt><dd data-i18n="f2Stat1Label">followers</dd></div>
+                <div><dt data-i18n="f2Stat2">142</dt><dd data-i18n="f2Stat2Label">trips shared</dd></div>
+                <div><dt data-i18n="f2Stat3">4.8</dt><dd data-i18n="f2Stat3Label">from 380 reviews</dd></div>
               </dl>
-              <blockquote class="profile-review">"Cleaner than the photos, life jackets for everyone, and the cook made fresh fish every meal." <cite>Nusrat, travelled in March</cite></blockquote>
+              <blockquote class="profile-review" data-i18n-html="f2Review">"Cleaner than the photos, life jackets for everyone, and the cook made fresh fish every meal." <cite>Nusrat, travelled in March</cite></blockquote>
             </div>
           </figure>
         </article>
 
         <article class="feature">
           <div class="feature-copy">
-            <h3>Guides for every place</h3>
-            <p>Each destination has its own page, built from what travelers post: the best months to go, how to get there from Dhaka, what to pack, and the latest photos. Nafakhum in the dry season is a different trip from Nafakhum in the monsoon, and the page shows both.</p>
+            <h3 data-i18n="f3Title">Guides for every place</h3>
+            <p data-i18n="f3Text">Each destination has its own page, built from what travelers post: the best months to go, how to get there from Dhaka, what to pack, and the latest photos. Nafakhum in the dry season is a different trip from Nafakhum in the monsoon, and the page shows both.</p>
             <ul class="ticks">
-              <li>Best season and current conditions</li>
-              <li>Routes and travel time from Dhaka</li>
-              <li>Agents who run trips there</li>
+              <li data-i18n="f3Li1">Best season and current conditions</li>
+              <li data-i18n="f3Li2">Routes and travel time from Dhaka</li>
+              <li data-i18n="f3Li3">Agents who run trips there</li>
             </ul>
           </div>
           <figure class="feature-shot shot-guide">
-            <img src="/img/places/nafakhum-falls.jpg" alt="Nafakhum waterfall pouring over a wide rock ledge in Bandarban" loading="lazy">
+            <img src="/img/places/nafakhum-falls.jpg" alt="Nafakhum waterfall pouring over a wide rock ledge in Bandarban" data-i18n-attr="alt:altNafakhum" loading="lazy">
             <figcaption class="guide-card">
               <span class="bn">নাফাখুম</span>
-              <strong>Nafakhum Falls, Bandarban</strong>
+              <strong data-i18n="f3GuideName">Nafakhum Falls, Bandarban</strong>
               <dl>
-                <div><dt>Best time</dt><dd>October to February</dd></div>
-                <div><dt>From Dhaka</dt><dd>Bus to Bandarban, then Thanchi and a boat up the Sangu</dd></div>
-                <div><dt>Recent posts</dt><dd>312 this month</dd></div>
+                <div><dt data-i18n="f3BestLabel">Best time</dt><dd data-i18n="f3Best">October to February</dd></div>
+                <div><dt data-i18n="f3RouteLabel">From Dhaka</dt><dd data-i18n="f3Route">Bus to Bandarban, then Thanchi and a boat up the Sangu</dd></div>
+                <div><dt data-i18n="f3PostsLabel">Recent posts</dt><dd data-i18n="f3Posts">312 this month</dd></div>
               </dl>
             </figcaption>
           </figure>
@@ -162,22 +163,22 @@
 
         <article class="feature feature-flip">
           <div class="feature-copy">
-            <h3>Plan trips with friends</h3>
-            <p>Save places and posts into a trip plan, arrange them day by day, and share the plan with the people you are going with. Everyone can add ideas, so the group chat doesn't have to hold the whole plan.</p>
+            <h3 data-i18n="f4Title">Plan trips with friends</h3>
+            <p data-i18n="f4Text">Save places and posts into a trip plan, arrange them day by day, and share the plan with the people you are going with. Everyone can add ideas, so the group chat doesn't have to hold the whole plan.</p>
             <ul class="ticks">
-              <li>Collect saved places into one plan</li>
-              <li>Organise it by day</li>
-              <li>Share and edit it together</li>
+              <li data-i18n="f4Li1">Collect saved places into one plan</li>
+              <li data-i18n="f4Li2">Organise it by day</li>
+              <li data-i18n="f4Li3">Share and edit it together</li>
             </ul>
           </div>
           <figure class="feature-shot shot-plan">
-            <img src="/img/places/sreemangal-tea-garden.jpg" alt="Rows of green tea bushes under shade trees in a Sreemangal tea garden" loading="lazy">
+            <img src="/img/places/sreemangal-tea-garden.jpg" alt="Rows of green tea bushes under shade trees in a Sreemangal tea garden" data-i18n-attr="alt:altSreemangal" loading="lazy">
             <div class="plan-card">
-              <div class="plan-head"><strong>Sylhet with the cousins</strong><span class="faces"><span class="avatar" style="--hue: 30">R</span><span class="avatar" style="--hue: 152">S</span><span class="avatar" style="--hue: 260">T</span></span></div>
+              <div class="plan-head"><strong data-i18n="f4PlanName">Sylhet with the cousins</strong><span class="faces"><span class="avatar" style="--hue: 30">R</span><span class="avatar" style="--hue: 152">S</span><span class="avatar" style="--hue: 260">T</span></span></div>
               <ol>
-                <li><span>Day 1</span>Sreemangal tea gardens, seven-layer tea at Nilkantha</li>
-                <li><span>Day 2</span>Lawachara forest walk, then Ratargul by boat</li>
-                <li><span>Day 3</span>Jaflong and the Piyain river</li>
+                <li data-i18n-html="f4Day1"><span>Day 1</span>Sreemangal tea gardens, seven-layer tea at Nilkantha</li>
+                <li data-i18n-html="f4Day2"><span>Day 2</span>Lawachara forest walk, then Ratargul by boat</li>
+                <li data-i18n-html="f4Day3"><span>Day 3</span>Jaflong and the Piyain river</li>
               </ol>
             </div>
           </figure>
@@ -189,29 +190,29 @@
     <section class="places" id="places">
       <div class="wrap">
         <div class="places-head">
-          <h2 class="h2">Places people share most</h2>
-          <p>From the longest sea beach in the world to the largest mangrove forest, Bangladesh fits a lot of country into a weekend trip.</p>
+          <h2 class="h2" data-i18n="placesTitle">Places people share most</h2>
+          <p data-i18n="placesText">From the longest sea beach in the world to the largest mangrove forest, Bangladesh fits a lot of country into a weekend trip.</p>
         </div>
         <ul class="gallery">
           <li class="g-cox">
-            <img src="/img/places/coxs-bazar-sunset.jpg" alt="People walking on wet sand at Cox's Bazar beach at sunset" loading="lazy">
-            <span class="g-label"><span class="bn">কক্সবাজার</span>Cox's Bazar</span>
+            <img src="/img/places/coxs-bazar-sunset.jpg" alt="People walking on wet sand at Cox's Bazar beach at sunset" data-i18n-attr="alt:altCox" loading="lazy">
+            <span class="g-label"><span class="bn">কক্সবাজার</span><span class="g-en">Cox's Bazar</span></span>
           </li>
           <li class="g-sund">
-            <img src="/img/places/sundarbans-canal.jpg" alt="A calm canal lined with dense mangrove trees in the Sundarbans" loading="lazy">
-            <span class="g-label"><span class="bn">সুন্দরবন</span>Sundarbans</span>
+            <img src="/img/places/sundarbans-canal.jpg" alt="A calm canal lined with dense mangrove trees in the Sundarbans" data-i18n-attr="alt:altSundarbans" loading="lazy">
+            <span class="g-label"><span class="bn">সুন্দরবন</span><span class="g-en">Sundarbans</span></span>
           </li>
           <li class="g-sajek">
-            <img src="/img/places/sajek-sunrise.jpg" alt="Sunrise over cloud-filled valleys at Sajek" loading="lazy">
-            <span class="g-label"><span class="bn">সাজেক</span>Sajek Valley</span>
+            <img src="/img/places/sajek-sunrise.jpg" alt="Sunrise over cloud-filled valleys at Sajek" data-i18n-attr="alt:altSajek" loading="lazy">
+            <span class="g-label"><span class="bn">সাজেক</span><span class="g-en">Sajek Valley</span></span>
           </li>
           <li class="g-stm">
-            <img src="/img/places/saint-martins-island.jpg" alt="Pink flowers and coconut palms on the shore of Saint Martin's Island" loading="lazy">
-            <span class="g-label"><span class="bn">সেন্টমার্টিন</span>Saint Martin's Island</span>
+            <img src="/img/places/saint-martins-island.jpg" alt="Pink flowers and coconut palms on the shore of Saint Martin's Island" data-i18n-attr="alt:altSaintMartin" loading="lazy">
+            <span class="g-label"><span class="bn">সেন্টমার্টিন</span><span class="g-en">Saint Martin's Island</span></span>
           </li>
           <li class="g-haor">
-            <img src="/img/places/tanguar-haor-boat.jpg" alt="People crossing Tanguar Haor in a small boat past a half-submerged tree" loading="lazy">
-            <span class="g-label"><span class="bn">টাঙ্গুয়ার হাওর</span>Tanguar Haor</span>
+            <img src="/img/places/tanguar-haor-boat.jpg" alt="People crossing Tanguar Haor in a small boat past a half-submerged tree" data-i18n-attr="alt:altHaorBoat" loading="lazy">
+            <span class="g-label"><span class="bn">টাঙ্গুয়ার হাওর</span><span class="g-en">Tanguar Haor</span></span>
           </li>
         </ul>
       </div>
@@ -221,14 +222,14 @@
     <section class="travelers" id="travelers">
       <div class="wrap">
         <div class="travelers-head">
-          <h2 class="h2">For travelers</h2>
-          <p>Plezar is free for travelers. Use it to find where to go next, and to see what a trip is really like before you leave Dhaka.</p>
+          <h2 class="h2" data-i18n="travelersTitle">For travelers</h2>
+          <p data-i18n="travelersText">Plezar is free for travelers. Use it to find where to go next, and to see what a trip is really like before you leave Dhaka.</p>
         </div>
         <ul class="traveler-points">
-          <li><strong>Find ideas from real trips</strong><span>See where people actually went last weekend, not a five-year-old blog post.</span></li>
-          <li><strong>Know what to expect</strong><span>Photos and notes show the road, the rooms and the weather before you leave.</span></li>
-          <li><strong>Choose agents with confidence</strong><span>Compare their past trips and reviews side by side.</span></li>
-          <li><strong>Keep your travel story</strong><span>Your posts become a map of everywhere you have been in Bangladesh.</span></li>
+          <li data-i18n-html="tp1"><strong>Find ideas from real trips</strong><span>See where people actually went last weekend, not a five-year-old blog post.</span></li>
+          <li data-i18n-html="tp2"><strong>Know what to expect</strong><span>Photos and notes show the road, the rooms and the weather before you leave.</span></li>
+          <li data-i18n-html="tp3"><strong>Choose agents with confidence</strong><span>Compare their past trips and reviews side by side.</span></li>
+          <li data-i18n-html="tp4"><strong>Keep your travel story</strong><span>Your posts become a map of everywhere you have been in Bangladesh.</span></li>
         </ul>
       </div>
     </section>
@@ -237,66 +238,66 @@
     <section class="agents" id="agents">
       <div class="wrap agents-inner">
         <div class="agents-copy">
-          <h2 class="h2">For tour agents</h2>
-          <p class="agents-lead">We are inviting a first group of tour agents to set up their profiles before Plezar opens to everyone. Tell us about your agency and our team will get in touch.</p>
+          <h2 class="h2" data-i18n="agentsTitle">For tour agents</h2>
+          <p class="agents-lead" data-i18n="agentsLead">We are inviting a first group of tour agents to set up their profiles before Plezar opens to everyone. Tell us about your agency and our team will get in touch.</p>
           <ul class="agent-points">
-            <li><strong>Show your work.</strong> Every trip you post adds to a portfolio people can browse any time.</li>
-            <li><strong>Grow followers who care.</strong> People who follow you see your new trips first.</li>
-            <li><strong>Earn trust with reviews.</strong> Honest reviews from real travelers stay on your profile.</li>
-            <li><strong>Get verified.</strong> Show your trade license once and stand out from unknown pages.</li>
+            <li data-i18n-html="ap1"><strong>Show your work.</strong> Every trip you post adds to a portfolio people can browse any time.</li>
+            <li data-i18n-html="ap2"><strong>Grow followers who care.</strong> People who follow you see your new trips first.</li>
+            <li data-i18n-html="ap3"><strong>Earn trust with reviews.</strong> Honest reviews from real travelers stay on your profile.</li>
+            <li data-i18n-html="ap4"><strong>Get verified.</strong> Show your trade license once and stand out from unknown pages.</li>
           </ul>
         </div>
 
         <div class="agent-form-card">
           <form id="agentForm" class="agent-form" onsubmit="handleAgentLead(event)" novalidate>
-            <h3>Tell us about your agency</h3>
-            <p class="form-hint">Fields marked * are required. We only use these details to contact you about Plezar.</p>
+            <h3 data-i18n="formTitle">Tell us about your agency</h3>
+            <p class="form-hint" data-i18n="formHint">Fields marked * are required. We only use these details to contact you about Plezar.</p>
 
             <div class="field-row">
               <div class="field">
-                <label for="agencyName">Agency name *</label>
+                <label for="agencyName" data-i18n="lblAgency">Agency name *</label>
                 <input id="agencyName" name="agencyName" type="text" required maxlength="120" autocomplete="organization">
               </div>
               <div class="field">
-                <label for="contactName">Your name *</label>
+                <label for="contactName" data-i18n="lblName">Your name *</label>
                 <input id="contactName" name="contactName" type="text" required maxlength="80" autocomplete="name">
               </div>
             </div>
 
             <div class="field-row">
               <div class="field">
-                <label for="agentPhone">Mobile number *</label>
+                <label for="agentPhone" data-i18n="lblPhone">Mobile number *</label>
                 <input id="agentPhone" name="phone" type="tel" required inputmode="tel" placeholder="01712345678" autocomplete="tel">
               </div>
               <div class="field">
-                <label for="agentEmail">Email *</label>
+                <label for="agentEmail" data-i18n="lblEmail">Email *</label>
                 <input id="agentEmail" name="email" type="email" required placeholder="you@agency.com" autocomplete="email">
               </div>
             </div>
 
             <div class="field">
-              <label for="agentRegions">Where do you run tours?</label>
-              <input id="agentRegions" name="regions" type="text" maxlength="200" placeholder="Sajek, Bandarban, Cox's Bazar">
+              <label for="agentRegions" data-i18n="lblRegions">Where do you run tours?</label>
+              <input id="agentRegions" name="regions" type="text" maxlength="200" placeholder="Sajek, Bandarban, Cox's Bazar" data-i18n-attr="placeholder:phRegions">
             </div>
 
             <div class="field">
-              <label for="agentWebsite">Facebook page or website</label>
+              <label for="agentWebsite" data-i18n="lblWebsite">Facebook page or website</label>
               <input id="agentWebsite" name="website" type="text" maxlength="200" placeholder="facebook.com/youragency">
             </div>
 
             <div class="field">
-              <label for="agentMessage">Anything else we should know?</label>
-              <textarea id="agentMessage" name="message" rows="3" maxlength="1000" placeholder="How long you have been running tours, group sizes, questions for us"></textarea>
+              <label for="agentMessage" data-i18n="lblMessage">Anything else we should know?</label>
+              <textarea id="agentMessage" name="message" rows="3" maxlength="1000" placeholder="How long you have been running tours, group sizes, questions for us" data-i18n-attr="placeholder:phMessage"></textarea>
             </div>
 
             <p class="form-error" id="agentFormError" role="alert" hidden></p>
-            <button type="submit" class="btn btn-dark btn-block">Send my details</button>
+            <button type="submit" class="btn btn-dark btn-block" data-i18n="formSubmit">Send my details</button>
           </form>
 
           <div class="agent-done" id="agentDone" hidden tabindex="-1">
-            <h3>Thanks, we have your details</h3>
-            <p id="agentDoneText">Our team will contact you within 2 working days.</p>
-            <button type="button" class="btn btn-outline" onclick="resetAgentForm()">Send another agency</button>
+            <h3 data-i18n="doneTitle">Thanks, we have your details</h3>
+            <p id="agentDoneText" data-i18n="doneText">Our team will contact you within 2 working days.</p>
+            <button type="button" class="btn btn-outline" onclick="resetAgentForm()" data-i18n="doneAgain">Send another agency</button>
           </div>
         </div>
       </div>
@@ -307,14 +308,14 @@
       <img class="updates-img" src="/img/places/ratargul-morning.jpg" alt="" loading="lazy">
       <div class="updates-shade"></div>
       <div class="wrap updates-inner">
-        <h2 class="h2">Follow Plezar as it grows</h2>
-        <p>Get an occasional email when there is something new to see: new features, early access, and the places our community is sharing.</p>
+        <h2 class="h2" data-i18n="updatesTitle">Follow Plezar as it grows</h2>
+        <p data-i18n="updatesText">Get an occasional email when there is something new to see: new features, early access, and the places our community is sharing.</p>
         <form class="updates-form" onsubmit="handleSubscribe(event)" data-source="portfolio_updates">
-          <label class="sr-only" for="updatesEmail">Email address</label>
+          <label class="sr-only" for="updatesEmail" data-i18n="lblUpdatesEmail">Email address</label>
           <input id="updatesEmail" type="email" placeholder="you@example.com" required>
-          <button type="submit" class="btn btn-light">Send me updates</button>
+          <button type="submit" class="btn btn-light" data-i18n="updatesSubmit">Send me updates</button>
         </form>
-        <p class="updates-note">No spam. Unsubscribe with one click.</p>
+        <p class="updates-note" data-i18n="updatesNote">No spam. Unsubscribe with one click.</p>
       </div>
     </section>
 
@@ -324,13 +325,13 @@
     <div class="wrap footer-inner">
       <div class="footer-brand">
         <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
-        <p>A social app for travel in Bangladesh.</p>
-        <p class="footer-copy">© <span id="year">2026</span> Plezar, Dhaka</p>
+        <p data-i18n="footerTagline">A social app for travel in Bangladesh.</p>
+        <p class="footer-copy">© <span id="year">2026</span> <span data-i18n="footerPlace">Plezar, Dhaka</span></p>
       </div>
       <div class="credits">
-        <h3>Photos</h3>
-        <p>All photos are from Wikimedia Commons, used under their licences.</p>
-        <ul>
+        <h3 data-i18n="creditsTitle">Photos</h3>
+        <p data-i18n="creditsText">All photos are from Wikimedia Commons, used under their licences.</p>
+        <ul lang="en">
           <li><a href="https://commons.wikimedia.org/wiki/File:Jaflong_Sylhet.jpg" rel="noopener" target="_blank">Jaflong</a> by Abdul Momin, CC BY-SA 4.0</li>
           <li><a href="https://commons.wikimedia.org/wiki/File:Sunrise_at_Sajek_Valley.jpg" rel="noopener" target="_blank">Sajek Valley</a> by Rocky Masum, CC BY-SA 4.0</li>
           <li><a href="https://commons.wikimedia.org/wiki/File:Ratargul_Swamp_Forest,_Sylhet..jpg" rel="noopener" target="_blank">Ratargul</a> by Sumon Mallick, CC BY-SA 4.0</li>
@@ -348,6 +349,7 @@
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
+  <script src="/js/i18n.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

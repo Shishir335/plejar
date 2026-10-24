@@ -62,6 +62,12 @@
           <span class="sidebar-text">Newsletter Leads</span>
         </button>
 
+        <button class="nav-link-btn" data-tab="agencies" onclick="switchTab('agencies')">
+          <span>🏝️</span>
+          <span class="sidebar-text">Agencies</span>
+          <span id="agenciesPendingCount" class="nav-count" hidden>0</span>
+        </button>
+
         <button class="nav-link-btn" data-tab="agentLeads" onclick="switchTab('agentLeads')">
           <span>🧭</span>
           <span class="sidebar-text">Agent Leads</span>
@@ -105,35 +111,52 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-header">
-              <span class="stat-label">Total Accounts</span>
+              <span class="stat-label">Active agencies</span>
+              <span class="stat-icon">🏝️</span>
+            </div>
+            <div id="statAgencies" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Awaiting verification</span>
+              <span class="stat-icon">🛡️</span>
+            </div>
+            <div id="statPendingVerification" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">New agent leads</span>
+              <span class="stat-icon">🧭</span>
+            </div>
+            <div id="statNewLeads" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Published packages</span>
+              <span class="stat-icon">🎒</span>
+            </div>
+            <div id="statPublishedPackages" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Newsletter subscribers</span>
+              <span class="stat-icon">📬</span>
+            </div>
+            <div id="statSubscribers" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">All accounts</span>
               <span class="stat-icon">👥</span>
             </div>
             <div id="statTotalUsers" class="stat-value">0</div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">Admins &amp; Managers</span>
-              <span class="stat-icon">🛡️</span>
-            </div>
-            <div id="statAdminUsers" class="stat-value">0</div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">Standard Users</span>
-              <span class="stat-icon">👤</span>
-            </div>
-            <div id="statStandardUsers" class="stat-value">0</div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">Newsletter Leads</span>
-              <span class="stat-icon">📬</span>
-            </div>
-            <div id="statSubscribers" class="stat-value">0</div>
-          </div>
         </div>
 
         <!-- 1. USERS DIRECTORY TAB -->
@@ -150,6 +173,7 @@
                 <option value="admin">Admins</option>
                 <option value="manager">Managers</option>
                 <option value="user">Standard Users</option>
+                <option value="agent">Agency accounts</option>
               </select>
             </div>
 
@@ -205,6 +229,53 @@
               </tbody>
             </table>
           </div>
+        </section>
+
+        <!-- AGENCIES TAB -->
+        <section id="tab-agencies" class="tab-pane">
+          <div class="control-bar">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <h2 style="font-size: 1.1rem; font-weight: 600;">Tour Agencies</h2>
+              <select id="agencyStatusFilter" class="form-select" style="max-width: 160px;" onchange="loadAgencies()">
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+              </select>
+              <select id="agencyVerificationFilter" class="form-select" style="max-width: 200px;" onchange="loadAgencies()">
+                <option value="">Any verification</option>
+                <option value="pending">Awaiting review</option>
+                <option value="approved">Verified</option>
+                <option value="rejected">Changes requested</option>
+                <option value="none">Not submitted</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" onclick="loadAgencies()">↻ Refresh</button>
+              <button class="btn btn-primary" onclick="openInviteAgency()">+ Invite agency</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="admin-table lead-table">
+              <thead>
+                <tr>
+                  <th>Agency</th>
+                  <th>Owner</th>
+                  <th>Packages</th>
+                  <th>Team</th>
+                  <th>Verification</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="agenciesTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- AGENCY DETAIL -->
+        <section id="tab-agencyDetail" class="tab-pane">
+          <div id="agencyDetail"></div>
         </section>
 
         <!-- 3. AGENT LEADS TAB -->
@@ -394,6 +465,47 @@
       <button type="button" class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="handleSendResetLink()">
         Dispatch Email Reset Link
       </button>
+    </div>
+  </div>
+
+  <!-- Invite Agency Modal -->
+  <div id="inviteAgencyModal" class="modal-overlay">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 1.2rem; font-weight: 700;">Invite a tour agency</h3>
+        <button onclick="closeModal('inviteAgencyModal')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;" aria-label="Close">&times;</button>
+      </div>
+      <form id="inviteAgencyForm" onsubmit="handleInviteAgency(event)" novalidate>
+        <input type="hidden" name="leadId">
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">This creates the agency and emails the owner a link to set their password and open the agency panel.</p>
+        <div class="form-group">
+          <label class="form-label" for="iaAgencyName">Agency name *</label>
+          <input id="iaAgencyName" name="agencyName" class="form-input" required maxlength="120">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="iaContactName">Owner name *</label>
+          <input id="iaContactName" name="contactName" class="form-input" required maxlength="80">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="iaEmail">Owner email *</label>
+          <input id="iaEmail" name="email" type="email" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="iaPhone">Phone</label>
+          <input id="iaPhone" name="phone" class="form-input" maxlength="20">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="iaRegions">Where they run tours</label>
+          <input id="iaRegions" name="regions" class="form-input" placeholder="Sajek, Bandarban">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="iaWebsite">Facebook page or website</label>
+          <input id="iaWebsite" name="website" class="form-input" maxlength="200">
+        </div>
+        <div id="inviteAgencyError" class="form-error-box" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary" id="inviteAgencySubmit" style="width: 100%; margin-top: 6px;">Create agency and send invite</button>
+      </form>
+      <div id="inviteAgencyResult" hidden></div>
     </div>
   </div>
 

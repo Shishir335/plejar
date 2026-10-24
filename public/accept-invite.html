@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set your password — Plezar</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/css/agent.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+</head>
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+
+      <div id="inviteLoading"><p class="sub">Checking your invite...</p></div>
+
+      <div id="inviteInvalid" hidden>
+        <h1>This invite link doesn't work</h1>
+        <p class="sub" id="inviteInvalidText">It may have expired or already been used. Ask the person who invited you to send a new invite.</p>
+        <a href="/agent" class="btn btn-quiet btn-block">Go to agency sign in</a>
+      </div>
+
+      <form id="inviteForm" hidden novalidate>
+        <h1 id="inviteTitle">Set your password</h1>
+        <p class="sub" id="inviteSub"></p>
+        <div class="alert alert-error" id="inviteError" role="alert" hidden></div>
+        <div class="field">
+          <label for="invitePassword">New password</label>
+          <input id="invitePassword" type="password" minlength="8" required autocomplete="new-password">
+          <span class="hint">At least 8 characters.</span>
+        </div>
+        <div class="field">
+          <label for="inviteConfirm">Confirm password</label>
+          <input id="inviteConfirm" type="password" minlength="8" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="inviteSubmit">Set password and open my panel</button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    const token = new URLSearchParams(window.location.search).get('token') || '';
+    const $ = id => document.getElementById(id);
+
+    function showInvalid(message) {
+      $('inviteLoading').hidden = true;
+      $('inviteForm').hidden = true;
+      $('inviteInvalid').hidden = false;
+      if (message) $('inviteInvalidText').textContent = message;
+    }
+
+    async function loadInvite() {
+      if (!token) return showInvalid('This link is missing its invite code. Open the link from your invite email again.');
+      try {
+        const res = await fetch(`/api/v1/users/invite/${encodeURIComponent(token)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return showInvalid(data.message);
+
+        const invite = data.data;
+        $('inviteTitle').textContent = `Welcome, ${invite.name.split(' ')[0]}`;
+        $('inviteSub').textContent = invite.agencyName
+          ? `You've been invited to manage ${invite.agencyName} on Plezar as ${invite.agencyRole === 'owner' ? 'the owner' : 'a team member'}. Set a password for ${invite.email} to continue.`
+          : `Set a password for ${invite.email} to continue.`;
+        $('inviteLoading').hidden = true;
+        $('inviteForm').hidden = false;
+        $('invitePassword').focus();
+      } catch (err) {
+        showInvalid('Could not reach the server. Check your connection and reload the page.');
+      }
+    }
+
+    function showError(message) {
+      $('inviteError').textContent = message;
+      $('inviteError').hidden = false;
+    }
+
+    $('inviteForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const password = $('invitePassword').value;
+      const confirmPassword = $('inviteConfirm').value;
+      if (password.length < 8) return showError('Use at least 8 characters for your password.');
+      if (password !== confirmPassword) return showError('The two passwords don\'t match.');
+
+      const btn = $('inviteSubmit');
+      btn.disabled = true;
+      btn.textContent = 'Setting password...';
+      try {
+        const res = await fetch(`/api/v1/users/acceptInvite/${encodeURIComponent(token)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ password, confirmPassword })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Could not set your password. Try again.');
+        if (data.token) {
+          try { localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still signs you in */ }
+        }
+        window.location.href = '/agent';
+      } catch (err) {
+        showError(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Set password and open my panel';
+      }
+    });
+
+    loadInvite();
+  </script>
+</body>
+</html>

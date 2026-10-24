@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agency panel — Plezar</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="/css/agent.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+</head>
+<body>
+
+  <!-- Sign in -->
+  <main class="auth-page" id="loginView" hidden>
+    <form class="auth-card" id="loginForm" novalidate>
+      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+      <h1>Agency sign in</h1>
+      <p class="sub">Manage your agency profile, tour packages and team.</p>
+      <div class="alert alert-error" id="loginError" role="alert" hidden></div>
+      <div class="alert alert-ok" id="loginNotice" role="status" hidden></div>
+      <div class="field">
+        <label for="loginEmail">Email</label>
+        <input id="loginEmail" name="email" type="email" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" name="password" type="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="loginSubmit">Sign in</button>
+      <p style="margin-top: 14px; font-size: 0.88rem; text-align: center;">
+        <a href="#" id="forgotLink">Forgot your password?</a>
+      </p>
+      <p style="margin-top: 18px; font-size: 0.84rem; color: var(--ink-faint); text-align: center;">
+        New agencies join by invitation. <a href="/#agents">Tell us about your agency</a>.
+      </p>
+    </form>
+  </main>
+
+  <!-- Panel -->
+  <div class="panel" id="panelView" hidden>
+    <aside class="side">
+      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+      <div class="side-agency" id="sideAgency"></div>
+      <nav class="side-nav" aria-label="Agency panel">
+        <button data-view="overview" class="active">Overview</button>
+        <button data-view="profile">Agency profile</button>
+        <button data-view="packages">Tour packages</button>
+        <button data-view="team" data-owner-only>Team</button>
+        <button data-view="verification" data-owner-only>Verification</button>
+      </nav>
+      <div class="side-foot">
+        <div><strong id="sideUserName"></strong><span id="sideUserRole"></span></div>
+        <button class="btn btn-quiet btn-sm" id="logoutBtn">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <!-- Overview -->
+      <section id="view-overview" data-view-pane>
+        <div class="page-head">
+          <div>
+            <h1 id="overviewTitle">Overview</h1>
+            <p>Here's how your agency looks on Plezar right now.</p>
+          </div>
+          <button class="btn btn-primary" data-action="new-package">Add a tour package</button>
+        </div>
+        <div id="overviewCallout"></div>
+        <dl class="stats">
+          <div class="stat"><dt>Published packages</dt><dd id="statPublished">0</dd></div>
+          <div class="stat"><dt>Drafts</dt><dd id="statDraft">0</dd></div>
+          <div class="stat"><dt>Hidden</dt><dd id="statHidden">0</dd></div>
+          <div class="stat"><dt>Team members</dt><dd id="statTeam">0</dd></div>
+        </dl>
+        <div class="card">
+          <h2>Profile checklist</h2>
+          <p class="muted">A complete profile helps travelers trust you.</p>
+          <ul class="doc-list" id="profileChecklist"></ul>
+        </div>
+      </section>
+
+      <!-- Profile -->
+      <section id="view-profile" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Agency profile</h1>
+            <p>This is what travelers see on your agency page.</p>
+          </div>
+        </div>
+        <div class="alert alert-warn" id="profileStaffNote" hidden>Only the agency owner can edit the profile.</div>
+        <form class="card" id="profileForm" novalidate>
+          <div class="field">
+            <span class="label">Logo</span>
+            <div class="logo-row">
+              <div class="logo-preview" id="logoPreview"></div>
+              <div>
+                <input id="logoInput" name="logo" type="file" accept="image/jpeg,image/png,image/webp">
+                <span class="hint">Square image, JPG, PNG or WebP, up to 5 MB.</span>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="pfName">Agency name *</label>
+            <input id="pfName" name="name" type="text" maxlength="120" required>
+          </div>
+          <div class="field">
+            <label for="pfDescription">About your agency</label>
+            <textarea id="pfDescription" name="description" maxlength="1500" rows="4" placeholder="What kind of trips you run, since when, what makes your trips different"></textarea>
+          </div>
+          <div class="field">
+            <label for="pfRegions">Where you run tours</label>
+            <input id="pfRegions" name="regions" type="text" placeholder="Sajek, Bandarban, Cox's Bazar">
+            <span class="hint">Separate places with commas.</span>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="pfPhone">Phone</label>
+              <input id="pfPhone" name="phone" type="tel" maxlength="20">
+            </div>
+            <div class="field">
+              <label for="pfEmail">Public email</label>
+              <input id="pfEmail" name="email" type="email">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="pfWebsite">Facebook page or website</label>
+              <input id="pfWebsite" name="website" type="text" maxlength="200">
+            </div>
+            <div class="field">
+              <label for="pfLicense">Trade license number</label>
+              <input id="pfLicense" name="tradeLicenseNumber" type="text" maxlength="60">
+            </div>
+          </div>
+          <div class="alert alert-error" id="profileError" role="alert" hidden></div>
+          <button type="submit" class="btn btn-primary" id="profileSave">Save profile</button>
+        </form>
+      </section>
+
+      <!-- Packages -->
+      <section id="view-packages" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Tour packages</h1>
+            <p>Published packages appear on your agency page. Drafts are only visible to your team.</p>
+          </div>
+          <button class="btn btn-primary" data-action="new-package">Add a tour package</button>
+        </div>
+        <div id="packageList"></div>
+      </section>
+
+      <!-- Team -->
+      <section id="view-team" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Team</h1>
+            <p>Team members can edit tour packages. Only you can change the profile, team and verification.</p>
+          </div>
+        </div>
+        <form class="card" id="inviteForm" novalidate>
+          <h2>Invite a team member</h2>
+          <p class="muted">They'll get an email with a link to set their password.</p>
+          <div class="field-row">
+            <div class="field">
+              <label for="invName">Name</label>
+              <input id="invName" name="name" type="text" maxlength="80" required>
+            </div>
+            <div class="field">
+              <label for="invEmail">Email</label>
+              <input id="invEmail" name="email" type="email" required>
+            </div>
+          </div>
+          <div class="alert alert-error" id="inviteError" role="alert" hidden></div>
+          <button type="submit" class="btn btn-primary" id="inviteSubmit">Send invite</button>
+          <div id="inviteResult"></div>
+        </form>
+        <div class="card">
+          <h2>Members</h2>
+          <table class="table">
+            <thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+            <tbody id="teamBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Verification -->
+      <section id="view-verification" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Verification</h1>
+            <p>Verified agencies get a mark on their profile and packages. Plezar checks your trade license and the owner's national ID.</p>
+          </div>
+        </div>
+        <div id="verificationStatus"></div>
+        <form class="card" id="verificationForm" novalidate>
+          <h2>Documents</h2>
+          <p class="muted">Documents are private. Only you and the Plezar team can see them.</p>
+          <ul class="doc-list" id="docList"></ul>
+          <div class="field">
+            <label for="vfLicenseNo">Trade license number *</label>
+            <input id="vfLicenseNo" name="tradeLicenseNumber" type="text" maxlength="60">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="vfTradeLicense">Trade license</label>
+              <input id="vfTradeLicense" name="tradeLicense" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+              <span class="hint">Photo or PDF, up to 5 MB.</span>
+            </div>
+            <div class="field">
+              <label for="vfNid">Owner's national ID (NID)</label>
+              <input id="vfNid" name="nid" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+              <span class="hint">Front side, photo or PDF, up to 5 MB.</span>
+            </div>
+          </div>
+          <div class="alert alert-error" id="verificationError" role="alert" hidden></div>
+          <button type="submit" class="btn btn-primary" id="verificationSubmit">Submit for review</button>
+        </form>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Package editor -->
+  <div class="drawer-bg" id="packageDrawer" hidden>
+    <form class="drawer" id="packageForm" role="dialog" aria-modal="true" aria-labelledby="packageFormTitle" novalidate>
+      <div class="drawer-head">
+        <h2 id="packageFormTitle">New tour package</h2>
+        <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
+      </div>
+      <div class="alert alert-warn" id="packageHiddenNote" hidden>Plezar has hidden this package. You can edit it, but contact support before publishing it again.</div>
+      <div class="field">
+        <label for="pkTitle">Title *</label>
+        <input id="pkTitle" name="title" type="text" maxlength="120" required placeholder="Sajek Valley weekend, 3 days">
+      </div>
+      <div class="field">
+        <label for="pkDestination">Destination *</label>
+        <input id="pkDestination" name="destination" type="text" maxlength="120" required placeholder="Sajek Valley, Rangamati">
+      </div>
+      <div class="field-row field-row-3">
+        <div class="field">
+          <label for="pkDays">Days *</label>
+          <input id="pkDays" name="durationDays" type="number" min="1" max="60" required>
+        </div>
+        <div class="field">
+          <label for="pkNights">Nights</label>
+          <input id="pkNights" name="durationNights" type="number" min="0" max="60">
+        </div>
+        <div class="field">
+          <label for="pkPrice">Price from (৳) *</label>
+          <input id="pkPrice" name="priceFrom" type="number" min="0" step="50" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="pkDescription">Description</label>
+        <textarea id="pkDescription" name="description" maxlength="3000" rows="5" placeholder="Day-by-day plan, pickup point, who the trip suits"></textarea>
+      </div>
+      <div class="field">
+        <label for="pkIncluded">What's included</label>
+        <textarea id="pkIncluded" name="included" rows="3" placeholder="One per line: AC bus both ways, hotel (3 per room), all meals, local guide"></textarea>
+        <span class="hint">One item per line.</span>
+      </div>
+      <div class="field">
+        <span class="label">Photos</span>
+        <div class="photo-strip" id="pkPhotos"></div>
+        <input id="pkPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top: 10px;">
+        <span class="hint">Up to 6 photos in total, 5 MB each.</span>
+      </div>
+      <div class="field">
+        <label for="pkStatus">Status</label>
+        <select id="pkStatus" name="status">
+          <option value="draft">Draft (only your team sees it)</option>
+          <option value="published">Published (visible on your agency page)</option>
+          <option value="hidden">Hidden</option>
+        </select>
+      </div>
+      <div class="alert alert-error" id="packageError" role="alert" hidden></div>
+      <div class="drawer-foot">
+        <button type="button" class="btn btn-quiet" data-action="close-drawer">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="packageSave">Save package</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/js/agent.js"></script>
+</body>
+</html>

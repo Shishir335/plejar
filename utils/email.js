@@ -63,7 +63,8 @@ module.exports = class Email {
             name: this.name,
             url: this.url,
             appName: process.env.APP_NAME || 'Plezar',
-            subject
+            subject,
+            ...this.data
         });
 
         // 2) define the email options
@@ -83,6 +84,11 @@ module.exports = class Email {
     async sendWelcome() {
         const appName = process.env.APP_NAME || 'Plezar';
         await this.send('welcome', `Welcome to ${appName}! 🎉`);
+    }
+
+    async sendAgentInvite() {
+        const appName = process.env.APP_NAME || 'Plezar';
+        await this.send('agentInvite', `You're invited to manage ${this.data.agencyName || 'your agency'} on ${appName}`);
     }
 
     async sendPasswordReset() {

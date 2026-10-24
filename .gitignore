@@ -31,3 +31,7 @@ yarn-error.log*
 *.sublime-project
 *.sublime-workspace
 .system_generated/
+
+# User uploads (agency images and private verification documents)
+uploads/
+public/img/agencies/

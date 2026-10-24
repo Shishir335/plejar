@@ -7,6 +7,13 @@
       "runtimeArgs": ["server.js"],
       "env": { "PORT": "3917" },
       "port": 3917
+    },
+    {
+      "name": "plezar-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "env": { "PORT": "3918", "NODE_ENV": "development" },
+      "port": 3918
     }
   ]
 }

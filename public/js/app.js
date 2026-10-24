@@ -55,6 +55,12 @@ function updateNav() {
 
 window.addEventListener('scroll', updateNav, { passive: true });
 
+// Server replies are in English, so in Bangla mode show our own translated message instead
+function serverText(data, key) {
+  if (i18n.lang === 'bn') return t(key);
+  return (data && data.message) || t(key);
+}
+
 // Email updates signup (source comes from the form's data-source)
 async function handleSubscribe(e) {
   e.preventDefault();
@@ -75,13 +81,13 @@ async function handleSubscribe(e) {
     const data = await res.json().catch(() => ({}));
 
     if (res.ok) {
-      showToast(data.message || "You're subscribed. We'll email you when there's news.", 'success');
+      showToast(serverText(data, 'subscribed'), 'success');
       emailInput.value = '';
     } else {
-      showToast(data.message || 'Could not subscribe. Check the email address and try again.', 'error');
+      showToast(serverText(data, 'subscribeFailed'), 'error');
     }
   } catch (err) {
-    showToast('Could not reach the server. Check your connection and try again.', 'error');
+    showToast(t('offline'), 'error');
   } finally {
     if (submitBtn) submitBtn.disabled = false;
   }
@@ -112,19 +118,17 @@ async function handleAgentLead(e) {
   Object.keys(values).forEach(key => { values[key] = values[key].trim(); });
   values.phone = values.phone.replace(/[\s-]/g, '');
 
-  if (!values.agencyName) return showAgentError(form, 'Enter your agency name.', form.agencyName);
-  if (!values.contactName) return showAgentError(form, 'Enter your name.', form.contactName);
-  if (!BD_PHONE.test(values.phone)) {
-    return showAgentError(form, 'Enter a Bangladeshi mobile number, for example 01712345678.', form.phone);
-  }
-  if (!EMAIL.test(values.email)) return showAgentError(form, 'Enter a valid email address.', form.email);
+  if (!values.agencyName) return showAgentError(form, t('errAgency'), form.agencyName);
+  if (!values.contactName) return showAgentError(form, t('errName'), form.contactName);
+  if (!BD_PHONE.test(values.phone)) return showAgentError(form, t('errPhone'), form.phone);
+  if (!EMAIL.test(values.email)) return showAgentError(form, t('errEmail'), form.email);
 
   const errorBox = document.getElementById('agentFormError');
   if (errorBox) errorBox.hidden = true;
   form.querySelectorAll('[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid'));
 
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Sending...';
+  submitBtn.textContent = t('sending');
 
   try {
     const res = await fetch('/api/v1/agent-leads', {
@@ -135,23 +139,23 @@ async function handleAgentLead(e) {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      showAgentError(form, data.message || 'Could not send your details. Please try again.');
+      showAgentError(form, serverText(data, 'errAgentFailed'));
       return;
     }
 
     const done = document.getElementById('agentDone');
     const doneText = document.getElementById('agentDoneText');
-    if (doneText && data.message) doneText.textContent = data.message;
+    if (doneText) doneText.textContent = t('doneText');
     form.hidden = true;
     if (done) {
       done.hidden = false;
       done.focus();
     }
   } catch (err) {
-    showAgentError(form, 'Could not reach the server. Check your connection and try again.');
+    showAgentError(form, t('offline'));
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Send my details';
+    submitBtn.textContent = t('formSubmit');
   }
 }
 

@@ -3,6 +3,7 @@ const { promisify } = require('util');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/userModel');
+const Agency = require('../models/agencyModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const Email = require('../utils/email');
@@ -88,12 +89,23 @@ exports.login = catchAsync(async (req, res, next) => {
     // 2) check if user exists in database and select password field
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
-    // 3) verify password with user record
-    if (!user || !(await user.correctPassword(password, user.password))) {
-        return next(new AppError('Incorrect email or passcode. Clearance denied.', 401));
+    // 3) verify password with user record (invited accounts have no password yet)
+    if (!user || !user.password || !(await user.correctPassword(password, user.password))) {
+        if (user && user.accountStatus === 'invited') {
+            return next(new AppError('Your invite has not been accepted yet. Use the link in your invite email to set a password.', 401));
+        }
+        return next(new AppError('Incorrect email or password.', 401));
     }
 
-    // 4) send token to client
+    // 4) agents of a suspended agency cannot sign in
+    if (user.role === 'agent') {
+        const agency = await Agency.findById(user.agency).select('status');
+        if (!agency || agency.status !== 'active') {
+            return next(new AppError('Your agency account is suspended. Contact Plezar support.', 403));
+        }
+    }
+
+    // 5) send token to client
     createAndSendToken(user, 200, req, res);
 });
 
@@ -306,12 +318,64 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
     user.confirmPassword = req.body.confirmPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpire = undefined;
+    // Setting a password through a reset link also completes a pending invite
+    user.accountStatus = 'active';
+    user.inviteToken = undefined;
+    user.inviteExpires = undefined;
 
     await user.save();
 
     // 3) Update changedPasswordAt property for the user
 
     // 4) Log the user in, send JWT
+    createAndSendToken(user, 200, req, res);
+});
+
+// Find a pending invite by its raw token
+const findInvitedUser = token => {
+    const hashedToken = crypto.createHash('sha256').update(String(token || '')).digest('hex');
+    return User.findOne({
+        inviteToken: hashedToken,
+        inviteExpires: { $gt: Date.now() },
+        accountStatus: 'invited'
+    }).populate('agency', 'name status');
+};
+
+// Show who an invite is for, so the set-password page can greet them
+exports.checkInvite = catchAsync(async (req, res, next) => {
+    const user = await findInvitedUser(req.params.token);
+    if (!user) {
+        return next(new AppError('This invite link is invalid or has expired. Ask for a new invite.', 400));
+    }
+
+    res.status(200).json({
+        status: 'success',
+        data: {
+            name: user.name,
+            email: user.email,
+            agencyName: user.agency ? user.agency.name : '',
+            agencyRole: user.agencyRole
+        }
+    });
+});
+
+// Set a password for an invited account and sign in
+exports.acceptInvite = catchAsync(async (req, res, next) => {
+    const user = await findInvitedUser(req.params.token);
+    if (!user) {
+        return next(new AppError('This invite link is invalid or has expired. Ask for a new invite.', 400));
+    }
+    if (user.agency && user.agency.status !== 'active') {
+        return next(new AppError('This agency account is suspended. Contact Plezar support.', 403));
+    }
+
+    user.password = req.body.password;
+    user.confirmPassword = req.body.confirmPassword;
+    user.accountStatus = 'active';
+    user.inviteToken = undefined;
+    user.inviteExpires = undefined;
+    await user.save();
+
     createAndSendToken(user, 200, req, res);
 });
 

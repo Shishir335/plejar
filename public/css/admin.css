@@ -471,9 +471,28 @@ body {
 .lead-sub a { color: inherit; }
 .lead-message { max-width: 280px; color: var(--text-muted); font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
 .lead-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
-.lead-table a { color: var(--text-main); text-decoration: none; }
+.lead-table a { color: var(--text-primary); text-decoration: none; }
 .lead-table a:hover { text-decoration: underline; }
 .lead-table .lead-sub a { color: var(--text-muted); }
 .lead-table td:nth-child(2) { white-space: nowrap; }
 .lead-table td:nth-child(3) { min-width: 180px; }
 .lead-table td:nth-child(7) { min-width: 130px; }
+
+/* Agencies */
+.badge-agent { background: rgba(20, 184, 166, 0.15); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.3); }
+.detail-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }
+.detail-card { background: var(--admin-card-bg); border: 1px solid var(--admin-border); border-radius: 14px; padding: 20px; }
+.detail-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
+.detail-wide { grid-column: 1 / -1; }
+.detail-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.detail-muted { color: var(--text-muted); font-size: 0.86rem; margin-bottom: 10px; }
+.detail-note { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-radius: 8px; padding: 8px 10px; font-size: 0.85rem; margin-bottom: 10px; }
+.detail-docs { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 6px 0 14px; }
+.detail-docs li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--admin-border); border-radius: 10px; font-size: 0.88rem; }
+.invite-box { margin-top: 12px; padding: 12px; border-radius: 10px; background: rgba(16, 185, 129, 0.1); font-size: 0.86rem; }
+.form-error-box { background: rgba(239, 68, 68, 0.12); color: #fca5a5; border-radius: 8px; padding: 8px 10px; font-size: 0.86rem; margin-bottom: 10px; }
+textarea.form-input { resize: vertical; font-family: inherit; }
+@media (max-width: 1000px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-two { grid-template-columns: 1fr; gap: 0; }
+}

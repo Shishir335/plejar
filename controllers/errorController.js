@@ -21,6 +21,15 @@ const handleValidationErrorDB = err => {
     return new AppError(message, 400);
 }
 
+const handleMulterError = err => {
+    const messages = {
+        LIMIT_FILE_SIZE: 'That file is too large. Upload files of 5 MB or less.',
+        LIMIT_FILE_COUNT: 'Too many files. Remove some and try again.',
+        LIMIT_UNEXPECTED_FILE: 'Unexpected file field or too many files.'
+    };
+    return new AppError(messages[err.code] || 'The upload could not be processed.', 400);
+}
+
 const handleJWTError = () => new AppError('Invalid token.', 401);
 
 const handleJWTExpireError = () => new AppError('Token expired', 401);
@@ -53,10 +62,20 @@ module.exports = (err, req, res, next) => {
     err.statusCode = err.statusCode || 500;
     err.status = err.status || 'error';
 
+    if (err.name === 'MulterError') {
+        err = handleMulterError(err);
+    }
+
     if (process.env.NODE_ENV === 'development') {
         if (err.code === 11000) {
             const error = handleDuplicateErrorDB(err);
             return sendErrorDev(error, res);
+        }
+        // Same status codes as production, but keep the original stack for debugging
+        if (err.name === 'ValidationError' || err.name === 'CastError') {
+            const mapped = err.name === 'ValidationError' ? handleValidationErrorDB(err) : handleCastErrorDB(err);
+            mapped.stack = err.stack;
+            return sendErrorDev(mapped, res);
         }
         sendErrorDev(err, res);
     } else {

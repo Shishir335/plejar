@@ -21,8 +21,35 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'manager', 'admin', 'dev'],
+        enum: ['user', 'manager', 'admin', 'dev', 'agent'],
         default: 'user'
+    },
+
+    // Tour agency membership (only for role 'agent')
+    agency: {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Agency',
+        default: null
+    },
+    agencyRole: {
+        type: String,
+        enum: ['owner', 'staff'],
+        default: null
+    },
+
+    // Invited accounts have no password until the invite is accepted
+    accountStatus: {
+        type: String,
+        enum: ['invited', 'active'],
+        default: 'active'
+    },
+    inviteToken: {
+        type: String,
+        select: false
+    },
+    inviteExpires: {
+        type: Date,
+        select: false
     },
     phone: {
         type: String,
@@ -46,7 +73,7 @@ const userSchema = new mongoose.Schema({
     password: {
         type: String,
         required: function() {
-            return this.authProvider === 'local';
+            return this.authProvider === 'local' && this.accountStatus !== 'invited';
         },
         minlength: 8,
         select: false
@@ -54,7 +81,7 @@ const userSchema = new mongoose.Schema({
     confirmPassword: {
         type: String,
         required: function() {
-            return this.authProvider === 'local' && this.isNew;
+            return this.authProvider === 'local' && this.isNew && this.accountStatus !== 'invited';
         },
         validate: {
             validator: function (el) {
@@ -122,6 +149,20 @@ userSchema.methods.createPasswordResetToken = function () {
     this.passwordResetExpire = Date.now() + 10 * 60 * 1000;
 
     return resetToken;
+}
+
+// Invite links stay valid for 7 days; only the hash is stored
+userSchema.methods.createInviteToken = function () {
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+
+    this.inviteToken = crypto
+        .createHash('sha256')
+        .update(inviteToken)
+        .digest('hex');
+
+    this.inviteExpires = Date.now() + 7 * 24 * 60 * 60 * 1000;
+
+    return inviteToken;
 }
 
 const User = mongoose.model('User', userSchema);

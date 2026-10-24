@@ -22,6 +22,8 @@ const cors = require('cors');
 const userRouter = require('./routes/userRoutes');
 const subscriberRouter = require('./routes/subscriberRoutes');
 const agentLeadRouter = require('./routes/agentLeadRoutes');
+const agencyRouter = require('./routes/agencyRoutes');
+const adminAgencyRouter = require('./routes/adminAgencyRoutes');
 
 const AppError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
@@ -82,6 +84,7 @@ app.use('/api/v1/users/signup', authLimiter);
 app.use('/api/v1/users/google-login', authLimiter);
 app.use('/api/v1/users/forgotPassword', authLimiter);
 app.use('/api/v1/users/resetPassword', authLimiter);
+app.use('/api/v1/users/acceptInvite', authLimiter);
 
 // PUBLIC FORM RATE LIMITER (10 agent enquiries / hour per IP to limit spam)
 const leadLimiter = rateLimit({
@@ -151,10 +154,20 @@ app.get('/reset-password', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
 });
 
+app.get(['/agent', '/agent/dashboard'], (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'agent.html'));
+});
+
+app.get('/accept-invite', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'accept-invite.html'));
+});
+
 // API ROUTES
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/subscribers', subscriberRouter);
 app.use('/api/v1/agent-leads', agentLeadRouter);
+app.use('/api/v1/agency', agencyRouter);
+app.use('/api/v1/admin', adminAgencyRouter);
 
 // 404 UNHANDLED ROUTE CATCHER
 app.all('*', (req, res, next) => {

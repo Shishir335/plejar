@@ -1,0 +1,37 @@
+const express = require('express');
+const authController = require('../controllers/authController');
+const agencyController = require('../controllers/agencyController');
+const { imageUpload, documentUpload } = require('../utils/uploads');
+
+const router = express.Router();
+
+// Agent panel: signed-in agents of an active agency, scoped to their own agency
+router.use(authController.protect, agencyController.requireAgent);
+
+router.get('/me', agencyController.getMyAgency);
+router.patch('/me', agencyController.requireOwner, imageUpload.single('logo'), agencyController.updateMyAgency);
+
+router
+  .route('/me/packages')
+  .get(agencyController.listMyPackages)
+  .post(imageUpload.array('photos', 6), agencyController.createMyPackage);
+router
+  .route('/me/packages/:id')
+  .patch(imageUpload.array('photos', 6), agencyController.updateMyPackage)
+  .delete(agencyController.deleteMyPackage);
+
+router.get('/me/team', agencyController.listTeam);
+router.post('/me/team', agencyController.requireOwner, agencyController.inviteStaff);
+router.post('/me/team/:userId/resend', agencyController.requireOwner, agencyController.resendStaffInvite);
+router.delete('/me/team/:userId', agencyController.requireOwner, agencyController.removeStaff);
+
+router.get('/me/verification', agencyController.requireOwner, agencyController.getVerification);
+router.post(
+  '/me/verification',
+  agencyController.requireOwner,
+  documentUpload.fields([{ name: 'tradeLicense', maxCount: 1 }, { name: 'nid', maxCount: 1 }]),
+  agencyController.submitVerification
+);
+router.get('/me/documents/:docId', agencyController.requireOwner, agencyController.getMyDocument);
+
+module.exports = router;

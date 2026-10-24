@@ -10,6 +10,8 @@ router.post('/login', authController.login);
 router.post('/google-login', authController.googleLogin);
 router.post('/forgotPassword', authController.forgotPassword);
 router.patch('/resetPassword/:token', authController.resetPassword);
+router.get('/invite/:token', authController.checkInvite);
+router.patch('/acceptInvite/:token', authController.acceptInvite);
 
 router.get('/logout', authController.logout);
 
