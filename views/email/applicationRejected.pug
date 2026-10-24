@@ -1,0 +1,9 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  p Thank you for applying to #{appName} with #{agencyName} (reference #{reference}). After reviewing it, we can't accept the application at this time.
+  p
+    strong Reason:
+    |  #{note}
+  p If things change, for example once your trade license is renewed, you are welcome to apply again.

@@ -806,3 +806,25 @@ select.form-select[hidden], [hidden] { display: none !important; }
 
 #bookingsTableBody td:first-child, #vendorTabBody .lead-table td:first-child { min-width: 210px; }
 #bookingsTableBody td, #vendorTabBody .lead-table td { padding-top: 12px; padding-bottom: 12px; }
+
+/* Membership applications */
+.chip.chip-active { background: var(--text-primary); border-color: var(--text-primary); color: var(--admin-card-bg); }
+.chip.chip-active strong { color: inherit; }
+.row-link { cursor: pointer; }
+.row-link:hover td { background: var(--surface-subtle); }
+.kv { display: grid; gap: 0; }
+.kv-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--admin-border); font-size: 0.88rem; }
+.kv-row:first-child { border-top: none; padding-top: 0; }
+.kv-row dt { color: var(--text-muted); }
+.kv-row dd { min-width: 0; overflow-wrap: anywhere; }
+.kv-row dd .tag { margin: 0 4px 4px 0; display: inline-block; }
+.pre { white-space: pre-wrap; }
+.app-thread { list-style: none; display: grid; gap: 10px; }
+.app-thread li { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--admin-border); max-width: 680px; font-size: 0.9rem; }
+.app-thread li p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.app-thread li.from-admin { background: var(--surface-subtle); }
+.app-thread li.from-applicant { margin-left: auto; border-color: var(--note-ok-fg); }
+#tab-applicationDetail .callout { margin-bottom: 10px; }
+@media (max-width: 900px) {
+  .kv-row { grid-template-columns: 1fr; gap: 2px; }
+}

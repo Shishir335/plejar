@@ -103,8 +103,8 @@ exports.getDashboard = catchAsync(async (req, res, next) => {
   const week = arr => sum(arr.slice(-7));
 
   const roleOrder = ['user', 'agent', 'manager', 'admin', 'dev'];
-  const leadOrder = ['new', 'contacted', 'archived'];
-  const agencyOrder = ['active', 'suspended'];
+  const leadOrder = ['new', 'reviewing', 'needs_info', 'approved', 'rejected', 'contacted', 'archived'];
+  const agencyOrder = ['active', 'suspended', 'deactivated'];
   const packageOrder = ['published', 'draft', 'hidden'];
   const subOrder = ['active', 'unsubscribed'];
 

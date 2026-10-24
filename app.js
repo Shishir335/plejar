@@ -21,7 +21,8 @@ const cors = require('cors');
 
 const userRouter = require('./routes/userRoutes');
 const subscriberRouter = require('./routes/subscriberRoutes');
-const agentLeadRouter = require('./routes/agentLeadRoutes');
+const applicationRouter = require('./routes/applicationRoutes');
+const adminApplicationRouter = require('./routes/adminApplicationRoutes');
 const bookingRouter = require('./routes/bookingRoutes');
 const reviewRouter = require('./routes/reviewRoutes');
 const complaintRouter = require('./routes/complaintRoutes');
@@ -92,14 +93,24 @@ app.use('/api/v1/users/forgotPassword', authLimiter);
 app.use('/api/v1/users/resetPassword', authLimiter);
 app.use('/api/v1/users/acceptInvite', authLimiter);
 
-// PUBLIC FORM RATE LIMITER (10 agent enquiries / hour per IP to limit spam)
-const leadLimiter = rateLimit({
+// PUBLIC FORM RATE LIMITERS: membership applications (10 accepted / hour per IP to limit spam;
+// a form sent back with errors doesn't count), and status checks and replies
+// (30 / 15 minutes, failures included, so reference numbers can't be guessed)
+const applicationLimiter = rateLimit({
     max: 10,
     windowMs: 60 * 60 * 1000,
+    skipFailedRequests: true,
     validate: { trustProxy: false },
-    message: { status: 'fail', message: 'Too many submissions from this IP. Please try again in an hour.' }
+    message: { status: 'fail', message: 'Too many applications from this IP. Please try again in an hour.' }
 });
-app.post('/api/v1/agent-leads', leadLimiter);
+const applicationLookupLimiter = rateLimit({
+    max: 30,
+    windowMs: 15 * 60 * 1000,
+    validate: { trustProxy: false },
+    message: { status: 'fail', message: 'Too many attempts. Please try again in 15 minutes.' }
+});
+app.post('/api/v1/applications', applicationLimiter);
+app.post(['/api/v1/applications/status', '/api/v1/applications/reply'], applicationLookupLimiter);
 
 // BODY PARSER, READING DATA FROM req.body
 app.use(express.json({ limit: '10mb' }));
@@ -164,6 +175,10 @@ app.get(['/agent', '/agent/dashboard'], (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'agent.html'));
 });
 
+app.get(['/apply', '/apply/status'], (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'apply.html'));
+});
+
 app.get('/accept-invite', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'accept-invite.html'));
 });
@@ -171,7 +186,7 @@ app.get('/accept-invite', (req, res) => {
 // API ROUTES
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/subscribers', subscriberRouter);
-app.use('/api/v1/agent-leads', agentLeadRouter);
+app.use('/api/v1/applications', applicationRouter);
 app.use('/api/v1/bookings', bookingRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/complaints', complaintRouter);
@@ -180,6 +195,7 @@ app.use('/api/v1/agency', agencyRouter);
 app.use('/api/v1/admin', authController.protect, authController.restrictTo('admin', 'manager', 'dev'));
 app.use('/api/v1/admin', adminUserRouter);
 app.use('/api/v1/admin', adminVendorRouter);
+app.use('/api/v1/admin', adminApplicationRouter);
 app.use('/api/v1/admin', adminAgencyRouter);
 
 // 404 UNHANDLED ROUTE CATCHER

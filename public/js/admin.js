@@ -7,7 +7,6 @@ const adminState = {
   token: localStorage.getItem('plezar_token') || null,
   users: [],
   subscribers: [],
-  agentLeads: [],
   filteredUsers: []
 };
 
@@ -80,7 +79,8 @@ async function checkAdminAuth() {
       showDashboard();
       loadUsers();
       loadSubscribers();
-      loadAgentLeads();
+      loadVendorSummary();
+      loadApplicationSummary();
       loadAgencies();
       loadPendingAgencies();
       loadDashboard();
@@ -137,7 +137,8 @@ async function handleAdminLogin(e) {
       showDashboard();
       loadUsers();
       loadSubscribers();
-      loadAgentLeads();
+      loadVendorSummary();
+      loadApplicationSummary();
       loadAgencies();
       loadPendingAgencies();
       loadDashboard();
@@ -169,7 +170,7 @@ async function handleAdminLogout() {
 // Switch Sidebar Tabs
 const TAB_TITLES = {
   dashboard: 'Dashboard', users: 'Users', userDetail: 'User profile', subscribers: 'Newsletter Leads', agencies: 'Agencies',
-  vendors: 'Vendors', vendorDetail: 'Vendor profile', system: 'System Status', profile: 'My profile'
+  vendors: 'Vendors', vendorDetail: 'Vendor profile', applicationDetail: 'Membership application', system: 'System Status', profile: 'My profile'
 };
 
 // Old tab names still work: they open the matching Vendors sub-tab
@@ -179,7 +180,7 @@ const TAB_ALIASES = {
   agentLeads: ['vendors', 'applications'],
   agencyDetail: ['vendorDetail']
 };
-const NAV_FOR = { userDetail: 'users', vendorDetail: 'vendors' };
+const NAV_FOR = { userDetail: 'users', vendorDetail: 'vendors', applicationDetail: 'vendors' };
 
 function switchTab(tabId) {
   if (TAB_ALIASES[tabId]) {
@@ -397,39 +398,6 @@ function exportSubscribersCSV() {
   window.open('/api/v1/subscribers/export', '_blank');
 }
 
-// Agent Leads
-const LEAD_BADGES = { new: 'badge-manager', contacted: 'badge-active', archived: 'badge-inactive' };
-
-function agentLeadsMessage(text, color = 'var(--text-dim)') {
-  const tbody = document.getElementById('agentLeadsTableBody');
-  if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: ${color};">${escapeHTML(text)}</td></tr>`;
-}
-
-async function loadAgentLeads() {
-  agentLeadsMessage('Loading agent leads...');
-
-  try {
-    const { ok, data } = await adminFetch('/api/v1/agent-leads');
-    if (ok && Array.isArray(data.data?.leads)) {
-      adminState.agentLeads = data.data.leads;
-      updateAgentLeadsCount();
-      renderAgentLeadsTable();
-    } else {
-      agentLeadsMessage(data.message || 'Could not load agent leads.', 'var(--color-danger)');
-    }
-  } catch (err) {
-    agentLeadsMessage('Failed to load agent leads.', 'var(--color-danger)');
-  }
-}
-
-function updateAgentLeadsCount() {
-  const badge = document.getElementById('agentLeadsNewCount');
-  if (!badge) return;
-  const count = adminState.agentLeads.filter(l => l.status === 'new').length;
-  badge.textContent = count;
-  badge.hidden = count === 0;
-}
-
 // Only link websites that are plain http(s) URLs or bare domains
 function leadLink(website) {
   if (!website) return '';
@@ -440,87 +408,6 @@ function leadLink(website) {
     return `<a href="${escapeHTML(parsed.href)}" target="_blank" rel="noopener noreferrer">${escapeHTML(website)}</a>`;
   } catch (e) {
     return escapeHTML(website);
-  }
-}
-
-function renderAgentLeadsTable() {
-  const tbody = document.getElementById('agentLeadsTableBody');
-  if (!tbody) return;
-
-  const filter = document.getElementById('agentLeadStatusFilter')?.value || 'all';
-  const leads = filter === 'all'
-    ? adminState.agentLeads
-    : adminState.agentLeads.filter(l => l.status === filter);
-
-  if (leads.length === 0) {
-    agentLeadsMessage(filter === 'all'
-      ? 'No agent leads yet. They appear here when agents send the form on the website.'
-      : `No ${filter} leads.`);
-    return;
-  }
-
-  tbody.innerHTML = leads.map(lead => {
-    const id = escapeHTML(lead._id);
-    const date = lead.createdAt ? new Date(lead.createdAt).toLocaleString() : 'N/A';
-    const status = LEAD_BADGES[lead.status] ? lead.status : 'new';
-    const actions = [];
-    if (status !== 'archived') actions.push(`<button class="btn btn-primary btn-sm" onclick="inviteFromLead('${id}')">Approve &amp; invite</button>`);
-    if (status !== 'contacted') actions.push(`<button class="btn btn-secondary btn-sm" onclick="setAgentLeadStatus('${id}', 'contacted')">Mark contacted</button>`);
-    if (status !== 'new') actions.push(`<button class="btn btn-secondary btn-sm" onclick="setAgentLeadStatus('${id}', 'new')">Mark new</button>`);
-    if (status !== 'archived') actions.push(`<button class="btn btn-secondary btn-sm" onclick="setAgentLeadStatus('${id}', 'archived')">Archive</button>`);
-    actions.push(`<button class="btn btn-danger btn-sm" onclick="deleteAgentLead('${id}')">Delete</button>`);
-
-    return `
-      <tr>
-        <td><span class="lead-main">${escapeHTML(lead.agencyName)}</span><span class="lead-sub">${escapeHTML(lead.contactName)}</span></td>
-        <td><a class="lead-main" href="tel:${escapeHTML(lead.phone)}">${escapeHTML(lead.phone)}</a><span class="lead-sub"><a href="mailto:${escapeHTML(lead.email)}">${escapeHTML(lead.email)}</a></span></td>
-        <td><span class="lead-sub" style="margin-top:0">${escapeHTML(lead.regions) || '—'}</span><span class="lead-sub">${leadLink(lead.website)}</span></td>
-        <td><div class="lead-message">${escapeHTML(lead.message) || '—'}</div></td>
-        <td style="color: var(--text-muted); white-space: nowrap;">${escapeHTML(date)}</td>
-        <td><span class="badge ${LEAD_BADGES[status]}">${status}</span></td>
-        <td><div class="lead-actions">${actions.join('')}</div></td>
-      </tr>
-    `;
-  }).join('');
-}
-
-async function setAgentLeadStatus(leadId, status) {
-  try {
-    const { ok, data } = await adminFetch(`/api/v1/agent-leads/${leadId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status })
-    });
-    if (ok) {
-      const lead = adminState.agentLeads.find(l => l._id === leadId);
-      if (lead) lead.status = status;
-      updateAgentLeadsCount();
-      renderAgentLeadsTable();
-      showAdminToast(`Lead marked as ${status}.`, 'success');
-    } else {
-      showAdminToast(data.message || 'Could not update the lead.', 'error');
-    }
-  } catch (e) {
-    showAdminToast('Could not update the lead.', 'error');
-  }
-}
-
-async function deleteAgentLead(leadId) {
-  const lead = adminState.agentLeads.find(l => l._id === leadId);
-  const name = lead ? lead.agencyName : 'this lead';
-  if (!confirm(`Delete ${name}? This can't be undone.`)) return;
-
-  try {
-    const { ok, status, data } = await adminFetch(`/api/v1/agent-leads/${leadId}`, { method: 'DELETE' });
-    if (ok || status === 204) {
-      adminState.agentLeads = adminState.agentLeads.filter(l => l._id !== leadId);
-      updateAgentLeadsCount();
-      renderAgentLeadsTable();
-      showAdminToast(`Deleted ${name}.`, 'info');
-    } else {
-      showAdminToast(data.message || 'Could not delete the lead.', 'error');
-    }
-  } catch (e) {
-    showAdminToast('Could not delete the lead.', 'error');
   }
 }
 
@@ -788,20 +675,6 @@ function openInviteAgency(prefill = {}) {
   form.elements.agencyName.focus();
 }
 
-function inviteFromLead(leadId) {
-  const lead = adminState.agentLeads.find(l => l._id === leadId);
-  if (!lead) return;
-  openInviteAgency({
-    leadId: lead._id,
-    agencyName: lead.agencyName,
-    contactName: lead.contactName,
-    email: lead.email,
-    phone: lead.phone,
-    regions: lead.regions,
-    website: lead.website
-  });
-}
-
 async function handleInviteAgency(e) {
   e.preventDefault();
   const form = e.target;
@@ -836,7 +709,6 @@ async function handleInviteAgency(e) {
         <button class="btn btn-secondary" onclick="closeModal('inviteAgencyModal')">Done</button>
       </div>`;
     loadAgencies();
-    loadAgentLeads();
     updateStats();
   } catch (err) {
     fail('Could not reach the server.');
@@ -987,7 +859,7 @@ function renderDashboard(d) {
   const t = d.totals;
   const a = d.attention;
   const attention = [];
-  if (a.newLeads) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.newLeads)}</strong><span>new agent ${a.newLeads === 1 ? 'lead' : 'leads'} to follow up</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('agentLeads')">Open leads</button></div>`);
+  if (a.newLeads) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.newLeads)}</strong><span>membership ${a.newLeads === 1 ? 'application' : 'applications'} to review</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('agentLeads')">Review applications</button></div>`);
   if (a.pendingVerification) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.pendingVerification)}</strong><span>${a.pendingVerification === 1 ? 'agency is' : 'agencies are'} waiting for verification</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">Review</button></div>`);
   if (a.invitedOwners) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.invitedOwners)}</strong><span>${a.invitedOwners === 1 ? 'owner has' : 'owners have'} not accepted their invite</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">View</button></div>`);
 
@@ -1028,16 +900,16 @@ function renderDashboard(d) {
         <div class="chart-card"><div class="chart-head"><div class="chart-title">Accounts by type</div></div>${barList(bd.userRoles.map(r => ({ label: ROLE_LABELS[r.role] || r.role, count: r.count })))}</div>
         <div class="chart-card"><div class="chart-head"><div class="chart-title">Agency verification</div></div>${barList(bd.verification.map(r => ({ label: VERIFY_KEY_LABELS[r.key], count: r.count })))}</div>
         <div class="chart-card"><div class="chart-head"><div class="chart-title">Tour packages</div></div>${barList(bd.packageStatus.map(r => ({ label: r.status[0].toUpperCase() + r.status.slice(1), count: r.count })))}</div>
-        <div class="chart-card"><div class="chart-head"><div class="chart-title">Agent leads by status</div></div>${barList(bd.leadStatus.map(r => ({ label: r.status[0].toUpperCase() + r.status.slice(1), count: r.count })))}</div>
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">Membership applications</div></div>${barList(bd.leadStatus.filter(r => r.count || !['contacted', 'archived'].includes(r.status)).map(r => ({ label: APPLICATION_LABELS[r.status] || r.status, count: r.count })))}</div>
       </div>
     </section>
 
     <section class="dash-section">
       <h3 class="dash-title">Latest activity</h3>
       <div class="recent-grid">
-        ${recentCard('Latest agent leads', 'View all', "switchTab('agentLeads')", d.recent.leads, l => `
-          <li><div class="recent-main"><strong>${escapeHTML(l.agencyName)}</strong><span>${escapeHTML(l.contactName)} · ${escapeHTML(l.phone)}</span></div>
-          <div class="recent-side"><span class="badge ${l.status === 'new' ? 'badge-manager' : (l.status === 'contacted' ? 'badge-active' : 'badge-inactive')}">${escapeHTML(l.status)}</span>${escapeHTML(when(l.createdAt))}</div></li>`)}
+        ${recentCard('Latest applications', 'View all', "switchTab('agentLeads')", d.recent.leads, l => `
+          <li><div class="recent-main"><strong><a href="#" onclick="openApplication('${escapeHTML(l._id)}'); return false;">${escapeHTML(l.agencyName)}</a></strong><span>${escapeHTML(l.contactName)}, ${escapeHTML(l.phone)}</span></div>
+          <div class="recent-side"><span class="badge ${APPLICATION_BADGES[l.status] || 'badge-inactive'}">${escapeHTML(APPLICATION_LABELS[l.status] || l.status)}</span>${escapeHTML(when(l.createdAt))}</div></li>`)}
         ${recentCard('Latest agencies', 'View all', "switchTab('agencies')", d.recent.agencies, ag => `
           <li><div class="recent-main"><strong>${escapeHTML(ag.name)}</strong><span>${escapeHTML((ag.regions || []).join(', ')) || 'No areas listed'}</span></div>
           <div class="recent-side"><span class="badge ${ag.verified ? 'badge-active' : 'badge-inactive'}">${ag.verified ? 'verified' : escapeHTML(ag.status)}</span>${escapeHTML(when(ag.createdAt))}</div></li>`)}

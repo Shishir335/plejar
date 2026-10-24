@@ -239,7 +239,7 @@
       <div class="wrap agents-inner">
         <div class="agents-copy">
           <h2 class="h2" data-i18n="agentsTitle">For tour agents</h2>
-          <p class="agents-lead" data-i18n="agentsLead">We are inviting a first group of tour agents to set up their profiles before Plezar opens to everyone. Tell us about your agency and our team will get in touch.</p>
+          <p class="agents-lead" data-i18n="agentsLead">Tour agencies join Plezar as members. Apply, we check your license, and then you set up your agency's profile.</p>
           <ul class="agent-points">
             <li data-i18n-html="ap1"><strong>Show your work.</strong> Every trip you post adds to a portfolio people can browse any time.</li>
             <li data-i18n-html="ap2"><strong>Grow followers who care.</strong> People who follow you see your new trips first.</li>
@@ -248,57 +248,16 @@
           </ul>
         </div>
 
-        <div class="agent-form-card">
-          <form id="agentForm" class="agent-form" onsubmit="handleAgentLead(event)" novalidate>
-            <h3 data-i18n="formTitle">Tell us about your agency</h3>
-            <p class="form-hint" data-i18n="formHint">Fields marked * are required. We only use these details to contact you about Plezar.</p>
-
-            <div class="field-row">
-              <div class="field">
-                <label for="agencyName" data-i18n="lblAgency">Agency name *</label>
-                <input id="agencyName" name="agencyName" type="text" required maxlength="120" autocomplete="organization">
-              </div>
-              <div class="field">
-                <label for="contactName" data-i18n="lblName">Your name *</label>
-                <input id="contactName" name="contactName" type="text" required maxlength="80" autocomplete="name">
-              </div>
-            </div>
-
-            <div class="field-row">
-              <div class="field">
-                <label for="agentPhone" data-i18n="lblPhone">Mobile number *</label>
-                <input id="agentPhone" name="phone" type="tel" required inputmode="tel" placeholder="01712345678" autocomplete="tel">
-              </div>
-              <div class="field">
-                <label for="agentEmail" data-i18n="lblEmail">Email *</label>
-                <input id="agentEmail" name="email" type="email" required placeholder="you@agency.com" autocomplete="email">
-              </div>
-            </div>
-
-            <div class="field">
-              <label for="agentRegions" data-i18n="lblRegions">Where do you run tours?</label>
-              <input id="agentRegions" name="regions" type="text" maxlength="200" placeholder="Sajek, Bandarban, Cox's Bazar" data-i18n-attr="placeholder:phRegions">
-            </div>
-
-            <div class="field">
-              <label for="agentWebsite" data-i18n="lblWebsite">Facebook page or website</label>
-              <input id="agentWebsite" name="website" type="text" maxlength="200" placeholder="facebook.com/youragency">
-            </div>
-
-            <div class="field">
-              <label for="agentMessage" data-i18n="lblMessage">Anything else we should know?</label>
-              <textarea id="agentMessage" name="message" rows="3" maxlength="1000" placeholder="How long you have been running tours, group sizes, questions for us" data-i18n-attr="placeholder:phMessage"></textarea>
-            </div>
-
-            <p class="form-error" id="agentFormError" role="alert" hidden></p>
-            <button type="submit" class="btn btn-dark btn-block" data-i18n="formSubmit">Send my details</button>
-          </form>
-
-          <div class="agent-done" id="agentDone" hidden tabindex="-1">
-            <h3 data-i18n="doneTitle">Thanks, we have your details</h3>
-            <p id="agentDoneText" data-i18n="doneText">Our team will contact you within 2 working days.</p>
-            <button type="button" class="btn btn-outline" onclick="resetAgentForm()" data-i18n="doneAgain">Send another agency</button>
-          </div>
+        <div class="agent-form-card join-card">
+          <h3 data-i18n="joinTitle">Become a Plezar member agency</h3>
+          <p class="join-text" data-i18n="joinText">Apply online. Our team checks every application by hand, so only real, licensed agencies are on Plezar.</p>
+          <ol class="join-steps">
+            <li data-i18n-html="join1"><strong>Apply online</strong><span>Your agency details, trade license and the owner's NID. About 10 minutes.</span></li>
+            <li data-i18n-html="join2"><strong>We check it within 3 working days</strong><span>If anything is missing, we ask on your application page.</span></li>
+            <li data-i18n-html="join3"><strong>Set up your agency panel</strong><span>Once accepted, you get an email to set your password.</span></li>
+          </ol>
+          <a class="btn btn-dark btn-block" href="/apply" data-i18n="joinApply">Apply for membership</a>
+          <a class="join-status" href="/apply/status" data-i18n="joinStatus">Check an application</a>
         </div>
       </div>
     </section>

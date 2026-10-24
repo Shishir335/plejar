@@ -436,20 +436,23 @@
           <!-- Applications -->
           <div class="subpane" id="vsub-applications">
             <div class="control-bar">
+              <div><h3 class="pane-title">Membership applications</h3><p class="pane-sub">Agencies apply on the website at /apply. Open one to check the documents, then accept, ask for more, or reject.</p></div>
+              <button class="btn btn-secondary" onclick="loadApplications(); loadPendingAgencies();">↻ Refresh</button>
+            </div>
+            <div class="chips" id="applicationChips" aria-label="Application summary"></div>
+            <div class="control-bar">
               <div class="filters">
-                <h3 class="pane-title">Applications from the website</h3>
-                <select id="agentLeadStatusFilter" class="form-select" aria-label="Lead status" onchange="renderAgentLeadsTable()">
-                  <option value="all">All statuses</option><option value="new" selected>New</option><option value="contacted">Contacted</option><option value="archived">Archived</option>
-                </select>
+                <div class="search-input-wrapper"><input type="search" id="apSearch" class="search-input" placeholder="Search agency, person, phone, reference or license" aria-label="Search applications"></div>
+                <select id="apSort" class="form-select" aria-label="Sort" onchange="loadApplications()"><option value="">Newest first</option><option value="oldest">Oldest first</option></select>
               </div>
-              <button class="btn btn-secondary" onclick="loadAgentLeads(); loadPendingAgencies();">↻ Refresh</button>
             </div>
             <div class="table-container">
               <table class="admin-table lead-table">
-                <thead><tr><th>Agency &amp; contact</th><th>Phone &amp; email</th><th>Tours &amp; link</th><th>Message</th><th>Received</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
-                <tbody id="agentLeadsTableBody"></tbody>
+                <thead><tr><th>Agency</th><th>Applicant</th><th>Areas</th><th>Documents</th><th>Received</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="applicationsTableBody"></tbody>
               </table>
             </div>
+            <div class="pager" id="applicationsPager"></div>
             <h3 class="section-label" style="margin-top: 28px;">Invited, owner hasn't signed up yet</h3>
             <div class="table-container">
               <table class="admin-table lead-table">
@@ -569,6 +572,10 @@
         </section>
 
         <!-- VENDOR PROFILE -->
+        <section id="tab-applicationDetail" class="tab-pane">
+          <div id="applicationDetail"></div>
+        </section>
+
         <section id="tab-vendorDetail" class="tab-pane">
           <div id="vendorDetail"></div>
         </section>
@@ -867,6 +874,23 @@
   </div>
 
   <!-- Reason Modal (delete, hide, reject) -->
+  <div id="approveModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Accept this agency</h3><button class="modal-x" onclick="closeModal('approveModal')" aria-label="Close">&times;</button></div>
+      <form id="approveForm" onsubmit="submitApprove(event)" novalidate>
+        <p class="modal-lead" id="approveLead"></p>
+        <label class="check"><input type="checkbox" id="apVerify" checked><span>Mark as verified. The trade license and NID they sent become the vendor's verification documents. Untick to send them to the Verification queue instead.</span></label>
+        <div class="form-group" id="apCategoriesGroup" hidden>
+          <span class="form-label">Categories</span>
+          <div class="check-list" id="apCategories"></div>
+        </div>
+        <div class="form-error-box" id="approveError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="approveSubmit">Accept and send invite</button>
+      </form>
+      <div id="approveResult" hidden></div>
+    </div>
+  </div>
+
   <div id="reasonModal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-head"><h3 id="reasonTitle">Confirm</h3><button class="modal-x" onclick="closeModal('reasonModal')" aria-label="Close">&times;</button></div>
@@ -1010,5 +1034,6 @@
   <script src="/js/admin-users.js"></script>
   <script src="/js/admin-vendors.js"></script>
   <script src="/js/admin-vendor-profile.js"></script>
+  <script src="/js/admin-applications.js"></script>
 </body>
 </html>

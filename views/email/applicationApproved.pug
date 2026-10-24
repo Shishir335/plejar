@@ -1,0 +1,16 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  p Good news: #{agencyName} has been accepted as a member of #{appName}.
+  p Set a password to open your agency panel. From there you can complete your profile, add your tour packages and invite your team.
+  table.btn.btn-primary(role='presentation', border='0', cellpadding='0', cellspacing='0')
+    tbody
+      tr
+        td(align='left')
+          table(role='presentation', border='0', cellpadding='0', cellspacing='0')
+            tbody
+              tr
+                td
+                  a(href=`${url}`, target='_blank') Set your password
+  p This link works for 7 days. Welcome aboard.

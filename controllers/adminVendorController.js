@@ -83,7 +83,7 @@ exports.summary = catchAsync(async (req, res, next) => {
     Agency.countDocuments({ verified: true }),
     Agency.countDocuments({ 'verification.status': 'pending' }),
     User.countDocuments({ role: 'agent', agencyRole: 'owner', accountStatus: 'invited' }),
-    AgentLead.countDocuments({ status: 'new' }),
+    AgentLead.countDocuments({ $or: [{ status: 'new' }, { unreadReply: true }] }),
     Payout.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, amount: { $sum: '$amount' }, count: { $sum: 1 } } }]),
     VendorCategory.countDocuments()
   ]);

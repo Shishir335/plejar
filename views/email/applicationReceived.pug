@@ -1,0 +1,19 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  p Thank you for applying to join #{appName} with #{agencyName}. We have your application and documents, and our team will review them within 3 working days.
+  p
+    | Your reference number is 
+    strong #{reference}
+    | . Keep it handy: you need it, with this email address, to check your application.
+  table.btn.btn-primary(role='presentation', border='0', cellpadding='0', cellspacing='0')
+    tbody
+      tr
+        td(align='left')
+          table(role='presentation', border='0', cellpadding='0', cellspacing='0')
+            tbody
+              tr
+                td
+                  a(href=`${url}`, target='_blank') Check your application
+  p If we need anything else, we will email you and ask for it on that page.

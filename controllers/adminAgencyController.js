@@ -37,7 +37,7 @@ exports.getStats = catchAsync(async (req, res, next) => {
       Agency.countDocuments({ status: 'active' }),
       Agency.countDocuments({ 'verification.status': 'pending' }),
       Agency.countDocuments({ verified: true }),
-      AgentLead.countDocuments({ status: 'new' }),
+      AgentLead.countDocuments({ $or: [{ status: 'new' }, { unreadReply: true }] }),
       Package.countDocuments({ status: 'published' }),
       Subscriber.countDocuments({ status: 'active' }),
       User.countDocuments()

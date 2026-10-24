@@ -790,8 +790,10 @@ async function submitRestrictions(e) {
 }
 
 // One reusable "type a reason" dialog
-function askReason({ title, lead, label: fieldLabel, confirmLabel, onSubmit }) {
+function askReason({ title, lead, label: fieldLabel, confirmLabel, onSubmit, danger = true, maxLength = 500 }) {
   U.reasonHandler = onSubmit;
+  document.getElementById('reasonSubmit').className = `btn ${danger ? 'btn-danger' : 'btn-primary'} btn-block`;
+  document.getElementById('reasonText').maxLength = maxLength;
   document.getElementById('reasonTitle').textContent = title;
   document.getElementById('reasonLead').textContent = lead || '';
   document.getElementById('reasonLabel').textContent = fieldLabel || 'Reason';

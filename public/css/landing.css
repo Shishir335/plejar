@@ -281,6 +281,17 @@ img { max-width: 100%; }
 .btn-outline:hover { border-color: var(--ink); }
 .btn-block { width: 100%; }
 
+.join-text { color: var(--ink-soft); margin: 8px 0 22px; }
+.join-steps { list-style: none; counter-reset: join; display: grid; gap: 18px; margin-bottom: 26px; }
+.join-steps li { counter-increment: join; position: relative; padding-left: 46px; }
+.join-steps li::before {
+  content: counter(join); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--tea-wash); color: var(--tea-deep); font-weight: 700; font-size: 0.9rem;
+}
+.join-steps strong { display: block; }
+.join-steps span { display: block; color: var(--ink-soft); font-size: 0.92rem; }
+.join-status { display: block; text-align: center; margin-top: 14px; font-weight: 600; font-size: 0.92rem; color: var(--tea-deep); text-underline-offset: 3px; }
+
 .agent-done { text-align: center; padding: 40px 8px; }
 .agent-done::before {
   content: ''; display: block; width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%;

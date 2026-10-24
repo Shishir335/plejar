@@ -43,6 +43,18 @@ const userDocumentUpload = multer({
   limits: { fileSize: MAX_FILE_SIZE, files: 4 }
 });
 
+// Membership applications from the website: trade license, NID (front and back), tourism license, other
+const applicationUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: fileFilter(DOCUMENT_TYPES),
+  limits: { fileSize: MAX_FILE_SIZE, files: 6 }
+}).fields([
+  { name: 'trade_license', maxCount: 1 },
+  { name: 'nid', maxCount: 2 },
+  { name: 'tourism_license', maxCount: 1 },
+  { name: 'other', maxCount: 2 }
+]);
+
 /**
  * Resize an uploaded image and store it under /public/img/agencies/<agencyId>/.
  * Returns the public URL path.
@@ -93,13 +105,34 @@ const removePrivateDocument = async relative => {
   if (target) await fs.promises.unlink(target).catch(() => {});
 };
 
+// Copy a private document into another folder (an approved application's files become the agency's)
+const copyPrivateDocument = async (relative, folder) => {
+  const source = privateDocumentPath(relative);
+  if (!source) return null;
+  const dir = path.join(PRIVATE_DOCS_DIR, String(folder));
+  await ensureDir(dir);
+  const filename = `${randomName()}${path.extname(source)}`;
+  await fs.promises.copyFile(source, path.join(dir, filename));
+  return path.join(String(folder), filename);
+};
+
+// Remove a whole private folder (used when an application is deleted)
+const removePrivateFolder = async folder => {
+  const target = path.resolve(PRIVATE_DOCS_DIR, String(folder));
+  if (!target.startsWith(PRIVATE_DOCS_DIR + path.sep)) return;
+  await fs.promises.rm(target, { recursive: true, force: true });
+};
+
 module.exports = {
   imageUpload,
   documentUpload,
   userDocumentUpload,
+  applicationUpload,
   saveAgencyImage,
   removeAgencyImage,
   savePrivateDocument,
   privateDocumentPath,
-  removePrivateDocument
+  removePrivateDocument,
+  copyPrivateDocument,
+  removePrivateFolder
 };

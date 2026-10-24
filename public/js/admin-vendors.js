@@ -50,7 +50,7 @@ function vendorBadges(v) {
 
 const VENDOR_SUB_LOADERS = {
   all: () => loadVendors(V.page),
-  applications: () => { loadAgentLeads(); loadPendingAgencies(); },
+  applications: () => { loadApplications(); loadPendingAgencies(); },
   verification: () => loadPendingAgencies(),
   categories: () => loadCategories(),
   bookings: () => loadBookings(),

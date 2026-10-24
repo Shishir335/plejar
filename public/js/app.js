@@ -49,7 +49,7 @@ function updateNav() {
   if (!dom.nav) return;
   const pastHero = window.scrollY > window.innerHeight * 0.6;
   const menuOpen = dom.navLinks && dom.navLinks.classList.contains('open');
-  dom.nav.classList.toggle('is-solid', pastHero || menuOpen);
+  dom.nav.classList.toggle('is-solid', pastHero || menuOpen || dom.nav.dataset.solid === 'true');
 }
 
 window.addEventListener('scroll', updateNav, { passive: true });
@@ -92,81 +92,9 @@ async function handleSubscribe(e) {
   }
 }
 
-// Tour agent contact form
+// Shared form checks (the membership application page uses these too)
 const BD_PHONE = /^(?:\+?880|0)1[3-9]\d{8}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function showAgentError(form, message, field) {
-  const box = document.getElementById('agentFormError');
-  form.querySelectorAll('[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid'));
-  if (field) {
-    field.setAttribute('aria-invalid', 'true');
-    field.focus();
-  }
-  if (box) {
-    box.textContent = message;
-    box.hidden = false;
-  }
-}
-
-async function handleAgentLead(e) {
-  e.preventDefault();
-  const form = e.target;
-  const submitBtn = form.querySelector('button[type="submit"]');
-  const values = Object.fromEntries(new FormData(form).entries());
-  Object.keys(values).forEach(key => { values[key] = values[key].trim(); });
-  values.phone = values.phone.replace(/[\s-]/g, '');
-
-  if (!values.agencyName) return showAgentError(form, t('errAgency'), form.agencyName);
-  if (!values.contactName) return showAgentError(form, t('errName'), form.contactName);
-  if (!BD_PHONE.test(values.phone)) return showAgentError(form, t('errPhone'), form.phone);
-  if (!EMAIL.test(values.email)) return showAgentError(form, t('errEmail'), form.email);
-
-  const errorBox = document.getElementById('agentFormError');
-  if (errorBox) errorBox.hidden = true;
-  form.querySelectorAll('[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid'));
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = t('sending');
-
-  try {
-    const res = await fetch('/api/v1/agent-leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values)
-    });
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      showAgentError(form, serverText(data, 'errAgentFailed'));
-      return;
-    }
-
-    const done = document.getElementById('agentDone');
-    const doneText = document.getElementById('agentDoneText');
-    if (doneText) doneText.textContent = t('doneText');
-    form.hidden = true;
-    if (done) {
-      done.hidden = false;
-      done.focus();
-    }
-  } catch (err) {
-    showAgentError(form, t('offline'));
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = t('formSubmit');
-  }
-}
-
-function resetAgentForm() {
-  const form = document.getElementById('agentForm');
-  const done = document.getElementById('agentDone');
-  if (!form || !done) return;
-  form.reset();
-  done.hidden = true;
-  form.hidden = false;
-  form.agencyName.focus();
-}
 
 // Initialization
 window.addEventListener('DOMContentLoaded', () => {

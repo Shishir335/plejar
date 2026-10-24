@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apply for membership — Plezar</title>
+  <meta name="description" content="Tour agencies in Bangladesh can apply to join Plezar. Send your agency details, trade license and owner's NID, and our team reviews them within 3 working days.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Tiro+Bangla&display=swap">
+  <link rel="stylesheet" href="/css/landing.css">
+  <link rel="stylesheet" href="/css/apply.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+</head>
+<body data-title-key="applyMetaTitle" data-description-key="applyMetaDescription">
+
+  <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+
+  <header class="nav is-solid" id="nav" data-solid="true">
+    <div class="wrap nav-inner">
+      <a href="/" class="logo" aria-label="Plezar home" data-i18n-attr="aria-label:logoLabel">plezar<span class="logo-dot"></span></a>
+      <nav class="nav-links apply-nav-links" aria-label="Main">
+        <a href="/#agents" data-i18n="applyNavBack">For agents</a>
+      </nav>
+      <button class="lang-toggle" id="langToggle" type="button" onclick="toggleLang()" lang="bn" aria-label="বাংলায় দেখুন">বাংলা</button>
+      <a href="/apply/status" class="btn btn-dark nav-cta" id="navSwitch" data-i18n="applyNavStatus">Check an application</a>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ===== Apply ===== -->
+    <section class="apply" id="applyView" hidden>
+      <div class="wrap apply-head">
+        <h1 class="apply-title" data-i18n="applyTitle">Join Plezar as a member agency</h1>
+        <p class="apply-lead" data-i18n="applyLead">Tell us about your agency and send your trade license and the owner's national ID. Our team checks every application by hand and replies within 3 working days.</p>
+      </div>
+
+      <div class="wrap apply-grid">
+        <form id="applyForm" class="apply-form" novalidate>
+
+          <fieldset class="apply-part">
+            <legend><span class="part-no">1</span><span data-i18n="partAgency">Your agency</span></legend>
+            <div class="field">
+              <label for="agencyName" data-i18n="lblAgency">Agency name *</label>
+              <input id="agencyName" name="agencyName" type="text" required maxlength="120" autocomplete="organization">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="tradeLicenseNumber" data-i18n="lblLicenseNo">Trade license number *</label>
+                <input id="tradeLicenseNumber" name="tradeLicenseNumber" type="text" required maxlength="60" placeholder="TRAD/DNCC/012345/2025">
+              </div>
+              <div class="field">
+                <label for="yearStarted" data-i18n="lblYear">Year you started</label>
+                <input id="yearStarted" name="yearStarted" type="number" inputmode="numeric" min="1950" max="2100" placeholder="2018">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="district" data-i18n="lblDistrict">Office district</label>
+                <input id="district" name="district" type="text" maxlength="60" list="districtList" autocomplete="address-level2" placeholder="Dhaka">
+                <datalist id="districtList"></datalist>
+              </div>
+              <div class="field">
+                <label for="teamSize" data-i18n="lblTeam">Team size</label>
+                <select id="teamSize" name="teamSize">
+                  <option value="" data-i18n="optChoose">Choose</option>
+                  <option value="1" data-i18n="optTeam1">Just me</option>
+                  <option value="2-5" data-i18n="optTeam2">2 to 5 people</option>
+                  <option value="6-15" data-i18n="optTeam3">6 to 15 people</option>
+                  <option value="16+" data-i18n="optTeam4">16 or more</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="officeAddress" data-i18n="lblAddress">Office address</label>
+              <input id="officeAddress" name="officeAddress" type="text" maxlength="300" autocomplete="street-address">
+            </div>
+            <div class="field">
+              <label for="regions" data-i18n="lblRegions">Where do you run tours?</label>
+              <input id="regions" name="regions" type="text" maxlength="200" placeholder="Sajek, Bandarban, Cox's Bazar" data-i18n-attr="placeholder:phRegions">
+            </div>
+            <div class="field" id="categoryField" hidden>
+              <span class="field-label" id="categoryLabel" data-i18n="lblTourTypes">Kinds of tours you run</span>
+              <div class="chip-picks" id="categoryPicks" role="group" aria-labelledby="categoryLabel"></div>
+            </div>
+            <div class="field">
+              <label for="website" data-i18n="lblWebsite">Facebook page or website</label>
+              <input id="website" name="website" type="text" maxlength="200" placeholder="facebook.com/youragency">
+            </div>
+            <div class="field">
+              <label for="about" data-i18n="lblAbout">Describe your agency in a few lines</label>
+              <textarea id="about" name="about" rows="3" maxlength="1500" data-i18n-attr="placeholder:phAbout" placeholder="The trips you are known for, group sizes, what travelers like about you"></textarea>
+            </div>
+          </fieldset>
+
+          <fieldset class="apply-part">
+            <legend><span class="part-no">2</span><span data-i18n="partYou">You</span></legend>
+            <p class="part-note" data-i18n="partYouNote">If we accept the application, this person gets the owner's sign-in for the agency panel.</p>
+            <div class="field-row">
+              <div class="field">
+                <label for="contactName" data-i18n="lblName">Your name *</label>
+                <input id="contactName" name="contactName" type="text" required maxlength="80" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="contactRole" data-i18n="lblRole">Your role</label>
+                <input id="contactRole" name="contactRole" type="text" maxlength="60" placeholder="Owner" data-i18n-attr="placeholder:phRole">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="phone" data-i18n="lblPhone">Mobile number *</label>
+                <input id="phone" name="phone" type="tel" required inputmode="tel" placeholder="01712345678" autocomplete="tel">
+              </div>
+              <div class="field">
+                <label for="email" data-i18n="lblEmail">Email *</label>
+                <input id="email" name="email" type="email" required placeholder="you@agency.com" autocomplete="email">
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="apply-part">
+            <legend><span class="part-no">3</span><span data-i18n="partDocs">Documents</span></legend>
+            <p class="part-note" data-i18n="partDocsNote">Photos or PDFs, up to 5 MB each. Only our review team can see them.</p>
+            <div class="doc-list">
+              <div class="doc" data-kind="trade_license" data-max="1" data-required="true">
+                <div class="doc-text">
+                  <strong data-i18n="docLicense">Trade license *</strong>
+                  <span data-i18n="docLicenseHint">The current one, with the number and expiry date readable.</span>
+                  <ul class="doc-files" aria-live="polite"></ul>
+                </div>
+                <label class="btn btn-outline doc-pick"><span data-i18n="docAdd">Add file</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label>
+              </div>
+              <div class="doc" data-kind="nid" data-max="2" data-required="true">
+                <div class="doc-text">
+                  <strong data-i18n="docNid">Owner's national ID *</strong>
+                  <span data-i18n="docNidHint">Front and back. Two files are fine.</span>
+                  <ul class="doc-files" aria-live="polite"></ul>
+                </div>
+                <label class="btn btn-outline doc-pick"><span data-i18n="docAdd">Add file</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label>
+              </div>
+              <div class="doc" data-kind="tourism_license" data-max="1">
+                <div class="doc-text">
+                  <strong data-i18n="docTourism">Tourism license or TOAB membership</strong>
+                  <span data-i18n="docTourismHint">If you have one. It helps us review faster.</span>
+                  <ul class="doc-files" aria-live="polite"></ul>
+                </div>
+                <label class="btn btn-outline doc-pick"><span data-i18n="docAdd">Add file</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label>
+              </div>
+              <div class="doc" data-kind="other" data-max="2">
+                <div class="doc-text">
+                  <strong data-i18n="docOther">Anything else</strong>
+                  <span data-i18n="docOtherHint">For example a brochure or photos from past trips.</span>
+                  <ul class="doc-files" aria-live="polite"></ul>
+                </div>
+                <label class="btn btn-outline doc-pick"><span data-i18n="docAdd">Add file</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="apply-part">
+            <legend><span class="part-no">4</span><span data-i18n="partSend">Check and send</span></legend>
+            <div class="field">
+              <label for="message" data-i18n="lblMessage">Anything else we should know?</label>
+              <textarea id="message" name="message" rows="3" maxlength="1000" placeholder="Questions for us, or the best time to call" data-i18n-attr="placeholder:phMessageApply"></textarea>
+            </div>
+            <label class="agree">
+              <input type="checkbox" id="agreedToTerms" name="agreedToTerms" value="true">
+              <span data-i18n="agreeText">I confirm these details are true, that I can act for this agency, and that Plezar may check them with the issuing offices.</span>
+            </label>
+            <p class="form-error" id="applyError" role="alert" hidden></p>
+            <button type="submit" class="btn btn-dark btn-block apply-submit" id="applySubmit" data-i18n="applySubmit">Send application</button>
+          </fieldset>
+        </form>
+
+        <aside class="card-side" aria-label="Your member card preview" data-i18n-attr="aria-label:cardAria">
+          <div class="member-card" id="memberCard">
+            <div class="mc-top">
+              <span class="mc-logo">plezar<span class="logo-dot"></span></span>
+              <span class="mc-kind" data-i18n="cardKind">Member agency</span>
+            </div>
+            <p class="mc-name" id="mcName" data-empty="Your agency" data-i18n-attr="data-empty:cardEmptyName">Your agency</p>
+            <p class="mc-place" id="mcPlace"></p>
+            <dl class="mc-meta">
+              <div><dt data-i18n="cardSince">Since</dt><dd id="mcSince">—</dd></div>
+              <div><dt data-i18n="cardRef">Reference</dt><dd id="mcRef">PLZ-······</dd></div>
+            </dl>
+            <div class="mc-stamp" id="mcStamp" aria-hidden="true"><span data-i18n="stampDraft">Draft</span></div>
+          </div>
+          <ol class="next-steps">
+            <li data-i18n-html="next1"><strong>You send the application.</strong> We email you a reference number.</li>
+            <li data-i18n-html="next2"><strong>We check it within 3 working days.</strong> If something is missing, we ask on your application page.</li>
+            <li data-i18n-html="next3"><strong>You set up your agency panel.</strong> Once accepted, you get an email to set your password.</li>
+          </ol>
+        </aside>
+        <div class="apply-done" id="applyDone" hidden tabindex="-1">
+          <h2 class="h2" data-i18n="doneApplyTitle">Your application is in</h2>
+          <p id="doneApplyText"></p>
+          <p class="done-ref"><span data-i18n="cardRef">Reference</span> <strong id="doneRef"></strong></p>
+          <div class="done-actions">
+            <a class="btn btn-dark" id="doneStatusLink" href="/apply/status" data-i18n="doneCheck">Check your application</a>
+            <a class="btn btn-outline" href="/" data-i18n="doneHome">Back to Plezar</a>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===== Status ===== -->
+    <section class="apply status" id="statusView" hidden>
+      <div class="wrap apply-head">
+        <h1 class="apply-title" data-i18n="statusTitle">Check your application</h1>
+        <p class="apply-lead" data-i18n="statusLead">Enter the reference number from our email and the email address you applied with.</p>
+      </div>
+
+      <div class="wrap status-wrap">
+        <form id="statusForm" class="status-form" novalidate>
+          <div class="field">
+            <label for="sRef" data-i18n="lblRef">Reference number</label>
+            <input id="sRef" name="reference" type="text" required maxlength="12" placeholder="PLZ-7KQ2M9" autocapitalize="characters" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="sEmail" data-i18n="lblEmailPlain">Email</label>
+            <input id="sEmail" name="email" type="email" required autocomplete="email" placeholder="you@agency.com">
+          </div>
+          <p class="form-error" id="statusError" role="alert" hidden></p>
+          <button type="submit" class="btn btn-dark btn-block" data-i18n="statusSubmit">Show my application</button>
+          <p class="status-alt"><span data-i18n="statusNoRef">Haven't applied yet?</span> <a href="/apply" data-i18n="statusApplyLink">Apply for membership</a></p>
+        </form>
+
+        <div class="status-result" id="statusResult" hidden tabindex="-1"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer apply-footer">
+    <div class="wrap">
+      <p class="footer-copy">© <span id="year">2026</span> <span data-i18n="footerPlace">Plezar, Dhaka</span></p>
+    </div>
+  </footer>
+
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <script src="/js/i18n.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/apply.js"></script>
+</body>
+</html>
