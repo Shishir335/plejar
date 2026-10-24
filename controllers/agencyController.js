@@ -356,6 +356,8 @@ const teamView = u => ({
   email: u.email,
   agencyRole: u.agencyRole,
   accountStatus: u.accountStatus,
+  mustChangePassword: Boolean(u.mustChangePassword),
+  lastLoginAt: u.lastLoginAt,
   createdAt: u.createdAt
 });
 exports.teamView = teamView;

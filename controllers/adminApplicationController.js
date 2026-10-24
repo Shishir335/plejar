@@ -183,6 +183,7 @@ const credentialsFor = (req, owner, agency, password) => {
     email: owner.email,
     password,
     loginURL,
+    temporary: true,
     emailDraft: credentialsEmail({ name: owner.name, agencyName: agency.name, email: owner.email, password, loginURL })
   };
 };
@@ -280,42 +281,6 @@ exports.approve = catchAsync(async (req, res, next) => {
       agency: { _id: agency._id, name: agency.name, verified: agency.verified },
       credentials: credentialsFor(req, owner, agency, password)
     }
-  });
-});
-
-// Lost the sign-in details before sending them? Issue a new temporary password,
-// but only while the owner hasn't chosen their own yet.
-exports.resetCredentials = catchAsync(async (req, res, next) => {
-  const lead = await findLead(req.params.id, next);
-  if (!lead) return;
-  if (lead.status !== 'approved' || !lead.agency) return next(new AppError('Only accepted applications have a vendor account.', 400));
-
-  const [agency, owner] = await Promise.all([
-    Agency.findById(lead.agency).select('name'),
-    User.findOne({ agency: lead.agency, agencyRole: 'owner' })
-  ]);
-  if (!agency || !owner) return next(new AppError('The vendor account for this application no longer exists.', 404));
-  // Owners accepted before temporary passwords existed may still be waiting on an invite link
-  const notSignedIn = owner.mustChangePassword || owner.accountStatus === 'invited';
-  if (!notSignedIn) {
-    return next(new AppError(`${owner.name} has already signed in and chosen a password. If they forgot it, they can use "Forgot your password?" on the sign-in page.`, 400));
-  }
-
-  const password = temporaryPassword();
-  owner.password = password;
-  owner.confirmPassword = password;
-  owner.mustChangePassword = true;
-  owner.accountStatus = 'active';
-  owner.inviteToken = undefined;
-  owner.inviteExpires = undefined;
-  owner.$locals.temporaryPassword = true;
-  await owner.save();
-  await logActivity(req, { action: 'agency.credentials_reset', summary: `New temporary password issued for ${owner.name}`, agency: agency._id });
-
-  res.status(200).json({
-    status: 'success',
-    message: 'New temporary password created. The old one no longer works.',
-    data: { credentials: credentialsFor(req, owner, agency, password) }
   });
 });
 

@@ -891,6 +891,37 @@
     </div>
   </div>
 
+  <div id="vendorPasswordModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3 id="vpTitle">Set password</h3><button class="modal-x" onclick="closeModal('vendorPasswordModal')" aria-label="Close">&times;</button></div>
+      <form id="vendorPasswordForm" onsubmit="submitVendorPassword(event)" novalidate>
+        <p class="modal-lead" id="vpLead"></p>
+        <div class="check-list">
+          <label class="check"><input type="radio" name="vpMode" value="generate" checked onchange="syncVendorPasswordForm()"> Make a strong password for me</label>
+          <label class="check"><input type="radio" name="vpMode" value="type" onchange="syncVendorPasswordForm()"> I'll type the password</label>
+        </div>
+        <div id="vpTyped" hidden style="margin-top: 12px;">
+          <div class="form-group">
+            <label class="form-label" for="vpPassword">New password</label>
+            <div style="display:flex; gap:8px;">
+              <input type="password" id="vpPassword" class="form-input" minlength="8" maxlength="128" autocomplete="new-password">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleVendorPasswordVisibility(this)">Show</button>
+            </div>
+            <p class="detail-muted" style="margin: 4px 0 0;">At least 8 characters.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vpConfirm">Type it again</label>
+            <input type="password" id="vpConfirm" class="form-input" minlength="8" maxlength="128" autocomplete="new-password">
+          </div>
+        </div>
+        <label class="check" style="margin-top: 12px;"><input type="checkbox" id="vpRequireChange" checked> Ask them to choose their own password the next time they sign in</label>
+        <div class="form-error-box" id="vpError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="vpSubmit" style="margin-top: 14px;">Set password</button>
+      </form>
+      <div id="vpResult" hidden></div>
+    </div>
+  </div>
+
   <div id="reasonModal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-head"><h3 id="reasonTitle">Confirm</h3><button class="modal-x" onclick="closeModal('reasonModal')" aria-label="Close">&times;</button></div>

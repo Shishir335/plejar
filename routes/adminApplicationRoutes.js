@@ -12,7 +12,6 @@ router
   .patch(application.updateApplication)
   .delete(authController.restrictTo('admin', 'dev'), application.deleteApplication);
 router.post('/applications/:id/approve', application.approve);
-router.post('/applications/:id/credentials', application.resetCredentials);
 router.post('/applications/:id/reject', application.reject);
 router.post('/applications/:id/request-info', application.requestInfo);
 router.get('/applications/:id/documents/:docId', application.getDocument);

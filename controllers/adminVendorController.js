@@ -15,6 +15,7 @@ const { getDefaultRate, isCustom } = require('../utils/commission');
 const { escapeRegex, pageParams, paged, validId, toId } = require('../utils/query');
 const { savePrivateDocument, removePrivateDocument, privateDocumentPath } = require('../utils/uploads');
 const { teamView, verificationView, packageCounts } = require('./agencyController');
+const { temporaryPassword, credentialsEmail } = require('../utils/credentials');
 
 const findVendor = async (id, next, select) => {
   if (!validId(id)) {
@@ -433,5 +434,62 @@ exports.getEarnings = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     data: { earnings, monthly, commission: { rate: isCustom(agency) ? agency.commissionRate : defaultRate, custom: isCustom(agency) } }
+  });
+});
+
+// Set or change the password of a vendor's owner or team member.
+// Either type one ({ password }) or let Plezar make a strong one ({ generate: true }).
+// requireChange (default true) makes them choose their own the next time they sign in.
+exports.setMemberPassword = catchAsync(async (req, res, next) => {
+  const agency = await findVendor(req.params.id, next, 'name');
+  if (!agency) return;
+  const member = validId(req.params.userId) ? await User.findOne({ _id: req.params.userId, agency: agency._id }) : null;
+  if (!member) return next(new AppError('No member found with that ID for this vendor.', 404));
+
+  const generate = req.body.generate === true || req.body.generate === 'true';
+  const password = generate ? temporaryPassword() : String(req.body.password || '');
+  if (!generate) {
+    if (password.length < 8) return next(new AppError('Use at least 8 characters for the password.', 400));
+    if (password.length > 128) return next(new AppError('Use at most 128 characters for the password.', 400));
+    if (req.body.confirmPassword !== undefined && req.body.confirmPassword !== password) {
+      return next(new AppError("The two passwords don't match.", 400));
+    }
+  }
+  const requireChange = req.body.requireChange !== false && req.body.requireChange !== 'false';
+  const wasNew = member.accountStatus === 'invited' || member.mustChangePassword;
+
+  member.password = password;
+  member.confirmPassword = password;
+  member.mustChangePassword = requireChange;
+  member.$locals.temporaryPassword = requireChange;
+  member.accountStatus = 'active';
+  member.inviteToken = undefined;
+  member.inviteExpires = undefined;
+  member.passwordResetToken = undefined;
+  member.passwordResetExpire = undefined;
+  await member.save();
+
+  await logActivity(req, {
+    action: 'agency.password_set',
+    summary: `${generate ? 'Generated' : 'Set'} a new password for ${member.name}${requireChange ? ' (must change it at next sign-in)' : ''}`,
+    user: member._id,
+    agency: agency._id
+  });
+
+  const loginURL = `${req.protocol}://${req.get('host')}/agent`;
+  res.status(200).json({
+    status: 'success',
+    message: `New password set for ${member.name}. Any device they were signed in on has been signed out.`,
+    data: {
+      member: teamView(member),
+      credentials: {
+        name: member.name,
+        email: member.email,
+        password,
+        loginURL,
+        temporary: requireChange,
+        emailDraft: credentialsEmail({ name: member.name, agencyName: agency.name, email: member.email, password, loginURL, kind: wasNew && member.agencyRole === 'owner' ? 'new' : 'changed', temporary: requireChange })
+      }
+    }
   });
 });

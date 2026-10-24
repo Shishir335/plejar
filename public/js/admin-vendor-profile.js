@@ -537,9 +537,80 @@ function vendorTeam() {
     <tbody>${V.detail.members.map(m => `<tr>
       <td><span class="lead-main">${E(m.name)}</span><span class="lead-sub">${E(m.email)}</span></td>
       <td>${m.agencyRole === 'owner' ? 'Owner' : 'Team member'}</td>
-      <td><span class="badge ${m.accountStatus === 'invited' ? 'badge-manager' : 'badge-active'}">${m.accountStatus === 'invited' ? 'Invite not accepted' : 'Active'}</span></td>
-      <td style="text-align: right;">${m.accountStatus === 'invited' ? `<button class="btn btn-secondary btn-sm" onclick="resendMemberInvite('${aid}', '${E(m.id)}')">Resend invite</button>` : `<button class="btn btn-secondary btn-sm" onclick="openUser('${E(m.id)}')">Open account</button>`}</td></tr>`).join('')}</tbody></table></div>
+      <td>${memberSignInBadge(m)}</td>
+      <td style="text-align: right;"><div class="lead-actions" style="justify-content: flex-end;">
+        ${isMoneyAdmin() ? `<button class="btn btn-secondary btn-sm" onclick="openVendorPasswordModal('${E(m.id)}')">${m.accountStatus === 'invited' || m.mustChangePassword ? 'Set password' : 'Change password'}</button>` : ''}
+        ${m.accountStatus === 'invited' ? `<button class="btn btn-secondary btn-sm" onclick="resendMemberInvite('${aid}', '${E(m.id)}')">Resend invite</button>` : `<button class="btn btn-secondary btn-sm" onclick="openUser('${E(m.id)}')">Open account</button>`}
+      </div></td></tr>`).join('')}</tbody></table></div>
     <div id="memberInviteResult"></div>`;
+}
+
+function memberSignInBadge(m) {
+  if (m.accountStatus === 'invited') return '<span class="badge badge-manager">Invite not accepted</span>';
+  if (m.mustChangePassword) return '<span class="badge badge-manager">Hasn\'t signed in yet</span><span class="lead-sub">Using a password set by Plezar</span>';
+  return `<span class="badge badge-active">Active</span><span class="lead-sub">${m.lastLoginAt ? `Last sign-in ${E(fmtDate(m.lastLoginAt))}` : 'Hasn\'t signed in yet'}</span>`;
+}
+
+// ---------- Vendor passwords (administrators only) ----------
+
+// agencyId and member come from the open vendor profile, or are passed in from the application page
+function openVendorPasswordModal(userId, from) {
+  const source = from || { agencyId: V.detail.agency._id, agencyName: V.detail.agency.name, member: V.detail.members.find(x => String(x.id) === String(userId)) };
+  if (!source.member) return;
+  V.passwordTarget = { agencyId: source.agencyId, userId: source.member.id || source.member._id, name: source.member.name, onDone: source.onDone };
+  document.getElementById('vpTitle').textContent = `${source.member.accountStatus === 'invited' || source.member.mustChangePassword ? 'Set' : 'Change'} password for ${source.member.name}`;
+  document.getElementById('vpLead').textContent = `${source.member.name} (${source.member.email}) signs in to the ${source.agencyName} vendor panel with this password. Any device they're signed in on will be signed out.`;
+  document.getElementById('vendorPasswordForm').reset();
+  document.getElementById('vendorPasswordForm').hidden = false;
+  document.getElementById('vpResult').hidden = true;
+  document.getElementById('vpPassword').type = 'password';
+  formError('vpError');
+  syncVendorPasswordForm();
+  openModal('vendorPasswordModal');
+}
+
+function syncVendorPasswordForm() {
+  const typed = document.querySelector('input[name="vpMode"]:checked').value === 'type';
+  document.getElementById('vpTyped').hidden = !typed;
+  if (typed) document.getElementById('vpPassword').focus();
+}
+
+function toggleVendorPasswordVisibility(btn) {
+  const show = document.getElementById('vpPassword').type === 'password';
+  ['vpPassword', 'vpConfirm'].forEach(id => { document.getElementById(id).type = show ? 'text' : 'password'; });
+  btn.textContent = show ? 'Hide' : 'Show';
+}
+
+async function submitVendorPassword(e) {
+  e.preventDefault();
+  const t = V.passwordTarget;
+  const generate = document.querySelector('input[name="vpMode"]:checked').value === 'generate';
+  const body = { generate, requireChange: document.getElementById('vpRequireChange').checked };
+  if (!generate) {
+    body.password = val('vpPassword');
+    body.confirmPassword = val('vpConfirm');
+    if (body.password.length < 8) return formError('vpError', 'Use at least 8 characters.');
+    if (body.password !== body.confirmPassword) return formError('vpError', "The two passwords don't match.");
+  }
+  const btn = document.getElementById('vpSubmit');
+  btn.disabled = true;
+  try {
+    const { ok, data } = await adminFetch(`/api/v1/admin/vendors/${t.agencyId}/members/${t.userId}/password`, { method: 'PUT', body: JSON.stringify(body) });
+    if (!ok) return formError('vpError', data.message || 'Could not set the password.');
+    document.getElementById('vendorPasswordForm').hidden = true;
+    const result = document.getElementById('vpResult');
+    result.hidden = false;
+    result.innerHTML = `
+      <p style="margin-bottom: 12px;">${E(data.message)} Send them the details below.</p>
+      ${credentialsBox(data.data.credentials)}
+      <div style="display:flex; gap:8px; margin-top: 16px;"><button class="btn btn-secondary" onclick="closeModal('vendorPasswordModal')">Done</button></div>`;
+    if (t.onDone) t.onDone();
+    else reloadVendor();
+  } catch (err) {
+    formError('vpError', 'Could not reach the server.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ---------- Activity ----------

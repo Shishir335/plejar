@@ -13,6 +13,8 @@ router.get('/vendors/summary', vendor.summary);
 router.get('/vendors', vendor.listVendors);
 router.get('/vendors/:id', vendor.getVendor);
 router.post('/vendors/:id/status', vendor.setStatus);
+// Passwords: administrators and developers only, like the rest of account security
+router.put('/vendors/:id/members/:userId/password', moneyAdmin, vendor.setMemberPassword);
 router.put('/vendors/:id/categories', vendor.setCategories);
 router.put('/vendors/:id/commission', moneyAdmin, vendor.setCommission);
 router.put('/vendors/:id/contract', moneyAdmin, documentUpload.single('document'), vendor.updateContract);
