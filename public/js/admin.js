@@ -169,17 +169,32 @@ async function handleAdminLogout() {
 // Switch Sidebar Tabs
 const TAB_TITLES = {
   dashboard: 'Dashboard', users: 'Users', userDetail: 'User profile', subscribers: 'Newsletter Leads', agencies: 'Agencies',
-  pendingAgencies: 'Pending Agencies', agentLeads: 'Agent Leads', system: 'System Status', profile: 'My profile', agencyDetail: 'Agency'
+  vendors: 'Vendors', vendorDetail: 'Vendor profile', system: 'System Status', profile: 'My profile'
 };
 
+// Old tab names still work: they open the matching Vendors sub-tab
+const TAB_ALIASES = {
+  agencies: ['vendors', 'all'],
+  pendingAgencies: ['vendors', 'verification'],
+  agentLeads: ['vendors', 'applications'],
+  agencyDetail: ['vendorDetail']
+};
+const NAV_FOR = { userDetail: 'users', vendorDetail: 'vendors' };
+
 function switchTab(tabId) {
+  if (TAB_ALIASES[tabId]) {
+    const [real, sub] = TAB_ALIASES[tabId];
+    switchTab(real);
+    if (sub && typeof switchVendorSub === 'function') switchVendorSub(sub);
+    return;
+  }
   const title = document.getElementById('topbarTitle');
   if (title) title.textContent = TAB_TITLES[tabId] || 'Admin Console';
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link-btn').forEach(b => b.classList.remove('active'));
 
   const targetPane = document.getElementById(`tab-${tabId}`);
-  const targetBtn = document.querySelector(`[data-tab="${tabId === 'agencyDetail' ? 'agencies' : tabId}"]`);
+  const targetBtn = document.querySelector(`[data-tab="${NAV_FOR[tabId] || tabId}"]`);
 
   if (targetPane) targetPane.classList.add('active');
   if (targetBtn) targetBtn.classList.add('active');
@@ -736,231 +751,10 @@ async function resendOwnerInvite(agencyId, userId) {
 const VERIFY_BADGES = { approved: 'badge-active', pending: 'badge-manager', rejected: 'badge-admin', none: 'badge-inactive' };
 const VERIFY_LABELS = { approved: 'Verified', pending: 'Awaiting review', rejected: 'Changes requested', none: 'Not submitted' };
 const DOC_LABELS = { trade_license: 'Trade license', nid: "Owner's national ID" };
-adminState.agencies = [];
-adminState.agencyDetail = null;
-
-function agenciesMessage(text, color = 'var(--text-dim)') {
-  const tbody = document.getElementById('agenciesTableBody');
-  if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: ${color};">${escapeHTML(text)}</td></tr>`;
-}
-
-async function loadAgencies() {
-  agenciesMessage('Loading agencies...');
-  const params = new URLSearchParams();
-  const status = document.getElementById('agencyStatusFilter')?.value;
-  const verification = document.getElementById('agencyVerificationFilter')?.value;
-  if (status) params.set('status', status);
-  if (verification) params.set('verification', verification);
-
-  try {
-    const { ok, data } = await adminFetch(`/api/v1/admin/agencies?${params}`);
-    if (!ok) return agenciesMessage(data.message || 'Could not load agencies.', 'var(--color-danger)');
-    adminState.agencies = data.data.agencies;
-    renderAgenciesTable();
-  } catch (e) {
-    agenciesMessage('Failed to load agencies.', 'var(--color-danger)');
-  }
-}
-
 function agencyLogo(a, size = 36) {
   return a.logo
     ? `<img src="${escapeHTML(a.logo)}" alt="" style="width:${size}px;height:${size}px;border-radius:8px;object-fit:cover;flex-shrink:0">`
     : `<span class="user-cell-avatar" style="width:${size}px;height:${size}px;border-radius:8px">${escapeHTML((a.name || '?').charAt(0).toUpperCase())}</span>`;
-}
-
-function renderAgenciesTable() {
-  const tbody = document.getElementById('agenciesTableBody');
-  if (!tbody) return;
-  if (!adminState.agencies.length) {
-    return agenciesMessage('No agencies match these filters. Invite one, or approve an agent lead.');
-  }
-
-  tbody.innerHTML = adminState.agencies.map(a => {
-    const id = escapeHTML(a.id);
-    const v = VERIFY_BADGES[a.verificationStatus] ? a.verificationStatus : 'none';
-    return `
-      <tr>
-        <td>
-          <div class="user-cell">
-            ${agencyLogo(a)}
-            <div class="user-cell-info">
-              <span class="user-cell-name">${escapeHTML(a.name)}</span>
-              <span class="user-cell-email">${escapeHTML((a.regions || []).join(', ')) || '—'}</span>
-            </div>
-          </div>
-        </td>
-        <td>${a.owner ? `<span class="lead-main">${escapeHTML(a.owner.name)}</span><span class="lead-sub">${escapeHTML(a.owner.email)}${a.owner.accountStatus === 'invited' ? ' · invite pending' : ''}</span>` : '—'}</td>
-        <td>${a.publishedPackages} published<span class="lead-sub">${a.packages} total</span></td>
-        <td>${a.members}</td>
-        <td><span class="badge ${VERIFY_BADGES[v]}">${VERIFY_LABELS[v]}</span></td>
-        <td><span class="badge ${a.status === 'active' ? 'badge-active' : 'badge-admin'}">${escapeHTML(a.status)}</span></td>
-        <td style="text-align: right;"><button class="btn btn-secondary btn-sm" onclick="openAgency('${id}')">Open</button></td>
-      </tr>`;
-  }).join('');
-}
-
-async function openAgency(agencyId) {
-  switchTab('agencyDetail');
-  const box = document.getElementById('agencyDetail');
-  box.innerHTML = '<p style="color: var(--text-dim); padding: 24px;">Loading agency...</p>';
-  try {
-    const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}`);
-    if (!ok) {
-      box.innerHTML = `<p style="color: var(--color-danger); padding: 24px;">${escapeHTML(data.message || 'Could not load agency.')}</p>`;
-      return;
-    }
-    adminState.agencyDetail = data.data;
-    renderAgencyDetail();
-  } catch (e) {
-    box.innerHTML = '<p style="color: var(--color-danger); padding: 24px;">Failed to load agency.</p>';
-  }
-}
-
-function renderAgencyDetail() {
-  const { agency: a, verification: v, members, packages } = adminState.agencyDetail;
-  const id = escapeHTML(a._id);
-  const vStatus = v.verified ? 'approved' : (VERIFY_BADGES[v.status] ? v.status : 'none');
-  const fmt = d => (d ? new Date(d).toLocaleString() : '');
-
-  document.getElementById('agencyDetail').innerHTML = `
-    <div class="control-bar">
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" onclick="switchTab('agencies'); loadAgencies();">&larr; All agencies</button>
-        ${agencyLogo(a, 44)}
-        <div>
-          <h2 style="font-size: 1.2rem; font-weight: 700;">${escapeHTML(a.name)}</h2>
-          <span class="badge ${a.status === 'active' ? 'badge-active' : 'badge-admin'}">${escapeHTML(a.status)}</span>
-          <span class="badge ${VERIFY_BADGES[vStatus]}">${VERIFY_LABELS[vStatus]}</span>
-        </div>
-      </div>
-      <div>
-        ${a.status === 'active'
-          ? `<button class="btn btn-danger" onclick="setAgencyStatus('${id}', 'suspended')">Suspend agency</button>`
-          : `<button class="btn btn-primary" onclick="setAgencyStatus('${id}', 'active')">Reactivate agency</button>`}
-      </div>
-    </div>
-
-    <div class="detail-grid">
-      <form class="detail-card" id="agencyProfileForm" onsubmit="saveAgencyProfile(event, '${id}')">
-        <h3>Profile</h3>
-        <div class="form-group"><label class="form-label">Agency name</label><input class="form-input" name="name" value="${escapeHTML(a.name)}" maxlength="120" required></div>
-        <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" name="description" rows="4" maxlength="1500">${escapeHTML(a.description)}</textarea></div>
-        <div class="form-group"><label class="form-label">Regions (comma separated)</label><input class="form-input" name="regions" value="${escapeHTML((a.regions || []).join(', '))}"></div>
-        <div class="detail-two">
-          <div class="form-group"><label class="form-label">Phone</label><input class="form-input" name="phone" value="${escapeHTML(a.phone)}" maxlength="20"></div>
-          <div class="form-group"><label class="form-label">Public email</label><input class="form-input" name="email" value="${escapeHTML(a.email)}"></div>
-        </div>
-        <div class="detail-two">
-          <div class="form-group"><label class="form-label">Facebook page or website</label><input class="form-input" name="website" value="${escapeHTML(a.website)}" maxlength="200"></div>
-          <div class="form-group"><label class="form-label">Trade license number</label><input class="form-input" name="tradeLicenseNumber" value="${escapeHTML(a.tradeLicenseNumber)}" maxlength="60"></div>
-        </div>
-        <button type="submit" class="btn btn-primary">Save profile</button>
-      </form>
-
-      <div class="detail-card">
-        <h3>Verification</h3>
-        <p class="detail-muted">${v.submittedAt ? `Submitted ${escapeHTML(fmt(v.submittedAt))}` : 'No documents submitted yet.'}${v.reviewedAt ? `<br>Last reviewed ${escapeHTML(fmt(v.reviewedAt))}` : ''}</p>
-        ${v.note ? `<p class="detail-note">Note to agency: ${escapeHTML(v.note)}</p>` : ''}
-        <p class="detail-muted">Trade license number: <strong>${escapeHTML(v.tradeLicenseNumber) || '—'}</strong></p>
-        <ul class="detail-docs">
-          ${v.documents.length ? v.documents.map(d => `
-            <li><span>${escapeHTML(DOC_LABELS[d.kind] || d.kind)}<span class="lead-sub">${escapeHTML(d.originalName)}</span></span>
-            <a class="btn btn-secondary btn-sm" href="/api/v1/admin/agencies/${id}/documents/${escapeHTML(d.id)}" target="_blank" rel="noopener">View</a></li>`).join('') : '<li><span>No documents.</span></li>'}
-        </ul>
-        <div class="form-group"><label class="form-label" for="verifyNote">Note to the agency (required when requesting changes)</label><textarea class="form-input" id="verifyNote" rows="2" maxlength="500" placeholder="For example: the trade license photo is blurry, upload a clearer one"></textarea></div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${v.documents.length >= 2 && !v.verified ? `<button class="btn btn-primary btn-sm" onclick="reviewVerification('${id}', 'approve')">Approve and verify</button>` : ''}
-          ${v.documents.length ? `<button class="btn btn-secondary btn-sm" onclick="reviewVerification('${id}', 'reject')">Request changes</button>` : ''}
-          ${v.verified ? `<button class="btn btn-danger btn-sm" onclick="reviewVerification('${id}', 'revoke')">Remove verified mark</button>` : ''}
-        </div>
-      </div>
-
-      <div class="detail-card">
-        <h3>Team</h3>
-        <table class="admin-table lead-table">
-          <tbody>
-            ${members.map(m => `
-              <tr>
-                <td><span class="lead-main">${escapeHTML(m.name)}</span><span class="lead-sub">${escapeHTML(m.email)}</span></td>
-                <td>${m.agencyRole === 'owner' ? 'Owner' : 'Staff'}</td>
-                <td><span class="badge ${m.accountStatus === 'invited' ? 'badge-manager' : 'badge-active'}">${m.accountStatus === 'invited' ? 'Invite pending' : 'Active'}</span></td>
-                <td style="text-align:right;">${m.accountStatus === 'invited' ? `<button class="btn btn-secondary btn-sm" onclick="resendMemberInvite('${id}', '${escapeHTML(m.id)}')">Resend invite</button>` : ''}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-        <div id="memberInviteResult"></div>
-      </div>
-
-      <div class="detail-card detail-wide">
-        <h3>Tour packages</h3>
-        ${packages.length ? `
-        <table class="admin-table lead-table">
-          <thead><tr><th>Package</th><th>Duration</th><th>Price from</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
-          <tbody>
-            ${packages.map(p => `
-              <tr>
-                <td><span class="lead-main">${escapeHTML(p.title)}</span><span class="lead-sub">${escapeHTML(p.destination)} · ${p.photos.length} photo${p.photos.length === 1 ? '' : 's'}</span></td>
-                <td>${Number(p.durationDays)}D / ${Number(p.durationNights || 0)}N</td>
-                <td>৳${Number(p.priceFrom).toLocaleString('en-US')}</td>
-                <td><span class="badge ${p.status === 'published' ? 'badge-active' : (p.status === 'draft' ? 'badge-manager' : 'badge-inactive')}">${escapeHTML(p.status)}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plezar</span>' : ''}</td>
-                <td style="text-align:right;">${p.hiddenByAdmin
-                  ? `<button class="btn btn-secondary btn-sm" onclick="moderatePackage('${id}', '${escapeHTML(p._id)}', false)">Allow again</button>`
-                  : `<button class="btn btn-danger btn-sm" onclick="moderatePackage('${id}', '${escapeHTML(p._id)}', true)">Hide</button>`}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>` : '<p class="detail-muted">This agency has not added any packages yet.</p>'}
-      </div>
-    </div>`;
-}
-
-async function saveAgencyProfile(e, agencyId) {
-  e.preventDefault();
-  const form = e.target;
-  const body = Object.fromEntries(new FormData(form).entries());
-  const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}`, { method: 'PATCH', body: JSON.stringify(body) });
-  if (!ok) return showAdminToast(data.message || 'Could not save the profile.', 'error');
-  showAdminToast('Agency profile saved.', 'success');
-  openAgency(agencyId);
-}
-
-async function setAgencyStatus(agencyId, status) {
-  const name = adminState.agencyDetail ? adminState.agencyDetail.agency.name : 'this agency';
-  const question = status === 'suspended'
-    ? `Suspend ${name}? Everyone in this agency will be signed out of the agency panel until you reactivate it.`
-    : `Reactivate ${name}? Its team will be able to sign in again.`;
-  if (!confirm(question)) return;
-
-  const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-  if (!ok) return showAdminToast(data.message || 'Could not change the status.', 'error');
-  showAdminToast(status === 'suspended' ? `${name} suspended.` : `${name} reactivated.`, 'success');
-  openAgency(agencyId);
-  updateStats();
-}
-
-async function reviewVerification(agencyId, decision) {
-  const note = (document.getElementById('verifyNote')?.value || '').trim();
-  if (decision === 'reject' && !note) {
-    showAdminToast('Add a note telling the agency what to fix.', 'error');
-    document.getElementById('verifyNote')?.focus();
-    return;
-  }
-  if (decision === 'revoke' && !confirm('Remove the verified mark from this agency?')) return;
-
-  const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}/verify`, { method: 'POST', body: JSON.stringify({ decision, note }) });
-  if (!ok) return showAdminToast(data.message || 'Could not update verification.', 'error');
-  const messages = { approve: 'Agency verified.', reject: 'Changes requested. The agency will see your note.', revoke: 'Verified mark removed.' };
-  showAdminToast(messages[decision], 'success');
-  openAgency(agencyId);
-  updateStats();
-}
-
-async function moderatePackage(agencyId, packageId, hidden) {
-  if (hidden && !confirm('Hide this package? The agency will not be able to publish it again until you allow it.')) return;
-  const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}/packages/${packageId}`, { method: 'PATCH', body: JSON.stringify({ hidden }) });
-  if (!ok) return showAdminToast(data.message || 'Could not update the package.', 'error');
-  showAdminToast(hidden ? 'Package hidden.' : 'Package allowed again. The agency can republish it.', 'success');
-  openAgency(agencyId);
-  updateStats();
 }
 
 function inviteLinkBox(url, message) {

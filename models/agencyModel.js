@@ -67,8 +67,37 @@ const agencySchema = new mongoose.Schema(
     // Master admin controls
     status: {
       type: String,
-      enum: ['active', 'suspended'],
+      enum: ['active', 'suspended', 'deactivated'],
       default: 'active'
+    },
+    statusReason: { type: String, trim: true, maxlength: 500, default: '' },
+    statusUntil: Date,
+    statusChangedAt: Date,
+    statusChangedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
+
+    categories: [{ type: mongoose.Schema.ObjectId, ref: 'VendorCategory' }],
+
+    // Percent of each booking Plezar keeps. Empty means the platform default applies.
+    commissionRate: { type: Number, min: [0, 'Commission cannot be negative'], max: [100, 'Commission cannot be more than 100%'], default: null },
+
+    contract: {
+      status: { type: String, enum: ['none', 'draft', 'sent', 'signed', 'terminated'], default: 'none' },
+      version: { type: String, trim: true, maxlength: 20, default: '' },
+      startDate: Date,
+      endDate: Date,
+      agreedCommission: { type: Number, min: 0, max: 100 },
+      terms: { type: String, trim: true, maxlength: 4000, default: '' },
+      signedBy: { type: String, trim: true, maxlength: 100, default: '' },
+      signedAt: Date,
+      // The signed agreement, stored privately and served only through an authenticated route
+      document: {
+        file: { type: String, select: false },
+        originalName: String,
+        mimeType: String,
+        uploadedAt: Date
+      },
+      updatedAt: Date,
+      updatedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
     },
     verified: { type: Boolean, default: false },
     verification: {

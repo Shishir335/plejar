@@ -6,6 +6,7 @@ const Subscriber = require('../models/subscriberModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { sendInvite } = require('../utils/invites');
+const { logActivity } = require('../utils/activity');
 const { saveAgencyImage, removeAgencyImage } = require('../utils/uploads');
 const {
   toList,
@@ -130,12 +131,6 @@ exports.updateAgency = catchAsync(async (req, res, next) => {
 
   Object.assign(agency, pick(req.body, PROFILE_FIELDS));
   if (req.body.regions !== undefined) agency.regions = toList(req.body.regions);
-  if (req.body.status !== undefined) {
-    if (!['active', 'suspended'].includes(req.body.status)) {
-      return next(new AppError('Status must be active or suspended.', 400));
-    }
-    agency.status = req.body.status;
-  }
 
   if (req.file) {
     const oldLogo = agency.logo;
@@ -144,6 +139,7 @@ exports.updateAgency = catchAsync(async (req, res, next) => {
   }
 
   await agency.save();
+  await logActivity(req, { action: 'agency.edited', summary: 'Plezar admin edited the agency profile', agency: agency._id });
   res.status(200).json({ status: 'success', data: { agency } });
 });
 
@@ -172,6 +168,8 @@ exports.verifyAgency = catchAsync(async (req, res, next) => {
   agency.verification.reviewedAt = new Date();
   agency.verification.reviewedBy = req.user._id;
   await agency.save();
+  const verbs = { approve: 'Verification approved', reject: `Verification changes requested: ${note}`, revoke: 'Verified mark removed' };
+  await logActivity(req, { action: `verification.${decision}`, summary: verbs[decision], agency: agency._id });
 
   res.status(200).json({ status: 'success', data: { agency, verification: verificationView(agency) } });
 });
@@ -193,6 +191,7 @@ exports.moderatePackage = catchAsync(async (req, res, next) => {
     if (pkg.status === 'hidden') pkg.status = 'draft';
   }
   await pkg.save();
+  await logActivity(req, { action: pkg.hiddenByAdmin ? 'package.hidden' : 'package.allowed', summary: `${pkg.hiddenByAdmin ? 'Hid' : 'Allowed again'} package "${pkg.title}"`, agency: pkg.agency });
 
   res.status(200).json({ status: 'success', data: { package: pkg } });
 });
@@ -251,6 +250,7 @@ exports.createAgency = catchAsync(async (req, res, next) => {
   }
 
   const { inviteURL, emailSent } = await sendInvite(owner, agency, req);
+  await logActivity(req, { action: 'agency.created', summary: `Agency created and owner ${owner.name} invited`, agency: agency._id });
 
   res.status(201).json({
     status: 'success',

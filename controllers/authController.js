@@ -8,6 +8,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const Email = require('../utils/email');
 const { recordLogin } = require('../utils/activity');
+const { agencyBlockedReason } = require('../utils/agencyStanding');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -33,9 +34,10 @@ const blockedReason = async user => {
             return null;
         }
         const until = user.statusUntil ? ` until ${user.statusUntil.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+        const why = user.statusReason ? ` Reason: ${user.statusReason.replace(/[.\s]+$/, '')}.` : '';
         return user.status === 'suspended'
-            ? `Your account is suspended${until}. Contact Plezar support.`
-            : 'Your account is deactivated. Contact Plezar support to reactivate it.';
+            ? `Your account is suspended${until}.${why} Contact Plezar support.`
+            : `Your account is deactivated.${why} Contact Plezar support to reactivate it.`;
     }
     return null;
 };
@@ -138,10 +140,11 @@ exports.login = catchAsync(async (req, res, next) => {
 
     // 5) agents of a suspended agency cannot sign in
     if (user.role === 'agent') {
-        const agency = await Agency.findById(user.agency).select('status');
-        if (!agency || agency.status !== 'active') {
+        const agency = await Agency.findById(user.agency);
+        const agencyBlocked = await agencyBlockedReason(agency);
+        if (agencyBlocked) {
             await recordLogin(req, { user, email, success: false, reason: 'agency_not_active' });
-            return next(new AppError('Your agency account is suspended. Contact Plezar support.', 403));
+            return next(new AppError(agencyBlocked, 403));
         }
     }
 
@@ -427,8 +430,9 @@ exports.acceptInvite = catchAsync(async (req, res, next) => {
     if (!user) {
         return next(new AppError('This invite link is invalid or has expired. Ask for a new invite.', 400));
     }
-    if (user.agency && user.agency.status !== 'active') {
-        return next(new AppError('This agency account is suspended. Contact Plezar support.', 403));
+    const inviteBlocked = user.agency ? await agencyBlockedReason(await Agency.findById(user.agency._id)) : null;
+    if (inviteBlocked) {
+        return next(new AppError(inviteBlocked, 403));
     }
 
     user.password = req.body.password;

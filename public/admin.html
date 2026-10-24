@@ -99,21 +99,10 @@
           <span class="sidebar-text">Newsletter Leads</span>
         </button>
 
-        <button class="nav-link-btn" data-tab="agencies" onclick="switchTab('agencies')">
+        <button class="nav-link-btn" data-tab="vendors" onclick="switchTab('vendors')">
           <span>🏝️</span>
-          <span class="sidebar-text">Agencies</span>
-        </button>
-
-        <button class="nav-link-btn" data-tab="pendingAgencies" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">
-          <span>⏳</span>
-          <span class="sidebar-text">Pending Agencies</span>
-          <span id="agenciesPendingCount" class="nav-count" hidden>0</span>
-        </button>
-
-        <button class="nav-link-btn" data-tab="agentLeads" onclick="switchTab('agentLeads')">
-          <span>🧭</span>
-          <span class="sidebar-text">Agent Leads</span>
-          <span id="agentLeadsNewCount" class="nav-count" hidden>0</span>
+          <span class="sidebar-text">Vendors</span>
+          <span id="vendorsAttentionCount" class="nav-count" hidden>0</span>
         </button>
 
         <button class="nav-link-btn" data-tab="system" onclick="switchTab('system')">
@@ -399,74 +388,189 @@
           </div>
         </section>
 
-        <!-- AGENCIES TAB -->
-        <section id="tab-agencies" class="tab-pane">
-          <div class="control-bar">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-              <h2 style="font-size: 1.1rem; font-weight: 600;">Tour Agencies</h2>
-              <select id="agencyStatusFilter" class="form-select" style="max-width: 160px;" onchange="loadAgencies()">
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-              </select>
-              <select id="agencyVerificationFilter" class="form-select" style="max-width: 200px;" onchange="loadAgencies()">
-                <option value="">Any verification</option>
-                <option value="pending">Awaiting review</option>
-                <option value="approved">Verified</option>
-                <option value="rejected">Changes requested</option>
-                <option value="none">Not submitted</option>
-              </select>
+        <!-- VENDOR MANAGEMENT -->
+        <section id="tab-vendors" class="tab-pane">
+          <div class="subtabs" role="tablist" aria-label="Vendor management">
+            <button type="button" role="tab" class="subtab active" data-vsub="all" aria-selected="true">All vendors</button>
+            <button type="button" role="tab" class="subtab" data-vsub="applications" aria-selected="false">Applications <span class="mini-count" id="vsubLeadCount" hidden>0</span></button>
+            <button type="button" role="tab" class="subtab" data-vsub="verification" aria-selected="false">Verification <span class="mini-count" id="vsubVerifyCount" hidden>0</span></button>
+            <button type="button" role="tab" class="subtab" data-vsub="categories" aria-selected="false">Categories</button>
+            <button type="button" role="tab" class="subtab" data-vsub="bookings" aria-selected="false">Bookings</button>
+            <button type="button" role="tab" class="subtab" data-vsub="payouts" aria-selected="false">Payouts <span class="mini-count" id="vsubPayoutCount" hidden>0</span></button>
+            <button type="button" role="tab" class="subtab" data-vsub="commission" aria-selected="false">Commission</button>
+            <button type="button" role="tab" class="subtab" data-vsub="activity" aria-selected="false">Activity logs</button>
+          </div>
+
+          <!-- All vendors -->
+          <div class="subpane active" id="vsub-all">
+            <div class="chips" id="vendorChips" aria-label="Vendor summary"></div>
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="vSearch" class="search-input" placeholder="Search name, email, phone or area" aria-label="Search vendors" oninput="debouncedVendors()"></div>
+                <select id="vStatusF" class="form-select" aria-label="Status" onchange="loadVendors(1)">
+                  <option value="">Any status</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="deactivated">Deactivated</option>
+                </select>
+                <select id="vVerifF" class="form-select" aria-label="Verification" onchange="loadVendors(1)">
+                  <option value="">Any verification</option><option value="verified">Verified</option><option value="pending">Awaiting review</option><option value="rejected">Changes requested</option><option value="none">Not submitted</option>
+                </select>
+                <select id="vCategoryF" class="form-select" aria-label="Category" onchange="loadVendors(1)"><option value="">Any category</option></select>
+                <select id="vSortF" class="form-select" aria-label="Sort" onchange="loadVendors(1)">
+                  <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A to Z</option>
+                </select>
+                <label class="check"><input type="checkbox" id="vCustomF" onchange="loadVendors(1)"> Custom commission</label>
+              </div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadVendors()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openInviteAgency()">+ Invite vendor</button>
+              </div>
             </div>
-            <div style="display: flex; gap: 10px;">
-              <button class="btn btn-secondary" onclick="loadAgencies()">↻ Refresh</button>
-              <button class="btn btn-primary" onclick="openInviteAgency()">+ Invite agency</button>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Vendor</th><th>Owner</th><th>Packages</th><th>Bookings</th><th>Revenue</th><th>Rating</th><th>Commission</th><th>Standing</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="vendorsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="vendorsPager"></div>
+          </div>
+
+          <!-- Applications -->
+          <div class="subpane" id="vsub-applications">
+            <div class="control-bar">
+              <div class="filters">
+                <h3 class="pane-title">Applications from the website</h3>
+                <select id="agentLeadStatusFilter" class="form-select" aria-label="Lead status" onchange="renderAgentLeadsTable()">
+                  <option value="all">All statuses</option><option value="new" selected>New</option><option value="contacted">Contacted</option><option value="archived">Archived</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadAgentLeads(); loadPendingAgencies();">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Agency &amp; contact</th><th>Phone &amp; email</th><th>Tours &amp; link</th><th>Message</th><th>Received</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="agentLeadsTableBody"></tbody>
+              </table>
+            </div>
+            <h3 class="section-label" style="margin-top: 28px;">Invited, owner hasn't signed up yet</h3>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Vendor</th><th>Owner</th><th>Invited</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="pendingInviteBody"></tbody>
+              </table>
+            </div>
+            <div id="pendingInviteResult"></div>
+          </div>
+
+          <!-- Verification -->
+          <div class="subpane" id="vsub-verification">
+            <div class="control-bar">
+              <div><h3 class="pane-title">Waiting for your verification review</h3><p class="pane-sub">Vendors who have uploaded their trade license and the owner's ID.</p></div>
+              <button class="btn btn-secondary" onclick="loadPendingAgencies()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Vendor</th><th>Owner</th><th>Submitted</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="pendingReviewBody"></tbody>
+              </table>
             </div>
           </div>
 
-          <div class="table-container">
-            <table class="admin-table lead-table">
-              <thead>
-                <tr>
-                  <th>Agency</th>
-                  <th>Owner</th>
-                  <th>Packages</th>
-                  <th>Team</th>
-                  <th>Verification</th>
-                  <th>Status</th>
-                  <th style="text-align: right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="agenciesTableBody"></tbody>
-            </table>
+          <!-- Categories -->
+          <div class="subpane" id="vsub-categories">
+            <div class="control-bar">
+              <div><h3 class="pane-title">Vendor categories</h3><p class="pane-sub">What kind of trips a vendor specialises in. Assign them on each vendor's profile.</p></div>
+              <div class="actions"><button class="btn btn-secondary" onclick="loadCategories()">↻ Refresh</button><button class="btn btn-primary" id="newCategoryBtn" onclick="openCategoryModal()">+ New category</button></div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Category</th><th>Description</th><th>Vendors</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="categoriesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Bookings -->
+          <div class="subpane" id="vsub-bookings">
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="bkSearch" class="search-input" placeholder="Search reference, trip or place" aria-label="Search bookings" oninput="debouncedBookings()"></div>
+                <select id="bkStatus" class="form-select" aria-label="Booking status" onchange="loadBookings(1)">
+                  <option value="">Any status</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+                </select>
+                <select id="bkPayment" class="form-select" aria-label="Payment" onchange="loadBookings(1)">
+                  <option value="">Any payment</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partially_refunded">Part refunded</option><option value="refunded">Refunded</option>
+                </select>
+                <select id="bkVendor" class="form-select" aria-label="Vendor" onchange="loadBookings(1)"><option value="">All vendors</option></select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadBookings()">↻ Refresh</button>
+            </div>
+            <p class="totals-line" id="bookingTotals"></p>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Booking</th><th>Traveler</th><th>Vendor</th><th>Travel date</th><th>Amount</th><th>Status</th><th>Payment</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="bookingsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="bookingsPager"></div>
+          </div>
+
+          <!-- Payouts -->
+          <div class="subpane" id="vsub-payouts">
+            <div class="kpi-grid" id="payoutKpis" style="margin-bottom: 18px;"></div>
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="poSearch" class="search-input" placeholder="Search by vendor name" aria-label="Search payouts" oninput="debouncedPayouts()"></div>
+                <select id="poStatus" class="form-select" aria-label="Payout status" onchange="loadPayouts(1)">
+                  <option value="pending">Waiting to be paid</option><option value="paid">Paid</option><option value="rejected">Rejected</option><option value="">All</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadPayouts()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Vendor</th><th>Amount</th><th>Send to</th><th>Started by</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="payoutsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="payoutsPager"></div>
+          </div>
+
+          <!-- Commission -->
+          <div class="subpane" id="vsub-commission">
+            <div class="commission-hero" id="commissionHero"></div>
+            <div class="control-bar">
+              <div><h3 class="pane-title">Vendors with their own rate</h3><p class="pane-sub">Everyone else pays the platform default. A new rate applies to bookings made after the change.</p></div>
+              <button class="btn btn-secondary" onclick="loadCommissionPane()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Vendor</th><th>Rate</th><th>Compared with default</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="commissionTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Activity logs -->
+          <div class="subpane" id="vsub-activity">
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="vaSearch" class="search-input" placeholder="Search activity" aria-label="Search activity" oninput="debouncedVendorActivity()"></div>
+                <select id="vaVendor" class="form-select" aria-label="Vendor" onchange="loadVendorActivity(1)"><option value="">All vendors</option></select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadVendorActivity()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Time</th><th>What happened</th><th>Vendor</th><th>By</th></tr></thead>
+                <tbody id="vendorActivityBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="vendorActivityPager"></div>
           </div>
         </section>
 
-        <!-- PENDING AGENCIES TAB -->
-        <section id="tab-pendingAgencies" class="tab-pane">
-          <div class="control-bar">
-            <div>
-              <h2 style="font-size: 1.1rem; font-weight: 600;">Pending Agencies</h2>
-              <p style="font-size: 0.86rem; color: var(--text-muted); margin-top: 2px;">Agencies that need something from you or from their owner.</p>
-            </div>
-            <button class="btn btn-secondary" onclick="loadPendingAgencies()">↻ Refresh</button>
-          </div>
-
-          <h3 class="section-label">Waiting for your verification review</h3>
-          <div class="table-container" style="margin-bottom: 28px;">
-            <table class="admin-table lead-table">
-              <thead><tr><th>Agency</th><th>Owner</th><th>Submitted</th><th style="text-align: right;">Actions</th></tr></thead>
-              <tbody id="pendingReviewBody"></tbody>
-            </table>
-          </div>
-
-          <h3 class="section-label">Invite sent, owner hasn't signed up yet</h3>
-          <div class="table-container">
-            <table class="admin-table lead-table">
-              <thead><tr><th>Agency</th><th>Owner</th><th>Invited</th><th style="text-align: right;">Actions</th></tr></thead>
-              <tbody id="pendingInviteBody"></tbody>
-            </table>
-          </div>
-          <div id="pendingInviteResult"></div>
+        <!-- VENDOR PROFILE -->
+        <section id="tab-vendorDetail" class="tab-pane">
+          <div id="vendorDetail"></div>
         </section>
 
         <!-- MY PROFILE TAB -->
@@ -512,48 +616,6 @@
                 <button class="btn btn-danger" onclick="handleAdminLogout()">Sign out</button>
               </div>
             </div>
-          </div>
-        </section>
-
-        <!-- AGENCY DETAIL -->
-        <section id="tab-agencyDetail" class="tab-pane">
-          <div id="agencyDetail"></div>
-        </section>
-
-        <!-- 3. AGENT LEADS TAB -->
-        <section id="tab-agentLeads" class="tab-pane">
-          <div class="control-bar">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-              <h2 style="font-size: 1.1rem; font-weight: 600;">Tour Agent Leads</h2>
-              <select id="agentLeadStatusFilter" class="form-select" style="max-width: 170px;" onchange="renderAgentLeadsTable()">
-                <option value="all">All statuses</option>
-                <option value="new" selected>New</option>
-                <option value="contacted">Contacted</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
-            <div style="display: flex; gap: 10px;">
-              <button class="btn btn-secondary" onclick="loadAgentLeads()">↻ Refresh</button>
-            </div>
-          </div>
-
-          <div class="table-container">
-            <table class="admin-table lead-table">
-              <thead>
-                <tr>
-                  <th>Agency &amp; contact</th>
-                  <th>Phone &amp; email</th>
-                  <th>Tours &amp; link</th>
-                  <th>Message</th>
-                  <th>Received</th>
-                  <th>Status</th>
-                  <th style="text-align: right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="agentLeadsTableBody">
-                <!-- Dynamically populated by admin.js -->
-              </tbody>
-            </table>
           </div>
         </section>
 
@@ -852,10 +914,101 @@
     </div>
   </div>
 
+  <!-- Vendor status Modal -->
+  <div id="vStatusModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Change vendor status</h3><button class="modal-x" onclick="closeModal('vStatusModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitVendorStatus(event)" novalidate>
+        <p class="modal-lead" id="vStatusLead"></p>
+        <div class="form-group">
+          <label class="form-label" for="vsStatus">New status</label>
+          <select id="vsStatus" class="form-select" onchange="syncVendorStatusForm()">
+            <option value="suspended">Suspended (a penalty, or while you investigate)</option>
+            <option value="deactivated">Deactivated (switched off, for example a closed business)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="vsReason">Reason (the agency sees this when they try to sign in)</label>
+          <textarea id="vsReason" class="form-input" rows="3" maxlength="500"></textarea>
+        </div>
+        <div class="form-group" id="vsUntilGroup">
+          <label class="form-label" for="vsUntil">Suspend until (optional)</label>
+          <input id="vsUntil" class="form-input" type="date">
+        </div>
+        <p class="modal-lead" style="margin-top: -4px;">While not active, travelers can't book this vendor and its team can't use the agency panel.</p>
+        <div class="form-error-box" id="vStatusError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-danger btn-block" id="vStatusSubmit">Apply</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Category Modal -->
+  <div id="categoryModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3 id="categoryModalTitle">New category</h3><button class="modal-x" onclick="closeModal('categoryModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitCategory(event)" novalidate>
+        <div class="form-group"><label class="form-label" for="catName">Name</label><input id="catName" class="form-input" maxlength="60"></div>
+        <div class="form-group"><label class="form-label" for="catDesc">Description (optional)</label><textarea id="catDesc" class="form-input" rows="2" maxlength="300"></textarea></div>
+        <div class="form-error-box" id="categoryError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="categorySubmit">Save category</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Payout Modal -->
+  <div id="payoutModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Create a payout</h3><button class="modal-x" onclick="closeModal('payoutModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitPayout(event)" novalidate>
+        <p class="modal-lead" id="payoutLead"></p>
+        <div class="form-group"><label class="form-label" for="poAmount">Amount (৳)</label><input id="poAmount" class="form-input" type="number" min="1" step="0.01"></div>
+        <div class="detail-two">
+          <div class="form-group"><label class="form-label" for="poMethod">Send with</label>
+            <select id="poMethod" class="form-select"><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="rocket">Rocket</option><option value="bank">Bank transfer</option></select></div>
+          <div class="form-group"><label class="form-label" for="poAccount">Account or mobile number</label><input id="poAccount" class="form-input" maxlength="120"></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="poNote">Note (optional)</label><input id="poNote" class="form-input" maxlength="300"></div>
+        <div class="form-error-box" id="payoutError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="payoutSubmit">Create payout</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Commission Modal -->
+  <div id="vCommissionModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3 id="vcTitle">Commission</h3><button class="modal-x" onclick="closeModal('vCommissionModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitCommission(event)" novalidate>
+        <p class="modal-lead" id="vcLead"></p>
+        <div class="form-group"><label class="form-label" for="vcRate" id="vcLabel">Commission (%)</label><input id="vcRate" class="form-input" type="number" min="0" max="100" step="0.1"></div>
+        <label class="check" id="vcResetRow"><input type="checkbox" id="vcReset"> Use the platform default instead</label>
+        <div class="form-error-box" id="vcError" role="alert" hidden style="margin-top: 12px;"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="vcSubmit" style="margin-top: 14px;">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Booking Modal -->
+  <div id="bookingModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Manage booking</h3><button class="modal-x" onclick="closeModal('bookingModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitBooking(event)" novalidate>
+        <p class="modal-lead" id="bookingLead"></p>
+        <div class="form-group"><label class="form-label" for="bmStatus">Trip status</label><select id="bmStatus" class="form-select"></select></div>
+        <div class="form-group" id="bmPaymentGroup"><label class="form-label" for="bmPayment">Payment</label><select id="bmPayment" class="form-select"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></div>
+        <div class="form-group"><label class="form-label" for="bmReason">Reason or note (required to cancel)</label><textarea id="bmReason" class="form-input" rows="2" maxlength="500"></textarea></div>
+        <div class="form-error-box" id="bookingError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="bookingSubmit">Save changes</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="adminToastContainer" class="toast-container"></div>
 
   <script src="/js/admin.js"></script>
   <script src="/js/admin-users.js"></script>
+  <script src="/js/admin-vendors.js"></script>
+  <script src="/js/admin-vendor-profile.js"></script>
 </body>
 </html>

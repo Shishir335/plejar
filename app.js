@@ -28,8 +28,10 @@ const complaintRouter = require('./routes/complaintRoutes');
 const agencyRouter = require('./routes/agencyRoutes');
 const adminAgencyRouter = require('./routes/adminAgencyRoutes');
 const adminUserRouter = require('./routes/adminUserRoutes');
+const adminVendorRouter = require('./routes/adminVendorRoutes');
 
 const AppError = require('./utils/appError');
+const authController = require('./controllers/authController');
 const globalErrorHandler = require('./controllers/errorController');
 
 const app = express();
@@ -174,7 +176,10 @@ app.use('/api/v1/bookings', bookingRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/complaints', complaintRouter);
 app.use('/api/v1/agency', agencyRouter);
+// Everything under /api/v1/admin is for administrators, managers and developers
+app.use('/api/v1/admin', authController.protect, authController.restrictTo('admin', 'manager', 'dev'));
 app.use('/api/v1/admin', adminUserRouter);
+app.use('/api/v1/admin', adminVendorRouter);
 app.use('/api/v1/admin', adminAgencyRouter);
 
 // 404 UNHANDLED ROUTE CATCHER

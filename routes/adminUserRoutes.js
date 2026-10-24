@@ -4,9 +4,6 @@ const adminUserController = require('../controllers/adminUserController');
 
 const router = express.Router();
 
-// Master admin area: administrators, managers and developers
-router.use(authController.protect, authController.restrictTo('admin', 'manager', 'dev'));
-
 router.get('/users/summary', adminUserController.summary);
 router.get('/users', adminUserController.listUsers);
 

@@ -36,6 +36,8 @@ const bookingSchema = new mongoose.Schema(
       default: 'unpaid'
     },
     paidAt: Date,
+    confirmedAt: Date,
+    completedAt: Date,
     cancelledAt: Date,
     cancelReason: { type: String, trim: true, maxlength: 500, default: '' },
     note: { type: String, trim: true, maxlength: 500, default: '' }

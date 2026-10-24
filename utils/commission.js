@@ -1,12 +1,18 @@
+const { getSetting } = require('./settings');
+
 // Platform commission, as a percentage of the booking amount.
 // A vendor can have its own rate (agency.commissionRate); otherwise the platform default applies.
-const DEFAULT_RATE = Number(process.env.DEFAULT_COMMISSION_RATE) || 10;
+const FALLBACK_RATE = Number(process.env.DEFAULT_COMMISSION_RATE) || 10;
 
-const rateFor = agency => {
-  const own = agency && agency.commissionRate;
-  return typeof own === 'number' && own >= 0 && own <= 100 ? own : DEFAULT_RATE;
+const getDefaultRate = async () => {
+  const rate = Number(await getSetting('commissionRate', FALLBACK_RATE));
+  return Number.isFinite(rate) && rate >= 0 && rate <= 100 ? rate : FALLBACK_RATE;
 };
+
+const isCustom = agency => typeof (agency && agency.commissionRate) === 'number';
+
+const rateFor = async agency => (isCustom(agency) ? agency.commissionRate : getDefaultRate());
 
 const commissionFor = (amount, rate) => Math.round(((amount * rate) / 100) * 100) / 100;
 
-module.exports = { DEFAULT_RATE, rateFor, commissionFor };
+module.exports = { FALLBACK_RATE, getDefaultRate, isCustom, rateFor, commissionFor };

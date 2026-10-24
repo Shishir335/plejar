@@ -4,6 +4,13 @@ const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { sendInvite } = require('../utils/invites');
+const { agencyBlockedReason } = require('../utils/agencyStanding');
+const { logActivity } = require('../utils/activity');
+const Booking = require('../models/bookingModel');
+const Payout = require('../models/payoutModel');
+const { moveBooking } = require('../utils/bookings');
+const { earningsFor, monthlyEarnings } = require('../utils/earnings');
+const { getDefaultRate, isCustom } = require('../utils/commission');
 const {
   saveAgencyImage,
   removeAgencyImage,
@@ -42,11 +49,9 @@ exports.requireAgent = catchAsync(async (req, res, next) => {
   }
 
   const agency = await Agency.findById(req.user.agency);
-  if (!agency) {
-    return next(new AppError('Your agency could not be found. Contact Plezar support.', 404));
-  }
-  if (agency.status !== 'active') {
-    return next(new AppError('Your agency account is suspended. Contact Plezar support.', 403));
+  const blocked = await agencyBlockedReason(agency);
+  if (blocked) {
+    return next(new AppError(blocked, agency ? 403 : 404));
   }
 
   req.agency = agency;
@@ -106,6 +111,7 @@ exports.updateMyAgency = catchAsync(async (req, res, next) => {
   }
 
   await agency.save();
+  await logActivity(req, { action: 'agency.profile_updated', summary: 'Updated the agency profile', agency: agency._id });
 
   res.status(200).json({ status: 'success', data: { agency } });
 });
@@ -153,6 +159,7 @@ exports.createMyPackage = catchAsync(async (req, res, next) => {
   const files = (req.files || []).slice(0, 6);
   pkg.photos = await Promise.all(files.map(file => saveAgencyImage(file, req.agency._id)));
   await pkg.save();
+  await logActivity(req, { action: 'package.created', summary: `Added tour package "${pkg.title}" (${pkg.status})`, agency: req.agency._id });
 
   res.status(201).json({ status: 'success', data: { package: pkg } });
 });
@@ -180,6 +187,7 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
   pkg.photos.push(...added);
   await pkg.save();
   await Promise.all(removed.map(removeAgencyImage));
+  await logActivity(req, { action: 'package.updated', summary: `Edited tour package "${pkg.title}" (${pkg.status})`, agency: req.agency._id });
 
   res.status(200).json({ status: 'success', data: { package: pkg } });
 });
@@ -190,6 +198,7 @@ exports.deleteMyPackage = catchAsync(async (req, res, next) => {
 
   await pkg.deleteOne();
   await Promise.all(pkg.photos.map(removeAgencyImage));
+  await logActivity(req, { action: 'package.deleted', summary: `Deleted tour package "${pkg.title}"`, agency: req.agency._id });
 
   res.status(204).json({ status: 'success', data: null });
 });
@@ -233,6 +242,7 @@ exports.inviteStaff = catchAsync(async (req, res, next) => {
   });
 
   const { inviteURL, emailSent } = await sendInvite(user, req.agency, req);
+  await logActivity(req, { action: 'team.invited', summary: `Invited ${name} to the team`, agency: req.agency._id });
 
   res.status(201).json({
     status: 'success',
@@ -281,6 +291,7 @@ exports.removeStaff = catchAsync(async (req, res, next) => {
     member.agencyRole = null;
     await member.save({ validateBeforeSave: false });
   }
+  await logActivity(req, { action: 'team.removed', summary: `Removed ${member.name} from the team`, agency: req.agency._id });
 
   res.status(204).json({ status: 'success', data: null });
 });
@@ -349,6 +360,7 @@ exports.submitVerification = catchAsync(async (req, res, next) => {
   agency.verification.submittedAt = new Date();
   await agency.save();
   await Promise.all(toRemove.map(removePrivateDocument));
+  await logActivity(req, { action: 'verification.submitted', summary: 'Submitted trade license and ID for verification', agency: agency._id });
 
   res.status(200).json({
     status: 'success',
@@ -380,4 +392,59 @@ exports.streamDocument = streamDocument;
 
 exports.getMyDocument = catchAsync(async (req, res, next) => {
   await streamDocument(req.agency._id, req.params.docId, res, next);
+});
+
+// ---------- Bookings, earnings and payouts (the agency's own) ----------
+
+exports.listMyBookings = catchAsync(async (req, res, next) => {
+  const filter = { agency: req.agency._id };
+  if (['pending', 'confirmed', 'completed', 'cancelled'].includes(req.query.status)) filter.status = req.query.status;
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+
+  const [bookings, total] = await Promise.all([
+    Booking.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate('user', 'name phone').lean(),
+    Booking.countDocuments(filter)
+  ]);
+  res.status(200).json({ status: 'success', data: { bookings, total, page, limit, pages: Math.max(Math.ceil(total / limit), 1) } });
+});
+
+exports.updateMyBooking = catchAsync(async (req, res, next) => {
+  const booking = await Booking.findOne({ _id: req.params.id, agency: req.agency._id });
+  if (!booking) return next(new AppError('No booking found with that ID in your agency.', 404));
+
+  moveBooking(booking, req.body.status, { reason: req.body.reason });
+  await booking.save();
+  await logActivity(req, { action: `booking.${booking.status}`, summary: `Booking ${booking.reference} marked ${booking.status}`, user: booking.user, agency: req.agency._id });
+
+  res.status(200).json({ status: 'success', data: { booking } });
+});
+
+exports.getMyEarnings = catchAsync(async (req, res, next) => {
+  const [earnings, monthly, defaultRate] = await Promise.all([earningsFor(req.agency._id), monthlyEarnings(req.agency._id, 6), getDefaultRate()]);
+  res.status(200).json({
+    status: 'success',
+    data: { earnings, monthly, commission: { rate: isCustom(req.agency) ? req.agency.commissionRate : defaultRate } }
+  });
+});
+
+exports.listMyPayouts = catchAsync(async (req, res, next) => {
+  const payouts = await Payout.find({ agency: req.agency._id }).sort({ createdAt: -1 }).limit(100).lean();
+  res.status(200).json({ status: 'success', data: { payouts } });
+});
+
+exports.requestPayout = catchAsync(async (req, res, next) => {
+  const amount = Math.round(Number(req.body.amount) * 100) / 100;
+  if (!(amount >= 1)) return next(new AppError('Enter an amount of at least ৳1.', 400));
+
+  const earnings = await earningsFor(req.agency._id);
+  if (amount > earnings.available) {
+    return next(new AppError(`You can request up to ৳${earnings.available}. Money becomes available once a paid trip is completed.`, 400));
+  }
+
+  const payout = await Payout.create({
+    agency: req.agency._id, amount, method: req.body.method, account: req.body.account, note: req.body.note, source: 'vendor', requestedBy: req.user._id
+  });
+  await logActivity(req, { action: 'payout.requested', summary: `Requested a payout of ৳${amount} via ${payout.method}`, agency: req.agency._id });
+  res.status(201).json({ status: 'success', message: 'Payout requested. Plezar will send it and update the status.', data: { payout } });
 });

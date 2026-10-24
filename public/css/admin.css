@@ -782,3 +782,27 @@ select.form-select[hidden], [hidden] { display: none !important; }
   .control-bar .filters .search-input-wrapper { flex: 1 1 100%; max-width: none; }
   .admin-table { min-width: 640px; }
 }
+
+/* ---------- Vendors section ---------- */
+.pane-title { font-size: 1.05rem; font-weight: 700; }
+.pane-sub { font-size: 0.86rem; color: var(--text-muted); margin-top: 2px; }
+.totals-line { font-size: 0.86rem; color: var(--text-muted); margin: -4px 0 12px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tag { font-size: 0.7rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--badge-agent-bg); color: var(--badge-agent-fg); }
+.commission-hero { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 22px; margin-bottom: 22px; background: var(--admin-card-bg); border: 1px solid var(--admin-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); }
+.commission-rate { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 4px 0; }
+.rating-big { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 4px 0; }
+.rating-big span { font-size: 1rem; font-weight: 500; color: var(--text-muted); letter-spacing: 0; }
+.detail-card .check-list { margin-top: 4px; }
+.detail-card input[type="file"].form-input { padding: 8px; }
+
+/* Vendors table: let the first column breathe and keep rows compact */
+#vsub-all .search-input-wrapper { flex: 1 1 240px; }
+#vendorsTableBody td { padding-top: 12px; padding-bottom: 12px; }
+#vendorsTableBody td:first-child { min-width: 230px; }
+#vendorsTableBody .user-cell-email { white-space: normal; }
+#vendorsTableBody .lead-sub { white-space: normal; }
+.standing { gap: 4px; }
+
+#bookingsTableBody td:first-child, #vendorTabBody .lead-table td:first-child { min-width: 210px; }
+#bookingsTableBody td, #vendorTabBody .lead-table td { padding-top: 12px; padding-bottom: 12px; }

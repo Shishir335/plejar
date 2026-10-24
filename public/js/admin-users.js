@@ -358,6 +358,7 @@ async function restoreReview(id) {
 }
 
 function refreshAfterReview() {
+  if (typeof refreshVendorReviews === 'function') refreshVendorReviews();
   if (document.getElementById('tab-userDetail').classList.contains('active') && U.tab === 'reviews') renderUserTab('reviews');
   if (document.getElementById('sub-reviews').classList.contains('active')) loadReviews();
 }

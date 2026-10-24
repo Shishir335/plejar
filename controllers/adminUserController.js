@@ -638,7 +638,8 @@ exports.listActivity = catchAsync(async (req, res, next) => {
   const q = req.query;
   const filter = {};
   if (q.user && mongoose.isValidObjectId(q.user)) filter.user = q.user;
-  if (q.agency && mongoose.isValidObjectId(q.agency)) filter.agency = q.agency;
+  if (q.agency === 'any') filter.agency = { $ne: null };
+  else if (q.agency && mongoose.isValidObjectId(q.agency)) filter.agency = q.agency;
   if (q.search) filter.summary = new RegExp(escapeRegex(String(q.search).trim()), 'i');
   const pg = pageParams(q, 30);
 

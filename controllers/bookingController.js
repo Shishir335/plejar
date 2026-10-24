@@ -40,7 +40,7 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   }
 
   const amount = pkg.priceFrom * travelers;
-  const commissionRate = rateFor(agency);
+  const commissionRate = await rateFor(agency);
 
   const booking = await Booking.create({
     user: req.user._id,

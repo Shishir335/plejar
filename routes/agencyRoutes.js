@@ -20,6 +20,15 @@ router
   .patch(imageUpload.array('photos', 6), agencyController.updateMyPackage)
   .delete(agencyController.deleteMyPackage);
 
+router.get('/me/bookings', agencyController.listMyBookings);
+router.patch('/me/bookings/:id', agencyController.updateMyBooking);
+
+router.get('/me/earnings', agencyController.requireOwner, agencyController.getMyEarnings);
+router
+  .route('/me/payouts')
+  .get(agencyController.requireOwner, agencyController.listMyPayouts)
+  .post(agencyController.requireOwner, agencyController.requestPayout);
+
 router.get('/me/team', agencyController.listTeam);
 router.post('/me/team', agencyController.requireOwner, agencyController.inviteStaff);
 router.post('/me/team/:userId/resend', agencyController.requireOwner, agencyController.resendStaffInvite);

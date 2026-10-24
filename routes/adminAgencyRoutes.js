@@ -6,9 +6,6 @@ const { imageUpload } = require('../utils/uploads');
 
 const router = express.Router();
 
-// Master admin only
-router.use(authController.protect, authController.restrictTo('admin', 'manager', 'dev'));
-
 router.get('/stats', adminAgencyController.getStats);
 router.get('/dashboard', adminDashboardController.getDashboard);
 
