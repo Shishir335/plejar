@@ -58,6 +58,8 @@ const packageSchema = new mongoose.Schema(
     },
     // Set when a master admin hides a package; the agency cannot republish it
     hiddenByAdmin: { type: Boolean, default: false },
+    // Optional link to a managed destination (set from the agency panel)
+    destinationRef: { type: mongoose.Schema.ObjectId, ref: 'Destination', index: true },
     createdBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
   },
   {

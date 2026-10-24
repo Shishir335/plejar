@@ -36,6 +36,13 @@ const documentUpload = multer({
   limits: { fileSize: MAX_FILE_SIZE, files: 2 }
 });
 
+// Traveler identity documents: up to four files (ID, passport, driving license, selfie)
+const userDocumentUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: fileFilter(DOCUMENT_TYPES),
+  limits: { fileSize: MAX_FILE_SIZE, files: 4 }
+});
+
 /**
  * Resize an uploaded image and store it under /public/img/agencies/<agencyId>/.
  * Returns the public URL path.
@@ -89,6 +96,7 @@ const removePrivateDocument = async relative => {
 module.exports = {
   imageUpload,
   documentUpload,
+  userDocumentUpload,
   saveAgencyImage,
   removeAgencyImage,
   savePrivateDocument,

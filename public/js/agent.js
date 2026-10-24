@@ -21,9 +21,8 @@ const isOwner = () => state.me && state.me.agencyRole === 'owner';
 // ---------- Helpers ----------
 
 function escapeHTML(value) {
-  const div = document.createElement('div');
-  div.textContent = value == null ? '' : String(value);
-  return div.innerHTML;
+  // Escape quotes too, so the result is safe inside HTML attributes as well as text
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 function toast(message, type = 'ok') {

@@ -22,8 +22,12 @@ const cors = require('cors');
 const userRouter = require('./routes/userRoutes');
 const subscriberRouter = require('./routes/subscriberRoutes');
 const agentLeadRouter = require('./routes/agentLeadRoutes');
+const bookingRouter = require('./routes/bookingRoutes');
+const reviewRouter = require('./routes/reviewRoutes');
+const complaintRouter = require('./routes/complaintRoutes');
 const agencyRouter = require('./routes/agencyRoutes');
 const adminAgencyRouter = require('./routes/adminAgencyRoutes');
+const adminUserRouter = require('./routes/adminUserRoutes');
 
 const AppError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
@@ -166,7 +170,11 @@ app.get('/accept-invite', (req, res) => {
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/subscribers', subscriberRouter);
 app.use('/api/v1/agent-leads', agentLeadRouter);
+app.use('/api/v1/bookings', bookingRouter);
+app.use('/api/v1/reviews', reviewRouter);
+app.use('/api/v1/complaints', complaintRouter);
 app.use('/api/v1/agency', agencyRouter);
+app.use('/api/v1/admin', adminUserRouter);
 app.use('/api/v1/admin', adminAgencyRouter);
 
 // 404 UNHANDLED ROUTE CATCHER

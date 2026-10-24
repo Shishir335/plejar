@@ -37,6 +37,56 @@ const userSchema = new mongoose.Schema({
         default: null
     },
 
+    // Account standing, managed by the master admin
+    status: {
+        type: String,
+        enum: ['active', 'suspended', 'deactivated'],
+        default: 'active'
+    },
+    statusReason: { type: String, trim: true, maxlength: 500, default: '' },
+    statusUntil: Date,
+    statusChangedAt: Date,
+    statusChangedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
+
+    // Soft delete: the account is hidden and cannot sign in, but can be restored
+    deletedAt: Date,
+    deletedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
+    deletedReason: { type: String, trim: true, maxlength: 500, default: '' },
+
+    // Things the user is blocked from doing while still being able to sign in
+    restrictions: {
+        booking: { type: Boolean, default: false },
+        reviews: { type: Boolean, default: false },
+        messaging: { type: Boolean, default: false },
+        reason: { type: String, trim: true, maxlength: 500, default: '' },
+        until: Date,
+        setBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
+        setAt: Date
+    },
+
+    // Prepaid balance in taka; changes go through WalletTransaction so every change is recorded
+    walletBalance: { type: Number, default: 0 },
+
+    lastLoginAt: Date,
+    loginCount: { type: Number, default: 0 },
+
+    // Identity verification (NID, passport...) reviewed by the master admin
+    verification: {
+        status: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
+        documents: [{
+            kind: { type: String, enum: ['nid', 'passport', 'driving_license', 'selfie'], required: true },
+            // Stored outside /public and served only through an authenticated route
+            file: { type: String, required: true, select: false },
+            originalName: { type: String, default: '' },
+            mimeType: { type: String, default: '' },
+            uploadedAt: { type: Date, default: Date.now }
+        }],
+        note: { type: String, trim: true, maxlength: 500, default: '' },
+        submittedAt: Date,
+        reviewedAt: Date,
+        reviewedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
+    },
+
     // Invited accounts have no password until the invite is accepted
     accountStatus: {
         type: String,
@@ -118,8 +168,8 @@ userSchema.pre('save', function (next) {
 });
 
 userSchema.pre(/^find/, function (next) {
-    // this points to current query
-    this.find({ active: { $ne: false } });
+    // this points to current query; admin screens pass { includeInactive: true } to see deleted accounts
+    if (!this.getOptions().includeInactive) this.find({ active: { $ne: false } });
     next();
 });
 

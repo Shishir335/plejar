@@ -7,6 +7,7 @@ const Agency = require('../models/agencyModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const Email = require('../utils/email');
+const { recordLogin } = require('../utils/activity');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -18,6 +19,27 @@ const getAdminEmails = () =>
         .filter(Boolean);
 
 const isAdminEmail = email => Boolean(email) && getAdminEmails().includes(email.toLowerCase());
+
+// Explain why an account can't be used right now, or return null when it can.
+// Suspensions with an end date lift themselves once that date has passed.
+const blockedReason = async user => {
+    if (user.deletedAt) return 'This account has been removed. Contact Plezar support if this is a mistake.';
+    if (user.status === 'suspended' || user.status === 'deactivated') {
+        if (user.status === 'suspended' && user.statusUntil && user.statusUntil <= new Date()) {
+            user.status = 'active';
+            user.statusReason = '';
+            user.statusUntil = undefined;
+            await user.save({ validateBeforeSave: false });
+            return null;
+        }
+        const until = user.statusUntil ? ` until ${user.statusUntil.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+        return user.status === 'suspended'
+            ? `Your account is suspended${until}. Contact Plezar support.`
+            : 'Your account is deactivated. Contact Plezar support to reactivate it.';
+    }
+    return null;
+};
+exports.blockedReason = blockedReason;
 
 // Store the admin role for ADMIN_EMAILS accounts, so the admin console (which reads the role) lets them in
 const promoteAdminEmail = async user => {
@@ -100,21 +122,35 @@ exports.login = catchAsync(async (req, res, next) => {
     // 3) verify password with user record (invited accounts have no password yet)
     if (!user || !user.password || !(await user.correctPassword(password, user.password))) {
         if (user && user.accountStatus === 'invited') {
+            await recordLogin(req, { user, email, success: false, reason: 'invite_not_accepted' });
             return next(new AppError('Your invite has not been accepted yet. Use the link in your invite email to set a password.', 401));
         }
+        await recordLogin(req, { user, email, success: false, reason: user ? 'wrong_password' : 'unknown_email' });
         return next(new AppError('Incorrect email or password.', 401));
     }
 
-    // 4) agents of a suspended agency cannot sign in
+    // 4) suspended, deactivated or removed accounts cannot sign in
+    const blocked = await blockedReason(user);
+    if (blocked) {
+        await recordLogin(req, { user, email, success: false, reason: `blocked_${user.deletedAt ? 'deleted' : user.status}` });
+        return next(new AppError(blocked, 403));
+    }
+
+    // 5) agents of a suspended agency cannot sign in
     if (user.role === 'agent') {
         const agency = await Agency.findById(user.agency).select('status');
         if (!agency || agency.status !== 'active') {
+            await recordLogin(req, { user, email, success: false, reason: 'agency_not_active' });
             return next(new AppError('Your agency account is suspended. Contact Plezar support.', 403));
         }
     }
 
-    // 5) send token to client
+    // 6) send token to client
     await promoteAdminEmail(user);
+    user.lastLoginAt = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save({ validateBeforeSave: false });
+    await recordLogin(req, { user, email, success: true });
     createAndSendToken(user, 200, req, res);
 });
 
@@ -180,6 +216,16 @@ exports.googleLogin = catchAsync(async (req, res, next) => {
         });
     }
 
+    const blocked = await blockedReason(user);
+    if (blocked) {
+        await recordLogin(req, { user, email, success: false, reason: `blocked_${user.deletedAt ? 'deleted' : user.status}`, method: 'google' });
+        return next(new AppError(blocked, 403));
+    }
+
+    user.lastLoginAt = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save({ validateBeforeSave: false });
+    await recordLogin(req, { user, email, success: true, method: 'google' });
     createAndSendToken(user, 200, req, res);
 });
 
@@ -211,6 +257,11 @@ exports.protect = catchAsync(async (req, res, next) => {
 
     if (currentUser.changedPasswordAfter && currentUser.changedPasswordAfter(decoded.iat)) {
         return next(new AppError('Password changed recently. Please login again.', 401));
+    }
+
+    const blocked = await blockedReason(currentUser);
+    if (blocked) {
+        return next(new AppError(blocked, 403));
     }
 
     await promoteAdminEmail(currentUser);

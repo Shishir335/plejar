@@ -90,7 +90,8 @@
 
         <button class="nav-link-btn" data-tab="users" onclick="switchTab('users')">
           <span>👥</span>
-          <span class="sidebar-text">User Directory</span>
+          <span class="sidebar-text">Users</span>
+          <span id="usersAttentionCount" class="nav-count" hidden>0</span>
         </button>
 
         <button class="nav-link-btn" data-tab="subscribers" onclick="switchTab('subscribers')">
@@ -168,46 +169,204 @@
           <div id="dashboardBody" aria-live="polite"></div>
         </section>
 
-        <!-- 1. USERS DIRECTORY TAB -->
+        <!-- USER MANAGEMENT -->
         <section id="tab-users" class="tab-pane">
-          <div class="control-bar">
-            <div style="display: flex; gap: 12px; flex: 1; flex-wrap: wrap;">
-              <div class="search-input-wrapper">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="userSearchInput" class="search-input" placeholder="Search by name, email, or ID..." oninput="filterUsers()">
+          <div class="subtabs" role="tablist" aria-label="User management">
+            <button type="button" role="tab" class="subtab active" data-sub="all" aria-selected="true">All users</button>
+            <button type="button" role="tab" class="subtab" data-sub="verification" aria-selected="false">Verification <span class="mini-count" id="subVerifyCount" hidden>0</span></button>
+            <button type="button" role="tab" class="subtab" data-sub="complaints" aria-selected="false">Complaints &amp; reports <span class="mini-count" id="subComplaintCount" hidden>0</span></button>
+            <button type="button" role="tab" class="subtab" data-sub="reviews" aria-selected="false">Reviews</button>
+            <button type="button" role="tab" class="subtab" data-sub="logins" aria-selected="false">Login history</button>
+            <button type="button" role="tab" class="subtab" data-sub="activity" aria-selected="false">Activity</button>
+          </div>
+
+          <!-- All users -->
+          <div class="subpane active" id="sub-all">
+            <div class="chips" id="userChips" aria-label="Account summary"></div>
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="uSearch" class="search-input" placeholder="Search name, email or phone" aria-label="Search users" oninput="debouncedUsers()">
+                </div>
+                <select id="uRole" class="form-select" aria-label="Role" onchange="loadUsers(1)">
+                  <option value="">All roles</option>
+                  <option value="user">Travelers</option>
+                  <option value="agent">Agency accounts</option>
+                  <option value="manager">Managers</option>
+                  <option value="admin">Administrators</option>
+                  <option value="dev">Developers</option>
+                </select>
+                <select id="uStatus" class="form-select" aria-label="Account status" onchange="loadUsers(1)">
+                  <option value="">Any status</option>
+                  <option value="active">Active</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="deactivated">Deactivated</option>
+                </select>
+                <select id="uVerif" class="form-select" aria-label="Verification" onchange="loadUsers(1)">
+                  <option value="">Any verification</option>
+                  <option value="approved">Verified</option>
+                  <option value="pending">Awaiting review</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="none">Not submitted</option>
+                </select>
+                <select id="uDeleted" class="form-select" aria-label="Deleted accounts" onchange="loadUsers(1)">
+                  <option value="">Live accounts</option>
+                  <option value="only">Deleted only</option>
+                  <option value="include">Include deleted</option>
+                </select>
+                <select id="uSort" class="form-select" aria-label="Sort" onchange="loadUsers(1)">
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="name">Name A to Z</option>
+                  <option value="lastLogin">Last sign-in</option>
+                </select>
+                <label class="check"><input type="checkbox" id="uRestricted" onchange="loadUsers(1)"> Restricted only</label>
               </div>
-
-              <select id="userRoleFilter" class="form-select" style="max-width: 160px;" onchange="filterUsers()">
-                <option value="all">All Roles</option>
-                <option value="admin">Admins</option>
-                <option value="manager">Managers</option>
-                <option value="user">Standard Users</option>
-                <option value="agent">Agency accounts</option>
-              </select>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadUsers()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openModal('createUserModal')">+ Create Account</button>
+              </div>
             </div>
-
-            <div style="display: flex; gap: 10px;">
-              <button class="btn btn-secondary" onclick="loadUsers()">↻ Refresh</button>
-              <button class="btn btn-primary" onclick="openModal('createUserModal')">+ Create Account</button>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>User</th><th>Role</th><th>Standing</th><th>Last sign-in</th><th>Joined</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="usersTableBody"></tbody>
+              </table>
             </div>
+            <div class="pager" id="usersPager"></div>
           </div>
 
-          <div class="table-container">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>User &amp; Email</th>
-                  <th>Role</th>
-                  <th>Joined Date</th>
-                  <th>Status</th>
-                  <th style="text-align: right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="usersTableBody">
-                <!-- Dynamically populated by admin.js -->
-              </tbody>
-            </table>
+          <!-- Verification -->
+          <div class="subpane" id="sub-verification">
+            <div class="control-bar">
+              <div class="filters">
+                <select id="vStatus" class="form-select" aria-label="Verification status" onchange="loadVerificationQueue(1)">
+                  <option value="pending">Awaiting review</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="approved">Verified</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadVerificationQueue()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>User</th><th>Documents</th><th>Submitted</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="verifyTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="verifyPager"></div>
           </div>
+
+          <!-- Complaints -->
+          <div class="subpane" id="sub-complaints">
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="cSearch" class="search-input" placeholder="Search subject or message" aria-label="Search complaints" oninput="debouncedComplaints()"></div>
+                <select id="cStatus" class="form-select" aria-label="Status" onchange="loadComplaints(1)">
+                  <option value="active">Open and in review</option>
+                  <option value="open">Open</option>
+                  <option value="in_review">In review</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="dismissed">Dismissed</option>
+                  <option value="">All</option>
+                </select>
+                <select id="cCategory" class="form-select" aria-label="Category" onchange="loadComplaints(1)">
+                  <option value="">Any category</option>
+                  <option value="payment">Payment</option>
+                  <option value="behavior">Behavior</option>
+                  <option value="safety">Safety</option>
+                  <option value="service_quality">Service quality</option>
+                  <option value="fraud">Fraud</option>
+                  <option value="other">Other</option>
+                </select>
+                <select id="cPriority" class="form-select" aria-label="Priority" onchange="loadComplaints(1)">
+                  <option value="">Any priority</option>
+                  <option value="high">High</option>
+                  <option value="normal">Normal</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadComplaints()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Complaint</th><th>Reported by</th><th>About</th><th>Priority</th><th>Status</th><th>Received</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="complaintsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="complaintsPager"></div>
+          </div>
+
+          <!-- Reviews -->
+          <div class="subpane" id="sub-reviews">
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="rSearch" class="search-input" placeholder="Search review text" aria-label="Search reviews" oninput="debouncedReviews()"></div>
+                <select id="rStatus" class="form-select" aria-label="Visibility" onchange="loadReviews(1)">
+                  <option value="">All reviews</option>
+                  <option value="visible">Visible</option>
+                  <option value="hidden">Hidden</option>
+                </select>
+                <select id="rRating" class="form-select" aria-label="Rating" onchange="loadReviews(1)">
+                  <option value="">Any rating</option>
+                  <option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadReviews()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Traveler</th><th>Agency and trip</th><th>Rating</th><th>Review</th><th>Date</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="reviewsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="reviewsPager"></div>
+          </div>
+
+          <!-- Login history -->
+          <div class="subpane" id="sub-logins">
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="lSearch" class="search-input" placeholder="Search by email" aria-label="Search sign-ins by email" oninput="debouncedLogins()"></div>
+                <select id="lSuccess" class="form-select" aria-label="Result" onchange="loadLogins(1)">
+                  <option value="">All sign-ins</option>
+                  <option value="true">Successful</option>
+                  <option value="false">Failed or blocked</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadLogins()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Time</th><th>Account</th><th>Result</th><th>Method</th><th>IP address</th><th>Device</th></tr></thead>
+                <tbody id="loginsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="loginsPager"></div>
+          </div>
+
+          <!-- Activity -->
+          <div class="subpane" id="sub-activity">
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="aSearch" class="search-input" placeholder="Search activity" aria-label="Search activity" oninput="debouncedActivity()"></div>
+              </div>
+              <button class="btn btn-secondary" onclick="loadActivity()">↻ Refresh</button>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Time</th><th>What happened</th><th>User</th><th>Agency</th><th>By</th></tr></thead>
+                <tbody id="activityTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="activityPager"></div>
+          </div>
+        </section>
+
+        <!-- USER PROFILE -->
+        <section id="tab-userDetail" class="tab-pane">
+          <div id="userDetail"></div>
         </section>
 
         <!-- 2. NEWSLETTER SUBSCRIBERS TAB -->
@@ -592,9 +751,111 @@
     </div>
   </div>
 
+  <!-- Account status Modal -->
+  <div id="statusModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Change account status</h3><button class="modal-x" onclick="closeModal('statusModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitStatus(event)" novalidate>
+        <p class="modal-lead" id="statusLead"></p>
+        <div class="form-group">
+          <label class="form-label" for="stStatus">New status</label>
+          <select id="stStatus" class="form-select" onchange="syncStatusForm()">
+            <option value="suspended">Suspended (temporary or until reviewed)</option>
+            <option value="deactivated">Deactivated (account switched off)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="stReason">Reason (the user sees this when they try to sign in)</label>
+          <textarea id="stReason" class="form-input" rows="3" maxlength="500"></textarea>
+        </div>
+        <div class="form-group" id="stUntilGroup">
+          <label class="form-label" for="stUntil">Suspend until (optional)</label>
+          <input id="stUntil" class="form-input" type="date">
+          <span class="field-hint">Leave empty to suspend until you reactivate the account.</span>
+        </div>
+        <div class="form-error-box" id="statusError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-danger btn-block" id="statusSubmit">Apply</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Restrictions Modal -->
+  <div id="restrictModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Restrictions</h3><button class="modal-x" onclick="closeModal('restrictModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitRestrictions(event)" novalidate>
+        <p class="modal-lead">A restricted user can still sign in. Choose what they can't do.</p>
+        <div class="check-list">
+          <label class="check"><input type="checkbox" id="rsBooking"> Book trips</label>
+          <label class="check"><input type="checkbox" id="rsReviews"> Write reviews</label>
+          <label class="check"><input type="checkbox" id="rsMessaging"> Send messages</label>
+        </div>
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label" for="rsReason">Reason</label>
+          <textarea id="rsReason" class="form-input" rows="3" maxlength="500"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="rsUntil">Restrict until (optional)</label>
+          <input id="rsUntil" class="form-input" type="date">
+        </div>
+        <div class="form-error-box" id="restrictError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="restrictSubmit">Save restrictions</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reason Modal (delete, hide, reject) -->
+  <div id="reasonModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3 id="reasonTitle">Confirm</h3><button class="modal-x" onclick="closeModal('reasonModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitReason(event)" novalidate>
+        <p class="modal-lead" id="reasonLead"></p>
+        <div class="form-group">
+          <label class="form-label" for="reasonText" id="reasonLabel">Reason</label>
+          <textarea id="reasonText" class="form-input" rows="3" maxlength="500"></textarea>
+        </div>
+        <div class="form-error-box" id="reasonError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-danger btn-block" id="reasonSubmit">Confirm</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Wallet Modal -->
+  <div id="walletModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Adjust wallet</h3><button class="modal-x" onclick="closeModal('walletModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitWallet(event)" novalidate>
+        <p class="modal-lead" id="walletLead"></p>
+        <div class="form-group">
+          <label class="form-label" for="wType">Change</label>
+          <select id="wType" class="form-select"><option value="credit">Add money (credit)</option><option value="debit">Take money (debit)</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="wAmount">Amount (৳)</label>
+          <input id="wAmount" class="form-input" type="number" min="0.01" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="wNote">Note (kept in the wallet history)</label>
+          <input id="wNote" class="form-input" maxlength="300">
+        </div>
+        <div class="form-error-box" id="walletError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="walletSubmit">Apply change</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Complaint Modal -->
+  <div id="complaintModal" class="modal-overlay">
+    <div class="modal-card modal-wide">
+      <div class="modal-head"><h3>Complaint</h3><button class="modal-x" onclick="closeModal('complaintModal')" aria-label="Close">&times;</button></div>
+      <div id="complaintBody"></div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="adminToastContainer" class="toast-container"></div>
 
   <script src="/js/admin.js"></script>
+  <script src="/js/admin-users.js"></script>
 </body>
 </html>

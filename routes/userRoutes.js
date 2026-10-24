@@ -2,6 +2,7 @@ const express = require('express');
 
 const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
+const { userDocumentUpload } = require('../utils/uploads');
 
 const router = express.Router();
 
@@ -19,6 +20,16 @@ router.get('/logout', authController.logout);
 router.use(authController.protect);
 
 router.get('/me', authController.getMe);
+router.get('/me/verification', userController.getMyVerification);
+router.post(
+    '/me/verification',
+    userDocumentUpload.fields([
+        { name: 'nid', maxCount: 1 },
+        { name: 'passport', maxCount: 1 },
+        { name: 'drivingLicense', maxCount: 1 },
+        { name: 'selfie', maxCount: 1 }
+    ]),
+    userController.submitMyVerification);
 router.patch('/changePassword', authController.changePassword);
 router.patch(
     '/updateMe',

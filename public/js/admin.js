@@ -20,9 +20,8 @@ function joinedDate(record) {
 
 // Escape user-submitted text before inserting it as HTML
 function escapeHTML(value) {
-  const div = document.createElement('div');
-  div.textContent = value == null ? '' : String(value);
-  return div.innerHTML;
+  // Escape quotes too, so the result is safe inside HTML attributes as well as text
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 // Toast helper
@@ -169,7 +168,7 @@ async function handleAdminLogout() {
 
 // Switch Sidebar Tabs
 const TAB_TITLES = {
-  dashboard: 'Dashboard', users: 'User Directory', subscribers: 'Newsletter Leads', agencies: 'Agencies',
+  dashboard: 'Dashboard', users: 'Users', userDetail: 'User profile', subscribers: 'Newsletter Leads', agencies: 'Agencies',
   pendingAgencies: 'Pending Agencies', agentLeads: 'Agent Leads', system: 'System Status', profile: 'My profile', agencyDetail: 'Agency'
 };
 
@@ -186,25 +185,6 @@ function switchTab(tabId) {
   if (targetBtn) targetBtn.classList.add('active');
 }
 
-// Load Users
-async function loadUsers() {
-  const tbody = document.getElementById('usersTableBody');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 24px; color: var(--text-dim);">Loading accounts...</td></tr>';
-
-  try {
-    const { ok, data } = await adminFetch('/api/v1/users');
-    if (ok && Array.isArray(data.data)) {
-      adminState.users = data.data;
-      updateStats();
-      filterUsers();
-    } else {
-      if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 24px; color: var(--color-danger);">${escapeHTML(data.message || 'Could not load users')}</td></tr>`;
-    }
-  } catch (err) {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 24px; color: var(--color-danger);">Failed to fetch user directory</td></tr>';
-  }
-}
-
 // Refresh the sidebar badge counts (the numbers themselves live on the Dashboard)
 async function updateStats() {
   try {
@@ -218,80 +198,6 @@ async function updateStats() {
   } catch (e) {
     // Badges are informational; leave the last values in place
   }
-}
-
-// Row actions in the user directory look the user up by ID
-function userAction(kind, userId) {
-  const user = adminState.users.find(u => u._id === userId);
-  if (!user) return;
-  if (kind === 'role') openEditRoleModal(user._id, user.name, user.role);
-  if (kind === 'reset') openResetPasswordModal(user._id, user.name, user.email);
-  if (kind === 'delete') handleDeleteUser(user._id, user.email);
-}
-
-// Filter Users in Table
-function filterUsers() {
-  const search = (document.getElementById('userSearchInput')?.value || '').toLowerCase().trim();
-  const roleFilter = document.getElementById('userRoleFilter')?.value || 'all';
-
-  adminState.filteredUsers = adminState.users.filter(user => {
-    const matchSearch = (user.name || '').toLowerCase().includes(search) || 
-                        (user.email || '').toLowerCase().includes(search) ||
-                        (user._id || '').toLowerCase().includes(search);
-    const matchRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchSearch && matchRole;
-  });
-
-  renderUsersTable();
-}
-
-function renderUsersTable() {
-  const tbody = document.getElementById('usersTableBody');
-  if (!tbody) return;
-
-  if (adminState.filteredUsers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 32px; color: var(--text-dim);">No accounts matching current criteria.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = adminState.filteredUsers.map(user => {
-    const id = escapeHTML(user._id);
-    const role = escapeHTML(user.role || 'user');
-    const initial = escapeHTML((user.name || 'U').charAt(0).toUpperCase());
-    const joined = joinedDate(user);
-    const createdAt = joined ? joined.toLocaleDateString() : 'N/A';
-    const isSelf = adminState.currentUser && adminState.currentUser._id === user._id;
-    const invited = user.accountStatus === 'invited';
-
-    // Buttons pass only the ID; names are looked up in userAction() so user text never reaches inline JS
-    return `
-      <tr>
-        <td>
-          <div class="user-cell">
-            <div class="user-cell-avatar">${initial}</div>
-            <div class="user-cell-info">
-              <span class="user-cell-name">${escapeHTML(user.name) || 'Unnamed'}</span>
-              <span class="user-cell-email">${escapeHTML(user.email)}</span>
-            </div>
-          </div>
-        </td>
-        <td><span class="badge badge-${role}">${role}${user.role === 'agent' && user.agencyRole ? ` · ${escapeHTML(user.agencyRole)}` : ''}</span></td>
-        <td style="color: var(--text-muted); font-size: 0.85rem;">${escapeHTML(createdAt)}</td>
-        <td>
-          <span class="badge ${invited ? 'badge-manager' : 'badge-active'}">${invited ? 'Invited' : 'Active'}</span>
-        </td>
-        <td style="text-align: right;">
-          <div style="display: inline-flex; gap: 8px;">
-            ${user.role !== 'agent' ? `<button class="btn btn-secondary btn-sm" onclick="userAction('role', '${id}')">Role</button>` : ''}
-            <button class="btn btn-secondary btn-sm" onclick="userAction('reset', '${id}')">Reset Pwd</button>
-            ${!isSelf ? `
-              <button class="btn btn-danger btn-sm" onclick="userAction('delete', '${id}')">Delete</button>
-            ` : '<span style="color:var(--text-dim); font-size:0.75rem; padding: 6px;">(You)</span>'}
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
 }
 
 // Create User
@@ -323,7 +229,7 @@ async function handleCreateUser(e) {
       showAdminToast(`User ${name} created successfully!`, 'success');
       closeModal('createUserModal');
       form.reset();
-      loadUsers();
+      refreshUsersViews();
     } else {
       showAdminToast(data.message || 'Creation failed.', 'error');
     }
@@ -357,7 +263,7 @@ async function handleUpdateRole(e) {
     if (ok) {
       showAdminToast('User role updated successfully!', 'success');
       closeModal('editRoleModal');
-      loadUsers();
+      refreshUsersViews();
     } else {
       showAdminToast(data.message || 'Could not update role.', 'error');
     }
@@ -408,28 +314,6 @@ async function handleSendResetLink() {
       closeModal('adminResetModal');
     } else {
       showAdminToast(data.message || 'Could not generate reset link.', 'error');
-    }
-  } catch (err) {
-    showAdminToast('Network error.', 'error');
-  }
-}
-
-// Delete User
-async function handleDeleteUser(userId, email) {
-  if (!confirm(`Are you sure you want to permanently delete account: ${email}? This cannot be undone.`)) {
-    return;
-  }
-
-  try {
-    const { ok, data } = await adminFetch(`/api/v1/users/${userId}`, {
-      method: 'DELETE'
-    });
-
-    if (ok) {
-      showAdminToast(`Account ${email} purged.`, 'success');
-      loadUsers();
-    } else {
-      showAdminToast(data.message || 'Could not delete user.', 'error');
     }
   } catch (err) {
     showAdminToast('Network error.', 'error');

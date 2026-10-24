@@ -5,6 +5,8 @@ const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const factory = require("./handlerFactory");
 const Email = require("../utils/email");
+const { savePrivateDocument, removePrivateDocument } = require('../utils/uploads');
+const { logActivity } = require('../utils/activity');
 
 const multerStorage = multer.memoryStorage();
 
@@ -76,6 +78,64 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
         status: 'success'
     });
 })
+
+// ---------- Traveler identity verification ----------
+
+const DOC_FIELDS = { nid: 'nid', passport: 'passport', drivingLicense: 'driving_license', selfie: 'selfie' };
+
+const verificationView = user => ({
+    status: user.verification.status,
+    note: user.verification.note,
+    submittedAt: user.verification.submittedAt,
+    reviewedAt: user.verification.reviewedAt,
+    documents: user.verification.documents.map(d => ({
+        id: d._id, kind: d.kind, originalName: d.originalName, uploadedAt: d.uploadedAt
+    }))
+});
+
+exports.getMyVerification = catchAsync(async (req, res, next) => {
+    res.status(200).json({ status: 'success', data: { verification: verificationView(req.user) } });
+});
+
+exports.submitMyVerification = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user.id).select('+verification.documents.file');
+    const files = req.files || {};
+    const uploads = Object.entries(DOC_FIELDS)
+        .map(([field, kind]) => ({ kind, file: files[field] && files[field][0] }))
+        .filter(u => u.file);
+
+    if (!uploads.length) {
+        return next(new AppError('Upload at least one ID document: NID, passport or driving license.', 400));
+    }
+    const kindsAfter = new Set([...user.verification.documents.map(d => d.kind), ...uploads.map(u => u.kind)]);
+    if (!['nid', 'passport', 'driving_license'].some(k => kindsAfter.has(k))) {
+        return next(new AppError('Include an ID document: NID, passport or driving license.', 400));
+    }
+
+    const stored = await Promise.all(uploads.map(u => savePrivateDocument(u.file, `u-${user.id}`)));
+    const toRemove = [];
+    uploads.forEach(({ kind, file }, i) => {
+        user.verification.documents.filter(d => d.kind === kind).forEach(d => toRemove.push(d.file));
+        user.verification.documents = user.verification.documents.filter(d => d.kind !== kind);
+        user.verification.documents.push({ kind, file: stored[i], originalName: file.originalname.slice(0, 120), mimeType: file.mimetype });
+    });
+
+    user.verification.status = 'pending';
+    user.verification.note = '';
+    user.verification.submittedAt = new Date();
+    await user.save({ validateBeforeSave: false });
+    await Promise.all(toRemove.map(removePrivateDocument));
+
+    await logActivity(req, { action: 'verification.submitted', summary: 'Submitted identity documents for verification', user: user._id });
+
+    res.status(200).json({
+        status: 'success',
+        message: 'Documents received. Plezar will review them and update your status.',
+        data: { verification: verificationView(user) }
+    });
+});
+
+exports.verificationView = verificationView;
 
 exports.getProfile = (req, res, next) => {
     req.params.id = req.user.id;
