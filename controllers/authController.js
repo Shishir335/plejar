@@ -19,6 +19,14 @@ const getAdminEmails = () =>
 
 const isAdminEmail = email => Boolean(email) && getAdminEmails().includes(email.toLowerCase());
 
+// Store the admin role for ADMIN_EMAILS accounts, so the admin console (which reads the role) lets them in
+const promoteAdminEmail = async user => {
+    if (user && isAdminEmail(user.email) && user.role !== 'admin' && user.role !== 'agent') {
+        user.role = 'admin';
+        await user.save({ validateBeforeSave: false });
+    }
+};
+
 
 const signToken = id => jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN
@@ -106,6 +114,7 @@ exports.login = catchAsync(async (req, res, next) => {
     }
 
     // 5) send token to client
+    await promoteAdminEmail(user);
     createAndSendToken(user, 200, req, res);
 });
 
@@ -203,6 +212,8 @@ exports.protect = catchAsync(async (req, res, next) => {
     if (currentUser.changedPasswordAfter && currentUser.changedPasswordAfter(decoded.iat)) {
         return next(new AppError('Password changed recently. Please login again.', 401));
     }
+
+    await promoteAdminEmail(currentUser);
 
     // Grant access to protected route
     req.user = currentUser;
