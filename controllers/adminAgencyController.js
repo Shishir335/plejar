@@ -82,9 +82,15 @@ exports.listAgencies = catchAsync(async (req, res, next) => {
     status: a.status,
     verified: a.verified,
     verificationStatus: a.verification ? a.verification.status : 'none',
+    verificationSubmittedAt: a.verification ? a.verification.submittedAt : null,
     createdAt: a.createdAt,
     owner: ownerMap[String(a._id)]
-      ? { name: ownerMap[String(a._id)].name, email: ownerMap[String(a._id)].email, accountStatus: ownerMap[String(a._id)].accountStatus }
+      ? {
+          id: ownerMap[String(a._id)]._id,
+          name: ownerMap[String(a._id)].name,
+          email: ownerMap[String(a._id)].email,
+          accountStatus: ownerMap[String(a._id)].accountStatus
+        }
       : null,
     members: memberMap[String(a._id)] ? memberMap[String(a._id)].count : 0,
     packages: pkgMap[String(a._id)] ? pkgMap[String(a._id)].total : 0,

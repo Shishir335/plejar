@@ -21,7 +21,7 @@
         </div>
       </div>
 
-      <form onsubmit="handleAdminLogin(event)">
+      <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
         <div class="form-group">
           <label class="form-label">Administrator Email</label>
           <input type="email" name="email" class="form-input" placeholder="admin@plezar.com" required autocomplete="username">
@@ -31,6 +31,22 @@
           <input type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
         </div>
         <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Sign In to Console</button>
+        <div style="margin-top: 14px; text-align: center;">
+          <a href="#" onclick="event.preventDefault(); showForgotForm(true);" style="font-size: 0.85rem; color: var(--accent-primary);">Forgot password?</a>
+        </div>
+      </form>
+
+      <form id="adminForgotForm" onsubmit="handleAdminForgot(event)" hidden>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">Enter your admin email. We'll send a link to set a new password. It works for 10 minutes.</p>
+        <div class="form-group">
+          <label class="form-label" for="forgotEmail">Administrator Email</label>
+          <input type="email" id="forgotEmail" name="email" class="form-input" required autocomplete="username">
+        </div>
+        <div id="forgotMessage" class="form-note-box" role="status" hidden></div>
+        <button type="submit" class="btn btn-primary" id="forgotSubmit" style="width: 100%;">Send reset link</button>
+        <div style="margin-top: 14px; text-align: center;">
+          <a href="#" onclick="event.preventDefault(); showForgotForm(false);" style="font-size: 0.85rem; color: var(--accent-primary);">&larr; Back to sign in</a>
+        </div>
       </form>
       <div style="margin-top: 20px; text-align: center;">
         <a href="/" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">&larr; Return to main site</a>
@@ -65,6 +81,11 @@
         <button class="nav-link-btn" data-tab="agencies" onclick="switchTab('agencies')">
           <span>🏝️</span>
           <span class="sidebar-text">Agencies</span>
+        </button>
+
+        <button class="nav-link-btn" data-tab="pendingAgencies" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">
+          <span>⏳</span>
+          <span class="sidebar-text">Pending Agencies</span>
           <span id="agenciesPendingCount" class="nav-count" hidden>0</span>
         </button>
 
@@ -81,6 +102,10 @@
       </nav>
 
       <div class="sidebar-footer">
+        <button class="nav-link-btn sidebar-profile" data-tab="profile" onclick="switchTab('profile')">
+          <span class="profile-avatar" id="sidebarAvatar">A</span>
+          <span class="sidebar-text"><strong id="sidebarUserName">My profile</strong><small>My profile</small></span>
+        </button>
         <a href="/" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center;">
           &larr; <span class="sidebar-text">Back to Site</span>
         </a>
@@ -96,12 +121,10 @@
           <h1 style="font-size: 1.25rem; font-weight: 700;">Platform Administration</h1>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 16px;">
-          <div style="font-size: 0.88rem; color: var(--text-muted);">
-            Logged in as <strong id="topbarUserName" style="color: var(--text-primary);">-</strong>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="handleAdminLogout()">Sign Out</button>
-        </div>
+        <button class="topbar-profile" onclick="switchTab('profile')" title="Open my profile">
+          <span class="profile-avatar" id="topbarAvatar">A</span>
+          <span id="topbarUserName">-</span>
+        </button>
       </header>
 
       <!-- Content Views -->
@@ -270,6 +293,70 @@
               </thead>
               <tbody id="agenciesTableBody"></tbody>
             </table>
+          </div>
+        </section>
+
+        <!-- PENDING AGENCIES TAB -->
+        <section id="tab-pendingAgencies" class="tab-pane">
+          <div class="control-bar">
+            <div>
+              <h2 style="font-size: 1.1rem; font-weight: 600;">Pending Agencies</h2>
+              <p style="font-size: 0.86rem; color: var(--text-muted); margin-top: 2px;">Agencies that need something from you or from their owner.</p>
+            </div>
+            <button class="btn btn-secondary" onclick="loadPendingAgencies()">↻ Refresh</button>
+          </div>
+
+          <h3 class="section-label">Waiting for your verification review</h3>
+          <div class="table-container" style="margin-bottom: 28px;">
+            <table class="admin-table lead-table">
+              <thead><tr><th>Agency</th><th>Owner</th><th>Submitted</th><th style="text-align: right;">Actions</th></tr></thead>
+              <tbody id="pendingReviewBody"></tbody>
+            </table>
+          </div>
+
+          <h3 class="section-label">Invite sent, owner hasn't signed up yet</h3>
+          <div class="table-container">
+            <table class="admin-table lead-table">
+              <thead><tr><th>Agency</th><th>Owner</th><th>Invited</th><th style="text-align: right;">Actions</th></tr></thead>
+              <tbody id="pendingInviteBody"></tbody>
+            </table>
+          </div>
+          <div id="pendingInviteResult"></div>
+        </section>
+
+        <!-- MY PROFILE TAB -->
+        <section id="tab-profile" class="tab-pane">
+          <div class="control-bar">
+            <h2 style="font-size: 1.1rem; font-weight: 600;">My profile</h2>
+          </div>
+
+          <div class="detail-grid">
+            <form class="detail-card" id="profileForm" onsubmit="saveMyProfile(event)">
+              <h3>Your details</h3>
+              <div class="form-group"><label class="form-label" for="pfName">Name</label><input class="form-input" id="pfName" name="name" required maxlength="80" autocomplete="name"></div>
+              <div class="form-group"><label class="form-label" for="pfEmail">Email</label><input class="form-input" id="pfEmail" name="email" type="email" required autocomplete="email"></div>
+              <div class="form-group"><label class="form-label" for="pfPhone">Phone</label><input class="form-input" id="pfPhone" name="phone" maxlength="20" autocomplete="tel"></div>
+              <p class="detail-muted">Role: <strong id="pfRole">-</strong> · Joined <span id="pfJoined">-</span></p>
+              <div id="profileMessage" class="form-note-box" role="status" hidden></div>
+              <button type="submit" class="btn btn-primary" id="profileSave">Save details</button>
+            </form>
+
+            <div>
+              <form class="detail-card" id="passwordForm" onsubmit="changeMyPassword(event)">
+                <h3>Change password</h3>
+                <div class="form-group"><label class="form-label" for="pwCurrent">Current password</label><input class="form-input" id="pwCurrent" name="currentPassword" type="password" required autocomplete="current-password"></div>
+                <div class="form-group"><label class="form-label" for="pwNew">New password</label><input class="form-input" id="pwNew" name="password" type="password" minlength="8" required autocomplete="new-password"><span class="detail-muted" style="display:block; margin-top:4px;">At least 8 characters.</span></div>
+                <div class="form-group"><label class="form-label" for="pwConfirm">Confirm new password</label><input class="form-input" id="pwConfirm" name="confirmPassword" type="password" minlength="8" required autocomplete="new-password"></div>
+                <div id="passwordMessage" class="form-note-box" role="status" hidden></div>
+                <button type="submit" class="btn btn-primary" id="passwordSave">Change password</button>
+              </form>
+
+              <div class="detail-card" style="margin-top: 16px;">
+                <h3>Sign out</h3>
+                <p class="detail-muted">Sign out of the admin console on this device.</p>
+                <button class="btn btn-danger" onclick="handleAdminLogout()">Sign out</button>
+              </div>
+            </div>
           </div>
         </section>
 

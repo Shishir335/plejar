@@ -76,6 +76,7 @@ async function checkAdminAuth() {
       loadSubscribers();
       loadAgentLeads();
       loadAgencies();
+      loadPendingAgencies();
       updateStats();
     } else {
       showLogin();
@@ -94,10 +95,7 @@ function showDashboard() {
   document.getElementById('adminLoginView').style.display = 'none';
   document.getElementById('adminDashboardView').style.display = 'flex';
 
-  const userBadge = document.getElementById('topbarUserName');
-  if (userBadge && adminState.currentUser) {
-    userBadge.textContent = adminState.currentUser.name;
-  }
+  renderMyProfile();
 }
 
 // Admin Login Handler
@@ -134,6 +132,7 @@ async function handleAdminLogin(e) {
       loadSubscribers();
       loadAgentLeads();
       loadAgencies();
+      loadPendingAgencies();
       updateStats();
     } else {
       showAdminToast(data.message || 'Login failed.', 'error');
@@ -146,11 +145,16 @@ async function handleAdminLogin(e) {
   }
 }
 
-function handleAdminLogout() {
-  localStorage.removeItem('plezar_token');
+async function handleAdminLogout() {
+  // End the server session too, otherwise the login cookie signs you straight back in
+  await adminFetch('/api/v1/users/logout').catch(() => {});
+  try { localStorage.removeItem('plezar_token'); } catch (e) { /* ignore */ }
   adminState.token = null;
   adminState.currentUser = null;
-  showAdminToast('Signed out from console.', 'info');
+  document.getElementById('adminLoginForm')?.reset();
+  switchTab('users');
+  showForgotForm(false);
+  showAdminToast('Signed out.', 'info');
   showLogin();
 }
 
@@ -614,6 +618,227 @@ async function deleteAgentLead(leadId) {
   } catch (e) {
     showAdminToast('Could not delete the lead.', 'error');
   }
+}
+
+// ---------- Forgot password (login screen) ----------
+
+function showForgotForm(show) {
+  const login = document.getElementById('adminLoginForm');
+  const forgot = document.getElementById('adminForgotForm');
+  if (!login || !forgot) return;
+  login.hidden = show;
+  forgot.hidden = !show;
+  const msg = document.getElementById('forgotMessage');
+  if (msg) msg.hidden = true;
+  if (show) {
+    const typed = login.elements.email.value;
+    if (typed) forgot.elements.email.value = typed;
+    forgot.elements.email.focus();
+  }
+}
+
+async function handleAdminForgot(e) {
+  e.preventDefault();
+  const form = e.target;
+  const email = form.elements.email.value.trim();
+  const msg = document.getElementById('forgotMessage');
+  const btn = document.getElementById('forgotSubmit');
+  const say = (text, isError) => {
+    msg.textContent = text;
+    msg.classList.toggle('is-error', Boolean(isError));
+    msg.hidden = false;
+  };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say('Enter a valid email address.', true);
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  try {
+    const { status } = await adminFetch('/api/v1/users/forgotPassword', { method: 'POST', body: JSON.stringify({ email }) });
+    // Same message whether or not the email exists, so this form can't be used to find admin accounts
+    if (status === 200 || status === 404) {
+      say(`If ${email} has an account, a reset link is on its way. Check your inbox and spam folder.`);
+    } else {
+      say("The reset email couldn't be sent right now. Try again later, or ask the site owner to reset your password.", true);
+    }
+  } catch (err) {
+    say('Could not reach the server. Check your connection and try again.', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send reset link';
+  }
+}
+
+// ---------- My profile ----------
+
+function renderMyProfile() {
+  const me = adminState.currentUser;
+  if (!me) return;
+  const initial = (me.name || 'A').charAt(0).toUpperCase();
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  set('topbarUserName', me.name || 'My profile');
+  set('sidebarUserName', me.name || 'My profile');
+  set('topbarAvatar', initial);
+  set('sidebarAvatar', initial);
+
+  const form = document.getElementById('profileForm');
+  if (form) {
+    form.elements.name.value = me.name || '';
+    form.elements.email.value = me.email || '';
+    form.elements.phone.value = me.phone || '';
+  }
+  set('pfRole', me.role || 'admin');
+  set('pfJoined', me.createdAt ? new Date(me.createdAt).toLocaleDateString() : 'date not recorded');
+}
+
+function showFormNote(id, text, isError) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('is-error', Boolean(isError));
+  el.hidden = !text;
+}
+
+async function saveMyProfile(e) {
+  e.preventDefault();
+  const form = e.target;
+  const body = {
+    name: form.elements.name.value.trim(),
+    email: form.elements.email.value.trim(),
+    phone: form.elements.phone.value.trim()
+  };
+  if (!body.name) return showFormNote('profileMessage', 'Enter your name.', true);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) return showFormNote('profileMessage', 'Enter a valid email address.', true);
+
+  const btn = document.getElementById('profileSave');
+  btn.disabled = true;
+  try {
+    const { ok, data } = await adminFetch('/api/v1/users/updateMe', { method: 'PATCH', body: JSON.stringify(body) });
+    if (!ok) return showFormNote('profileMessage', data.message || 'Could not save your details.', true);
+    adminState.currentUser = { ...adminState.currentUser, ...data.data };
+    renderMyProfile();
+    showFormNote('profileMessage', 'Details saved.');
+  } catch (err) {
+    showFormNote('profileMessage', 'Could not reach the server.', true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function changeMyPassword(e) {
+  e.preventDefault();
+  const form = e.target;
+  const currentPassword = form.elements.currentPassword.value;
+  const password = form.elements.password.value;
+  const confirmPassword = form.elements.confirmPassword.value;
+  if (!currentPassword) return showFormNote('passwordMessage', 'Enter your current password.', true);
+  if (password.length < 8) return showFormNote('passwordMessage', 'Use at least 8 characters for the new password.', true);
+  if (password !== confirmPassword) return showFormNote('passwordMessage', "The new passwords don't match.", true);
+  if (password === currentPassword) return showFormNote('passwordMessage', 'Choose a password different from your current one.', true);
+
+  const btn = document.getElementById('passwordSave');
+  btn.disabled = true;
+  btn.textContent = 'Changing...';
+  try {
+    const { ok, data } = await adminFetch('/api/v1/users/changePassword', {
+      method: 'PATCH',
+      body: JSON.stringify({ currentPassword, password, confirmPassword })
+    });
+    if (!ok) return showFormNote('passwordMessage', data.message || 'Could not change your password.', true);
+    // Changing the password invalidates older sessions, so keep the new token
+    if (data.token) {
+      adminState.token = data.token;
+      try { localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still works */ }
+    }
+    form.reset();
+    showFormNote('passwordMessage', 'Password changed. Use the new password next time you sign in.');
+  } catch (err) {
+    showFormNote('passwordMessage', 'Could not reach the server.', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Change password';
+  }
+}
+
+// ---------- Pending agencies ----------
+
+function pendingRowMessage(id, text) {
+  const tbody = document.getElementById(id);
+  if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--text-dim);">${escapeHTML(text)}</td></tr>`;
+}
+
+async function loadPendingAgencies() {
+  pendingRowMessage('pendingReviewBody', 'Loading...');
+  pendingRowMessage('pendingInviteBody', 'Loading...');
+  const result = document.getElementById('pendingInviteResult');
+  if (result) result.innerHTML = '';
+
+  try {
+    const { ok, data } = await adminFetch('/api/v1/admin/agencies');
+    if (!ok) {
+      pendingRowMessage('pendingReviewBody', data.message || 'Could not load agencies.');
+      pendingRowMessage('pendingInviteBody', '');
+      return;
+    }
+    const all = data.data.agencies;
+    const fmt = d => (d ? new Date(d).toLocaleDateString() : '—');
+    const ownerCell = a => (a.owner
+      ? `<span class="lead-main">${escapeHTML(a.owner.name)}</span><span class="lead-sub">${escapeHTML(a.owner.email)}</span>`
+      : '—');
+    const agencyCell = a => `
+      <div class="user-cell">${agencyLogo(a)}<div class="user-cell-info">
+        <span class="user-cell-name">${escapeHTML(a.name)}</span>
+        <span class="user-cell-email">${escapeHTML((a.regions || []).join(', ')) || '—'}</span>
+      </div></div>`;
+
+    const review = all.filter(a => a.verificationStatus === 'pending');
+    const invited = all.filter(a => a.owner && a.owner.accountStatus === 'invited');
+
+    const reviewBody = document.getElementById('pendingReviewBody');
+    if (!review.length) pendingRowMessage('pendingReviewBody', 'Nothing to review. New document submissions will appear here.');
+    else {
+      reviewBody.innerHTML = review.map(a => `
+        <tr>
+          <td>${agencyCell(a)}</td>
+          <td>${ownerCell(a)}</td>
+          <td>${escapeHTML(fmt(a.verificationSubmittedAt))}</td>
+          <td style="text-align:right;"><button class="btn btn-primary btn-sm" onclick="openAgency('${escapeHTML(a.id)}')">Review documents</button></td>
+        </tr>`).join('');
+    }
+
+    const inviteBody = document.getElementById('pendingInviteBody');
+    if (!invited.length) pendingRowMessage('pendingInviteBody', 'Every invited owner has signed up.');
+    else {
+      inviteBody.innerHTML = invited.map(a => `
+        <tr>
+          <td>${agencyCell(a)}</td>
+          <td>${ownerCell(a)}</td>
+          <td>${escapeHTML(fmt(a.createdAt))}</td>
+          <td style="text-align:right;">
+            <button class="btn btn-secondary btn-sm" onclick="resendOwnerInvite('${escapeHTML(a.id)}', '${escapeHTML(a.owner.id)}')">Resend invite</button>
+            <button class="btn btn-secondary btn-sm" onclick="openAgency('${escapeHTML(a.id)}')">Open</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    const badge = document.getElementById('agenciesPendingCount');
+    if (badge) {
+      badge.textContent = review.length;
+      badge.hidden = review.length === 0;
+    }
+  } catch (err) {
+    pendingRowMessage('pendingReviewBody', 'Failed to load agencies.');
+    pendingRowMessage('pendingInviteBody', '');
+  }
+}
+
+async function resendOwnerInvite(agencyId, userId) {
+  const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}/members/${userId}/resend`, { method: 'POST' });
+  if (!ok) return showAdminToast(data.message || 'Could not resend the invite.', 'error');
+  if (data.data.emailSent) showAdminToast(data.message, 'success');
+  else document.getElementById('pendingInviteResult').innerHTML = inviteLinkBox(data.data.inviteURL, 'Email is not set up. Send this new link to the owner yourself (works for 7 days):');
 }
 
 // ---------- Agencies ----------
