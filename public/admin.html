@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Plezar // Administration & User Management Console</title>
+  <meta name="color-scheme" content="dark light">
+  <script>
+    (function () {
+      var theme = 'dark';
+      try {
+        var saved = localStorage.getItem('plezar_admin_theme');
+        theme = saved === 'light' || saved === 'dark' ? saved : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      } catch (e) { /* storage blocked: stay dark */ }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <link rel="stylesheet" href="/css/admin.css">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
@@ -11,8 +22,12 @@
 <body>
 
   <!-- ADMIN AUTH GATEWAY (SHOWN IF NOT SIGNED IN AS ADMIN) -->
-  <div id="adminLoginView" style="display: none; width: 100vw; height: 100vh; align-items: center; justify-content: center; background: radial-gradient(circle at center, #111827 0%, #090d16 100%); padding: 20px;">
-    <div style="background: rgba(17, 24, 39, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-lg); padding: 36px; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+  <div id="adminLoginView" class="login-view" style="display: none;">
+    <button type="button" class="icon-btn login-theme-toggle" data-theme-toggle aria-label="Switch theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <div class="login-card">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
         <div class="sidebar-brand-badge" style="width: 40px; height: 40px; font-size: 1.2rem;">P</div>
         <div>
@@ -68,7 +83,12 @@
       </div>
 
       <nav class="sidebar-nav">
-        <button class="nav-link-btn active" data-tab="users" onclick="switchTab('users')">
+        <button class="nav-link-btn active" data-tab="dashboard" onclick="switchTab('dashboard'); loadDashboard();">
+          <span>📊</span>
+          <span class="sidebar-text">Dashboard</span>
+        </button>
+
+        <button class="nav-link-btn" data-tab="users" onclick="switchTab('users')">
           <span>👥</span>
           <span class="sidebar-text">User Directory</span>
         </button>
@@ -118,72 +138,38 @@
       <!-- Topbar -->
       <header class="admin-topbar">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <h1 style="font-size: 1.25rem; font-weight: 700;">Platform Administration</h1>
+          <h1 id="topbarTitle" style="font-size: 1.25rem; font-weight: 700;">Dashboard</h1>
         </div>
 
+        <div class="topbar-actions">
+        <button type="button" class="icon-btn" data-theme-toggle aria-label="Switch theme" title="Switch theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
         <button class="topbar-profile" onclick="switchTab('profile')" title="Open my profile">
           <span class="profile-avatar" id="topbarAvatar">A</span>
           <span id="topbarUserName">-</span>
         </button>
+        </div>
       </header>
 
       <!-- Content Views -->
       <main class="admin-content">
         
-        <!-- Stats Row -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">Active agencies</span>
-              <span class="stat-icon">🏝️</span>
+        <!-- DASHBOARD TAB -->
+        <section id="tab-dashboard" class="tab-pane active">
+          <div class="control-bar">
+            <div>
+              <h2 style="font-size: 1.1rem; font-weight: 600;">Platform overview</h2>
+              <p id="dashUpdated" style="font-size: 0.84rem; color: var(--text-muted); margin-top: 2px;">Loading...</p>
             </div>
-            <div id="statAgencies" class="stat-value">0</div>
+            <button class="btn btn-secondary" onclick="loadDashboard()">↻ Refresh</button>
           </div>
-
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">Awaiting verification</span>
-              <span class="stat-icon">🛡️</span>
-            </div>
-            <div id="statPendingVerification" class="stat-value">0</div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">New agent leads</span>
-              <span class="stat-icon">🧭</span>
-            </div>
-            <div id="statNewLeads" class="stat-value">0</div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">Published packages</span>
-              <span class="stat-icon">🎒</span>
-            </div>
-            <div id="statPublishedPackages" class="stat-value">0</div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">Newsletter subscribers</span>
-              <span class="stat-icon">📬</span>
-            </div>
-            <div id="statSubscribers" class="stat-value">0</div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-header">
-              <span class="stat-label">All accounts</span>
-              <span class="stat-icon">👥</span>
-            </div>
-            <div id="statTotalUsers" class="stat-value">0</div>
-          </div>
-
-        </div>
+          <div id="dashboardBody" aria-live="polite"></div>
+        </section>
 
         <!-- 1. USERS DIRECTORY TAB -->
-        <section id="tab-users" class="tab-pane active">
+        <section id="tab-users" class="tab-pane">
           <div class="control-bar">
             <div style="display: flex; gap: 12px; flex: 1; flex-wrap: wrap;">
               <div class="search-input-wrapper">
@@ -352,6 +338,16 @@
               </form>
 
               <div class="detail-card" style="margin-top: 16px;">
+                <h3>Appearance</h3>
+                <p class="detail-muted">Choose how the admin console looks on this device.</p>
+                <div class="segmented" role="radiogroup" aria-label="Theme">
+                  <button type="button" role="radio" aria-checked="false" data-theme-choice="light">Light</button>
+                  <button type="button" role="radio" aria-checked="false" data-theme-choice="dark">Dark</button>
+                  <button type="button" role="radio" aria-checked="false" data-theme-choice="system">Match system</button>
+                </div>
+              </div>
+
+              <div class="detail-card" style="margin-top: 16px;">
                 <h3>Sign out</h3>
                 <p class="detail-muted">Sign out of the admin console on this device.</p>
                 <button class="btn btn-danger" onclick="handleAdminLogout()">Sign out</button>
@@ -430,25 +426,25 @@
             <div class="stat-card">
               <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">Registered API Endpoints</h3>
               <div style="display: flex; flex-direction: column; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
-                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                <div class="endpoint-row">
                   <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/health
                 </div>
-                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                <div class="endpoint-row">
                   <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/users/signup
                 </div>
-                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                <div class="endpoint-row">
                   <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/users/login
                 </div>
-                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                <div class="endpoint-row">
                   <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/users/me
                 </div>
-                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                <div class="endpoint-row">
                   <span style="color: var(--color-warning); font-weight: 700;">PATCH</span> /api/v1/users/updateMe
                 </div>
-                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                <div class="endpoint-row">
                   <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/users (Admin)
                 </div>
-                <div style="padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);">
+                <div class="endpoint-row">
                   <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/subscribers
                 </div>
               </div>
@@ -511,7 +507,7 @@
       <form onsubmit="handleUpdateRole(event)">
         <input type="hidden" id="editRoleId">
         <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
-          Update system role and access permissions for <strong id="editRoleUserName" style="color: #fff;">-</strong>:
+          Update system role and access permissions for <strong id="editRoleUserName" style="color: var(--text-primary);">-</strong>:
         </p>
         <div class="form-group">
           <label class="form-label">Assign Role</label>
@@ -536,7 +532,7 @@
 
       <input type="hidden" id="resetTargetUserId">
       <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
-        Target User: <strong id="resetTargetUserName" style="color: #fff;">-</strong>
+        Target User: <strong id="resetTargetUserName" style="color: var(--text-primary);">-</strong>
       </p>
 
       <form onsubmit="handleAdminDirectPasswordReset(event)">

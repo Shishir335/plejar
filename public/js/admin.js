@@ -11,6 +11,13 @@ const adminState = {
   filteredUsers: []
 };
 
+// Accounts don't store a creation date, but every MongoDB ID starts with its creation time
+function joinedDate(record) {
+  if (record && record.createdAt) return new Date(record.createdAt);
+  const hex = record && typeof record._id === 'string' ? record._id.slice(0, 8) : '';
+  return /^[0-9a-f]{8}$/i.test(hex) ? new Date(parseInt(hex, 16) * 1000) : null;
+}
+
 // Escape user-submitted text before inserting it as HTML
 function escapeHTML(value) {
   const div = document.createElement('div');
@@ -77,6 +84,7 @@ async function checkAdminAuth() {
       loadAgentLeads();
       loadAgencies();
       loadPendingAgencies();
+      loadDashboard();
       updateStats();
     } else {
       showLogin();
@@ -133,6 +141,7 @@ async function handleAdminLogin(e) {
       loadAgentLeads();
       loadAgencies();
       loadPendingAgencies();
+      loadDashboard();
       updateStats();
     } else {
       showAdminToast(data.message || 'Login failed.', 'error');
@@ -152,14 +161,21 @@ async function handleAdminLogout() {
   adminState.token = null;
   adminState.currentUser = null;
   document.getElementById('adminLoginForm')?.reset();
-  switchTab('users');
+  switchTab('dashboard');
   showForgotForm(false);
   showAdminToast('Signed out.', 'info');
   showLogin();
 }
 
 // Switch Sidebar Tabs
+const TAB_TITLES = {
+  dashboard: 'Dashboard', users: 'User Directory', subscribers: 'Newsletter Leads', agencies: 'Agencies',
+  pendingAgencies: 'Pending Agencies', agentLeads: 'Agent Leads', system: 'System Status', profile: 'My profile', agencyDetail: 'Agency'
+};
+
 function switchTab(tabId) {
+  const title = document.getElementById('topbarTitle');
+  if (title) title.textContent = TAB_TITLES[tabId] || 'Admin Console';
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link-btn').forEach(b => b.classList.remove('active'));
 
@@ -189,30 +205,18 @@ async function loadUsers() {
   }
 }
 
-// Update Stats Cards from the server
+// Refresh the sidebar badge counts (the numbers themselves live on the Dashboard)
 async function updateStats() {
   try {
     const { ok, data } = await adminFetch('/api/v1/admin/stats');
     if (!ok) return;
-    const s = data.data.stats;
-    const set = (id, value) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = value;
-    };
-    set('statAgencies', s.activeAgencies);
-    set('statPendingVerification', s.pendingVerification);
-    set('statNewLeads', s.newLeads);
-    set('statPublishedPackages', s.publishedPackages);
-    set('statSubscribers', s.subscribers);
-    set('statTotalUsers', s.users);
-
     const pending = document.getElementById('agenciesPendingCount');
     if (pending) {
-      pending.textContent = s.pendingVerification;
-      pending.hidden = s.pendingVerification === 0;
+      pending.textContent = data.data.stats.pendingVerification;
+      pending.hidden = data.data.stats.pendingVerification === 0;
     }
   } catch (e) {
-    // Stats are informational; leave the last values in place
+    // Badges are informational; leave the last values in place
   }
 }
 
@@ -254,7 +258,8 @@ function renderUsersTable() {
     const id = escapeHTML(user._id);
     const role = escapeHTML(user.role || 'user');
     const initial = escapeHTML((user.name || 'U').charAt(0).toUpperCase());
-    const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
+    const joined = joinedDate(user);
+    const createdAt = joined ? joined.toLocaleDateString() : 'N/A';
     const isSelf = adminState.currentUser && adminState.currentUser._id === user._id;
     const invited = user.accountStatus === 'invited';
 
@@ -690,7 +695,8 @@ function renderMyProfile() {
     form.elements.phone.value = me.phone || '';
   }
   set('pfRole', me.role || 'admin');
-  set('pfJoined', me.createdAt ? new Date(me.createdAt).toLocaleDateString() : 'date not recorded');
+  const joined = joinedDate(me);
+  set('pfJoined', joined ? joined.toLocaleDateString() : 'date not recorded');
 }
 
 function showFormNote(id, text, isError) {
@@ -1161,6 +1167,262 @@ async function handleInviteAgency(e) {
     btn.textContent = 'Create agency and send invite';
   }
 }
+
+// ---------- Theme (light / dark) ----------
+
+const THEME_KEY = 'plezar_admin_theme';
+const systemLight = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+
+function savedTheme() {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    return v === 'light' || v === 'dark' ? v : 'system';
+  } catch (e) {
+    return 'system';
+  }
+}
+
+function effectiveTheme(pref) {
+  if (pref === 'light' || pref === 'dark') return pref;
+  return systemLight && systemLight.matches ? 'light' : 'dark';
+}
+
+// pref: 'light' | 'dark' | 'system'
+function setTheme(pref) {
+  try {
+    if (pref === 'system') localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, pref);
+  } catch (e) { /* storage blocked: the choice lasts until reload */ }
+  applyTheme(pref);
+}
+
+function applyTheme(pref) {
+  const theme = effectiveTheme(pref);
+  document.documentElement.setAttribute('data-theme', theme);
+  const next = theme === 'dark' ? 'light' : 'dark';
+  document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+    btn.setAttribute('aria-label', `Switch to ${next} theme`);
+    btn.title = `Switch to ${next} theme`;
+  });
+  document.querySelectorAll('[data-theme-choice]').forEach(btn => {
+    btn.setAttribute('aria-checked', String(btn.dataset.themeChoice === pref));
+  });
+}
+
+document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+});
+document.querySelectorAll('[data-theme-choice]').forEach(btn => {
+  btn.addEventListener('click', () => setTheme(btn.dataset.themeChoice));
+});
+if (systemLight && systemLight.addEventListener) {
+  systemLight.addEventListener('change', () => {
+    if (savedTheme() === 'system') applyTheme('system');
+  });
+}
+applyTheme(savedTheme());
+
+// ---------- Dashboard ----------
+
+const nf = new Intl.NumberFormat('en-US');
+const shortDate = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const when = d => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
+
+function kpiTile(label, value, note, weekGain) {
+  const gain = weekGain > 0
+    ? `<span class="up">+${nf.format(weekGain)}</span> in the last 7 days`
+    : (weekGain === 0 ? 'None in the last 7 days' : '');
+  return `
+    <div class="kpi">
+      <div class="kpi-label">${escapeHTML(label)}</div>
+      <div class="kpi-value">${nf.format(value)}</div>
+      <div class="kpi-note">${note ? `${escapeHTML(note)}${gain ? ' · ' : ''}` : ''}${gain}</div>
+    </div>`;
+}
+
+// 30 columns, one series. Hover or focus a column for its value; the table button lists every value.
+function columnChart(id, title, noun, dates, values) {
+  const max = Math.max(...values, 1);
+  const total = values.reduce((a, b) => a + b, 0);
+  const cols = values.map((v, i) => {
+    const label = `${shortDate(dates[i])}: ${plural(v, noun[0], noun[1])}`;
+    return `<div class="col ${v === 0 ? 'is-zero' : ''}" tabindex="0" role="img" aria-label="${escapeHTML(label)}" data-date="${escapeHTML(shortDate(dates[i]))}" data-value="${v}" data-noun="${escapeHTML(v === 1 ? noun[0] : noun[1])}"><i style="height:${(v / max) * 100}%"></i></div>`;
+  }).join('');
+  const rows = dates.map((d, i) => `<tr><td>${escapeHTML(shortDate(d))}</td><td>${values[i]}</td></tr>`).join('');
+  return `
+    <div class="chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">${escapeHTML(title)}</div>
+          <div class="chart-total"><strong>${nf.format(total)}</strong>in the last 30 days</div>
+        </div>
+        <button class="link-btn" type="button" onclick="toggleChartTable('${id}', this)" aria-expanded="false" aria-controls="${id}-table">Show table</button>
+      </div>
+      <div class="chart-wrap">
+        <span class="axis-max">${nf.format(max)}</span>
+        <div class="cols">${cols}</div>
+      </div>
+      <div class="axis"><span>${escapeHTML(shortDate(dates[0]))}</span><span>${escapeHTML(shortDate(dates[Math.floor(dates.length / 2)]))}</span><span>${escapeHTML(shortDate(dates[dates.length - 1]))}</span></div>
+      <div class="chart-table-wrap" id="${id}-table" hidden>
+        <table class="chart-table"><thead><tr><th>Date</th><th>${escapeHTML(noun[1][0].toUpperCase() + noun[1].slice(1))}</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>
+    </div>`;
+}
+
+function toggleChartTable(id, btn) {
+  const box = document.getElementById(`${id}-table`);
+  const show = box.hidden;
+  box.hidden = !show;
+  btn.textContent = show ? 'Hide table' : 'Show table';
+  btn.setAttribute('aria-expanded', String(show));
+}
+
+// Ranked horizontal bars, one hue; the label names the category and the count sits at the bar tip
+function barList(items) {
+  const max = Math.max(...items.map(i => i.count), 1);
+  return `<div class="bars">${items.map(i => `
+    <div class="bar-row">
+      <span>${escapeHTML(i.label)}</span>
+      <div class="bar-track"><span class="bar-fill" style="width:${(i.count / max) * 100}%"></span></div>
+      <span class="bar-count">${nf.format(i.count)}</span>
+    </div>`).join('')}</div>`;
+}
+
+function recentCard(title, linkLabel, onClick, items, render) {
+  return `
+    <div class="recent-card">
+      <div class="chart-head" style="margin-bottom: 6px;">
+        <div class="chart-title">${escapeHTML(title)}</div>
+        <button class="link-btn" type="button" onclick="${onClick}">${escapeHTML(linkLabel)}</button>
+      </div>
+      ${items.length ? `<ul class="recent-list">${items.map(render).join('')}</ul>` : '<p class="recent-empty">Nothing here yet.</p>'}
+    </div>`;
+}
+
+const ROLE_LABELS = { user: 'Travelers', agent: 'Agency accounts', manager: 'Managers', admin: 'Administrators', dev: 'Developers' };
+const VERIFY_KEY_LABELS = { verified: 'Verified', pending: 'Awaiting review', rejected: 'Changes requested', none: 'Not submitted' };
+
+function renderDashboard(d) {
+  const t = d.totals;
+  const a = d.attention;
+  const attention = [];
+  if (a.newLeads) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.newLeads)}</strong><span>new agent ${a.newLeads === 1 ? 'lead' : 'leads'} to follow up</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('agentLeads')">Open leads</button></div>`);
+  if (a.pendingVerification) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.pendingVerification)}</strong><span>${a.pendingVerification === 1 ? 'agency is' : 'agencies are'} waiting for verification</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">Review</button></div>`);
+  if (a.invitedOwners) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.invitedOwners)}</strong><span>${a.invitedOwners === 1 ? 'owner has' : 'owners have'} not accepted their invite</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">View</button></div>`);
+
+  const s = d.series;
+  const bd = d.breakdowns;
+
+  document.getElementById('dashboardBody').innerHTML = `
+    <section class="dash-section">
+      <h3 class="dash-title">Needs your attention</h3>
+      ${attention.length ? `<div class="attention">${attention.join('')}</div>` : '<div class="attention-clear">All caught up. No leads, reviews or invites are waiting.</div>'}
+    </section>
+
+    <section class="dash-section">
+      <h3 class="dash-title">At a glance</h3>
+      <div class="kpi-grid">
+        ${kpiTile('Accounts', t.users.total, '', t.users.week)}
+        ${kpiTile('Agencies', t.agencies.total, `${nf.format(t.agencies.active)} active · ${nf.format(t.agencies.verified)} verified`, t.agencies.week)}
+        ${kpiTile('Published packages', t.packages.published, `${plural(t.packages.draft, 'draft', 'drafts')} · ${nf.format(t.packages.hidden)} hidden`)}
+        ${kpiTile('Agent leads', t.leads.total, `${nf.format(t.leads.new)} new`, t.leads.week)}
+        ${kpiTile('Newsletter subscribers', t.subscribers.active, `${nf.format(t.subscribers.total)} ever signed up`, t.subscribers.week)}
+        ${kpiTile('Suspended agencies', t.agencies.suspended, t.agencies.suspended ? 'Locked out of the agency panel' : 'None')}
+      </div>
+    </section>
+
+    <section class="dash-section">
+      <h3 class="dash-title">Activity <span class="dash-sub">last 30 days, Dhaka time</span></h3>
+      <div class="chart-grid">
+        ${columnChart('chartUsers', 'New accounts', ['account', 'accounts'], s.dates, s.users)}
+        ${columnChart('chartLeads', 'Agent leads', ['lead', 'leads'], s.dates, s.leads)}
+        ${columnChart('chartSubs', 'Newsletter signups', ['signup', 'signups'], s.dates, s.subscribers)}
+        ${columnChart('chartAgencies', 'New agencies', ['agency', 'agencies'], s.dates, s.agencies)}
+      </div>
+    </section>
+
+    <section class="dash-section">
+      <h3 class="dash-title">Breakdowns</h3>
+      <div class="chart-grid">
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">Accounts by type</div></div>${barList(bd.userRoles.map(r => ({ label: ROLE_LABELS[r.role] || r.role, count: r.count })))}</div>
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">Agency verification</div></div>${barList(bd.verification.map(r => ({ label: VERIFY_KEY_LABELS[r.key], count: r.count })))}</div>
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">Tour packages</div></div>${barList(bd.packageStatus.map(r => ({ label: r.status[0].toUpperCase() + r.status.slice(1), count: r.count })))}</div>
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">Agent leads by status</div></div>${barList(bd.leadStatus.map(r => ({ label: r.status[0].toUpperCase() + r.status.slice(1), count: r.count })))}</div>
+      </div>
+    </section>
+
+    <section class="dash-section">
+      <h3 class="dash-title">Latest activity</h3>
+      <div class="recent-grid">
+        ${recentCard('Latest agent leads', 'View all', "switchTab('agentLeads')", d.recent.leads, l => `
+          <li><div class="recent-main"><strong>${escapeHTML(l.agencyName)}</strong><span>${escapeHTML(l.contactName)} · ${escapeHTML(l.phone)}</span></div>
+          <div class="recent-side"><span class="badge ${l.status === 'new' ? 'badge-manager' : (l.status === 'contacted' ? 'badge-active' : 'badge-inactive')}">${escapeHTML(l.status)}</span>${escapeHTML(when(l.createdAt))}</div></li>`)}
+        ${recentCard('Latest agencies', 'View all', "switchTab('agencies')", d.recent.agencies, ag => `
+          <li><div class="recent-main"><strong>${escapeHTML(ag.name)}</strong><span>${escapeHTML((ag.regions || []).join(', ')) || 'No areas listed'}</span></div>
+          <div class="recent-side"><span class="badge ${ag.verified ? 'badge-active' : 'badge-inactive'}">${ag.verified ? 'verified' : escapeHTML(ag.status)}</span>${escapeHTML(when(ag.createdAt))}</div></li>`)}
+        ${recentCard('Latest accounts', 'View all', "switchTab('users')", d.recent.users, u => `
+          <li><div class="recent-main"><strong>${escapeHTML(u.name)}</strong><span>${escapeHTML(u.email)}</span></div>
+          <div class="recent-side"><span class="badge badge-${escapeHTML(u.role)}">${escapeHTML(u.role)}</span>${escapeHTML(when(u.createdAt))}</div></li>`)}
+        ${recentCard('Latest newsletter signups', 'View all', "switchTab('subscribers')", d.recent.subscribers, sub => `
+          <li><div class="recent-main"><strong>${escapeHTML(sub.email)}</strong><span>${escapeHTML(sub.source || 'newsletter')}</span></div>
+          <div class="recent-side"><span class="badge ${sub.status === 'active' ? 'badge-active' : 'badge-inactive'}">${escapeHTML(sub.status)}</span>${escapeHTML(when(sub.createdAt))}</div></li>`)}
+        ${recentCard('Top agencies by published packages', 'View agencies', "switchTab('agencies')", d.topAgencies, ag => `
+          <li><div class="recent-main"><strong>${escapeHTML(ag.name)}</strong><span>${ag.verified ? 'Verified agency' : 'Not verified'}</span></div>
+          <div class="recent-side"><strong style="font-size:1rem;color:var(--text-primary)">${nf.format(ag.publishedPackages)}</strong>published</div></li>`)}
+      </div>
+    </section>`;
+
+  document.getElementById('dashUpdated').textContent = `Updated ${new Date(d.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+async function loadDashboard() {
+  const body = document.getElementById('dashboardBody');
+  if (!body) return;
+  body.classList.add('dash-loading'); // keep the previous render visible while refreshing
+  try {
+    const { ok, data } = await adminFetch('/api/v1/admin/dashboard');
+    if (!ok) {
+      body.innerHTML = `<p class="recent-empty">${escapeHTML(data.message || 'Could not load the dashboard.')}</p>`;
+      return;
+    }
+    renderDashboard(data.data);
+  } catch (e) {
+    body.innerHTML = '<p class="recent-empty">Could not reach the server. Check your connection and refresh.</p>';
+  } finally {
+    body.classList.remove('dash-loading');
+  }
+}
+
+// One shared tooltip for every column chart (hover or keyboard focus)
+(function initChartTooltip() {
+  const tip = document.createElement('div');
+  tip.className = 'tip';
+  tip.hidden = true;
+  document.body.appendChild(tip);
+
+  const show = col => {
+    const r = col.getBoundingClientRect();
+    tip.replaceChildren();
+    const value = document.createElement('strong');
+    value.textContent = `${col.dataset.value} ${col.dataset.noun}`;
+    const day = document.createElement('span');
+    day.textContent = col.dataset.date;
+    tip.append(value, day);
+    tip.hidden = false;
+    tip.style.left = `${Math.min(Math.max(r.left + r.width / 2, 60), window.innerWidth - 60)}px`;
+    tip.style.top = `${r.top - 6}px`;
+  };
+  const hide = () => { tip.hidden = true; };
+
+  document.addEventListener('pointerover', e => { const c = e.target.closest('.col'); if (c) show(c); });
+  document.addEventListener('pointerout', e => { if (e.target.closest('.col')) hide(); });
+  document.addEventListener('focusin', e => { const c = e.target.closest('.col'); if (c) show(c); });
+  document.addEventListener('focusout', e => { if (e.target.closest('.col')) hide(); });
+  window.addEventListener('scroll', hide, { passive: true, capture: true });
+})();
 
 // Init
 window.addEventListener('DOMContentLoaded', () => {
