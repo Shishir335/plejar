@@ -4,7 +4,7 @@
  */
 
 const VENDOR_TABS = [
-  ['overview', 'Overview'], ['verification', 'Verification & documents'], ['packages', 'Packages'], ['bookings', 'Bookings'],
+  ['overview', 'Overview'], ['verification', 'Verification & documents'], ['packages', 'Tour events'], ['bookings', 'Bookings'],
   ['performance', 'Performance'], ['ratings', 'Ratings'], ['earnings', 'Earnings & payouts'], ['commission', 'Commission'],
   ['contract', 'Contract'], ['team', 'Team'], ['activity', 'Activity']
 ];
@@ -289,25 +289,27 @@ async function reviewVendorVerification(decision) {
 
 function vendorPackages() {
   const pk = V.detail.packages;
-  if (!pk.length) return '<p class="empty-note">This vendor has not added any tour packages yet.</p>';
+  if (!pk.length) return '<p class="empty-note">This vendor has not created any tour events yet.</p>';
   const aid = E(V.detail.agency._id);
+  const STATUS_BADGE = { published: 'badge-active', draft: 'badge-manager', hidden: 'badge-inactive', cancelled: 'badge-admin' };
   return `<div class="table-container"><table class="admin-table lead-table">
-    <thead><tr><th>Package</th><th>Duration</th><th>Price from</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+    <thead><tr><th>Tour event</th><th>Dates</th><th>Seats</th><th>Price</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
     <tbody>${pk.map(p => `<tr>
-      <td><span class="lead-main">${E(p.title)}</span><span class="lead-sub">${E(p.destination)} · ${p.photos.length} photo${p.photos.length === 1 ? '' : 's'}</span></td>
-      <td>${Number(p.durationDays)}D / ${Number(p.durationNights || 0)}N</td>
+      <td><span class="lead-main">${E(p.title)}</span><span class="lead-sub">${E(p.destination)}, ${p.photos.length} photo${p.photos.length === 1 ? '' : 's'}</span></td>
+      <td style="white-space: nowrap;">${p.startDate ? `${E(fmtDate(p.startDate))}${p.endDate && p.endDate !== p.startDate ? `<span class="lead-sub">to ${E(fmtDate(p.endDate))}</span>` : ''}` : '<span class="lead-sub" style="margin:0">No date</span>'}<span class="lead-sub">${Number(p.durationDays)}D / ${Number(p.durationNights || 0)}N</span></td>
+      <td>${p.seats ? Number(p.seats) : '—'}</td>
       <td>${takaFmt(p.priceFrom)}</td>
-      <td><span class="badge ${p.status === 'published' ? 'badge-active' : (p.status === 'draft' ? 'badge-manager' : 'badge-inactive')}">${E(label(p.status))}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plezar</span>' : ''}</td>
-      <td style="text-align: right;">${p.hiddenByAdmin
+      <td><span class="badge ${STATUS_BADGE[p.status] || 'badge-inactive'}">${E(label(p.status))}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plezar</span>' : ''}${p.status === 'cancelled' && p.cancelReason ? `<span class="lead-sub">${E(p.cancelReason)}</span>` : ''}</td>
+      <td style="text-align: right;">${p.status === 'cancelled' ? '' : p.hiddenByAdmin
         ? `<button class="btn btn-secondary btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', false)">Allow again</button>`
         : `<button class="btn btn-danger btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', true)">Hide</button>`}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 async function moderateVendorPackage(agencyId, packageId, hidden) {
-  if (hidden && !confirm('Hide this package? The vendor cannot publish it again until you allow it.')) return;
+  if (hidden && !confirm('Hide this tour event? The vendor cannot publish it again until you allow it.')) return;
   const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}/packages/${packageId}`, { method: 'PATCH', body: JSON.stringify({ hidden }) });
   if (!ok) return showAdminToast(data.message || 'Could not update the package.', 'error');
-  showAdminToast(hidden ? 'Package hidden.' : 'Package allowed again.', 'success');
+  showAdminToast(hidden ? 'Tour event hidden.' : 'Tour event allowed again.', 'success');
   reloadVendor();
 }
 

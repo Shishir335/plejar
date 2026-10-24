@@ -182,6 +182,7 @@ exports.getAgencyDocument = catchAsync(async (req, res, next) => {
 exports.moderatePackage = catchAsync(async (req, res, next) => {
   const pkg = await Package.findOne({ _id: req.params.packageId, agency: req.params.id });
   if (!pkg) return next(new AppError('No package found with that ID for this agency.', 404));
+  if (pkg.status === 'cancelled') return next(new AppError('This tour event was cancelled by the vendor, so there is nothing to hide.', 400));
 
   if (req.body.hidden === true || req.body.hidden === 'true') {
     pkg.hiddenByAdmin = true;

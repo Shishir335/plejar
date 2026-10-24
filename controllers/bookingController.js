@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Booking = require('../models/bookingModel');
 const Package = require('../models/packageModel');
 const Agency = require('../models/agencyModel');
@@ -5,6 +6,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { rateFor, commissionFor } = require('../utils/commission');
 const { logActivity } = require('../utils/activity');
+const { HOLDS_SEAT, registrationStats, registrationClosedReason } = require('../utils/events');
 
 // A restriction with an end date stops applying once that date has passed
 const restricted = (user, what) => {
@@ -23,16 +25,35 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   }
 
   const travelers = Number(req.body.travelers);
-  const travelDate = new Date(req.body.travelDate);
   if (!Number.isInteger(travelers) || travelers < 1 || travelers > 50) {
     return next(new AppError('Enter between 1 and 50 travelers.', 400));
   }
-  if (Number.isNaN(travelDate.getTime()) || travelDate <= new Date()) {
-    return next(new AppError('Choose a travel date in the future.', 400));
-  }
 
-  const pkg = await Package.findOne({ _id: req.body.packageId, status: 'published' });
-  if (!pkg) return next(new AppError('That tour package is not available.', 404));
+  const pkg = mongoose.isValidObjectId(req.body.packageId) ? await Package.findOne({ _id: req.body.packageId, status: 'published' }) : null;
+  if (!pkg) return next(new AppError('That tour is not available.', 404));
+
+  // A tour event has fixed dates and a number of seats; an undated package lets the traveler pick a date
+  let travelDate;
+  if (pkg.startDate) {
+    const closed = registrationClosedReason(pkg);
+    if (closed) return next(new AppError(closed, 400));
+    if (await Booking.exists({ user: req.user._id, package: pkg._id, status: { $in: HOLDS_SEAT } })) {
+      return next(new AppError('You are already registered for this tour event.', 400));
+    }
+    if (pkg.seats) {
+      const taken = ((await registrationStats([pkg._id]))[String(pkg._id)] || { seatsTaken: 0 }).seatsTaken;
+      const left = Math.max(pkg.seats - taken, 0);
+      if (travelers > left) {
+        return next(new AppError(left ? `Only ${left} seat${left === 1 ? ' is' : 's are'} left on this tour.` : 'This tour event is full.', 400));
+      }
+    }
+    travelDate = pkg.startDate;
+  } else {
+    travelDate = new Date(req.body.travelDate);
+    if (Number.isNaN(travelDate.getTime()) || travelDate <= new Date()) {
+      return next(new AppError('Choose a travel date in the future.', 400));
+    }
+  }
 
   const agency = await Agency.findById(pkg.agency);
   if (!agency || agency.status !== 'active') {

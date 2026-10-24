@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agency panel — Plezar</title>
+  <title>Vendor panel — Plezar</title>
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +17,8 @@
   <main class="auth-page" id="loginView" hidden>
     <form class="auth-card" id="loginForm" novalidate>
       <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
-      <h1>Agency sign in</h1>
-      <p class="sub">Manage your agency profile, tour packages and team.</p>
+      <h1>Vendor sign in</h1>
+      <p class="sub">Manage your tour events, registrations, announcements and team.</p>
       <div class="alert alert-error" id="loginError" role="alert" hidden></div>
       <div class="alert alert-ok" id="loginNotice" role="status" hidden></div>
       <div class="field">
@@ -34,8 +34,33 @@
         <a href="#" id="forgotLink">Forgot your password?</a>
       </p>
       <p style="margin-top: 18px; font-size: 0.84rem; color: var(--ink-faint); text-align: center;">
-        New agencies join by invitation. <a href="/#agents">Tell us about your agency</a>.
+        New agency? <a href="/apply">Apply for membership</a>.
       </p>
+    </form>
+  </main>
+
+  <!-- First sign-in: replace the temporary password -->
+  <main class="auth-page" id="passwordView" hidden>
+    <form class="auth-card" id="passwordForm" novalidate>
+      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+      <h1>Choose your own password</h1>
+      <p class="sub">You signed in with the temporary password Plezar sent you. Pick a new one that only you know before you continue.</p>
+      <div class="alert alert-error" id="passwordError" role="alert" hidden></div>
+      <div class="field" id="currentPasswordField">
+        <label for="pwCurrent">Temporary password</label>
+        <input id="pwCurrent" type="password" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="pwNew">New password</label>
+        <input id="pwNew" type="password" autocomplete="new-password" minlength="8">
+        <span class="hint">At least 8 characters.</span>
+      </div>
+      <div class="field">
+        <label for="pwConfirm">Type it again</label>
+        <input id="pwConfirm" type="password" autocomplete="new-password" minlength="8">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="passwordSubmit">Save password and continue</button>
+      <p style="margin-top: 14px; font-size: 0.88rem; text-align: center;"><a href="#" id="passwordLogout">Sign out</a></p>
     </form>
   </main>
 
@@ -46,8 +71,11 @@
       <div class="side-agency" id="sideAgency"></div>
       <nav class="side-nav" aria-label="Agency panel">
         <button data-view="overview" class="active">Overview</button>
+        <button data-view="events">Tour events</button>
+        <button data-view="registrations">Registrations</button>
+        <button data-view="announcements">Announcements</button>
+        <button data-view="notifications">Notifications</button>
         <button data-view="profile">Agency profile</button>
-        <button data-view="packages">Tour packages</button>
         <button data-view="team" data-owner-only>Team</button>
         <button data-view="verification" data-owner-only>Verification</button>
       </nav>
@@ -66,15 +94,20 @@
             <h1 id="overviewTitle">Overview</h1>
             <p>Here's how your agency looks on Plezar right now.</p>
           </div>
-          <button class="btn btn-primary" data-action="new-package">Add a tour package</button>
+          <button class="btn btn-primary" data-action="new-event">Create a tour event</button>
         </div>
         <div id="overviewCallout"></div>
         <dl class="stats">
-          <div class="stat"><dt>Published packages</dt><dd id="statPublished">0</dd></div>
-          <div class="stat"><dt>Drafts</dt><dd id="statDraft">0</dd></div>
-          <div class="stat"><dt>Hidden</dt><dd id="statHidden">0</dd></div>
+          <div class="stat"><dt>Upcoming events</dt><dd id="statUpcoming">0</dd></div>
+          <div class="stat"><dt>Open registrations</dt><dd id="statRegistrations">0</dd></div>
+          <div class="stat"><dt>Announcements</dt><dd id="statAnnouncements">0</dd></div>
           <div class="stat"><dt>Team members</dt><dd id="statTeam">0</dd></div>
         </dl>
+        <div class="card" id="nextEventsCard">
+          <h2>Coming up</h2>
+          <p class="muted">Your next published tour events.</p>
+          <ul class="doc-list" id="nextEvents"></ul>
+        </div>
         <div class="card">
           <h2>Profile checklist</h2>
           <p class="muted">A complete profile helps travelers trust you.</p>
@@ -140,16 +173,107 @@
         </form>
       </section>
 
-      <!-- Packages -->
-      <section id="view-packages" data-view-pane hidden>
+      <!-- Tour events -->
+      <section id="view-events" data-view-pane hidden>
         <div class="page-head">
           <div>
-            <h1>Tour packages</h1>
-            <p>Published packages appear on your agency page. Drafts are only visible to your team.</p>
+            <h1>Tour events</h1>
+            <p>Published events appear in the Plezar app, where travelers register. Drafts are only visible to your team.</p>
           </div>
-          <button class="btn btn-primary" data-action="new-package">Add a tour package</button>
+          <button class="btn btn-primary" data-action="new-event">Create a tour event</button>
         </div>
-        <div id="packageList"></div>
+        <div class="filter-row" role="group" aria-label="Show events">
+          <button class="chip active" data-event-filter="upcoming">Upcoming</button>
+          <button class="chip" data-event-filter="drafts">Drafts and hidden</button>
+          <button class="chip" data-event-filter="past">Past</button>
+          <button class="chip" data-event-filter="cancelled">Cancelled</button>
+          <button class="chip" data-event-filter="all">All</button>
+        </div>
+        <div id="eventList"></div>
+      </section>
+
+      <!-- Registrations -->
+      <section id="view-registrations" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Registrations</h1>
+            <p>Who registered for each tour event. Confirm registrations once you've spoken to the traveler or received payment.</p>
+          </div>
+        </div>
+        <div class="reg-bar">
+          <div class="field">
+            <label for="regEvent">Tour event</label>
+            <select id="regEvent"></select>
+          </div>
+          <div class="field">
+            <label for="regStatus">Show</label>
+            <select id="regStatus">
+              <option value="">Everyone</option>
+              <option value="pending">Waiting for you to confirm</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <a class="btn btn-quiet" id="regCsv" href="#" download>Download spreadsheet</a>
+        </div>
+        <div id="regSummary"></div>
+        <div class="card">
+          <table class="table">
+            <thead><tr><th>Traveler</th><th>Seats</th><th>Amount</th><th>Registered</th><th>Status</th><th></th></tr></thead>
+            <tbody id="regBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Announcements -->
+      <section id="view-announcements" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Announcements</h1>
+            <p>News, offers and trip updates. Published announcements show on your agency page in the app; pinned ones stay at the top.</p>
+          </div>
+          <button class="btn btn-primary" data-action="new-announcement">Write an announcement</button>
+        </div>
+        <div id="announcementList"></div>
+      </section>
+
+      <!-- Notifications -->
+      <section id="view-notifications" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Notifications</h1>
+            <p>Send a message straight to travelers' Plezar app. Use it for things they need to know: pickup times, changes, new trips.</p>
+          </div>
+        </div>
+        <form class="card" id="broadcastForm" novalidate>
+          <h2>New notification</h2>
+          <p class="muted" id="broadcastLimit"></p>
+          <fieldset class="audience">
+            <legend class="label">Send to</legend>
+            <label class="radio"><input type="radio" name="audience" value="event" checked> <span>People registered for a tour event</span></label>
+            <div class="field audience-event" id="audienceEventField">
+              <label class="sr-only" for="bcEvent">Tour event</label>
+              <select id="bcEvent"></select>
+            </div>
+            <label class="radio"><input type="radio" name="audience" value="travelers"> <span>Everyone who has registered with you <span class="muted" id="audienceTravelers"></span></span></label>
+          </fieldset>
+          <div class="field">
+            <label for="bcTitle">Title *</label>
+            <input id="bcTitle" type="text" maxlength="120" placeholder="Bus leaves Fakirapul at 10 pm sharp">
+          </div>
+          <div class="field">
+            <label for="bcBody">Message</label>
+            <textarea id="bcBody" rows="4" maxlength="1000" placeholder="Please be at the counter by 9:30 pm with your NID. Call 01712-345678 if you are running late."></textarea>
+            <span class="hint" id="bcCount">0 / 1000</span>
+          </div>
+          <div class="alert alert-error" id="broadcastError" role="alert" hidden></div>
+          <button type="submit" class="btn btn-primary" id="broadcastSubmit">Send notification</button>
+        </form>
+        <div class="card">
+          <h2>Sent</h2>
+          <ul class="sent-list" id="broadcastList"></ul>
+        </div>
       </section>
 
       <!-- Team -->
@@ -157,7 +281,7 @@
         <div class="page-head">
           <div>
             <h1>Team</h1>
-            <p>Team members can edit tour packages. Only you can change the profile, team and verification.</p>
+            <p>Team members can manage tour events, registrations, announcements and notifications. Only you can change the profile, team and verification.</p>
           </div>
         </div>
         <form class="card" id="inviteForm" novalidate>
@@ -191,7 +315,7 @@
         <div class="page-head">
           <div>
             <h1>Verification</h1>
-            <p>Verified agencies get a mark on their profile and packages. Plezar checks your trade license and the owner's national ID.</p>
+            <p>Verified agencies get a mark on their profile and tour events. Plezar checks your trade license and the owner's national ID.</p>
           </div>
         </div>
         <div id="verificationStatus"></div>
@@ -223,63 +347,140 @@
     </main>
   </div>
 
-  <!-- Package editor -->
-  <div class="drawer-bg" id="packageDrawer" hidden>
-    <form class="drawer" id="packageForm" role="dialog" aria-modal="true" aria-labelledby="packageFormTitle" novalidate>
+  <!-- Tour event editor -->
+  <div class="drawer-bg" id="eventDrawer" hidden>
+    <form class="drawer" id="eventForm" role="dialog" aria-modal="true" aria-labelledby="eventFormTitle" novalidate>
       <div class="drawer-head">
-        <h2 id="packageFormTitle">New tour package</h2>
+        <h2 id="eventFormTitle">New tour event</h2>
         <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
       </div>
-      <div class="alert alert-warn" id="packageHiddenNote" hidden>Plezar has hidden this package. You can edit it, but contact support before publishing it again.</div>
+      <div class="alert alert-warn" id="eventHiddenNote" hidden>Plezar has hidden this event. You can edit it, but contact support before publishing it again.</div>
+      <div class="alert alert-warn" id="eventRegisteredNote" hidden></div>
       <div class="field">
-        <label for="pkTitle">Title *</label>
-        <input id="pkTitle" name="title" type="text" maxlength="120" required placeholder="Sajek Valley weekend, 3 days">
+        <label for="evTitle">Title *</label>
+        <input id="evTitle" name="title" type="text" maxlength="120" required placeholder="Sajek Valley weekend">
       </div>
       <div class="field">
-        <label for="pkDestination">Destination *</label>
-        <input id="pkDestination" name="destination" type="text" maxlength="120" required placeholder="Sajek Valley, Rangamati">
+        <label for="evDestination">Destination *</label>
+        <input id="evDestination" name="destination" type="text" maxlength="120" required placeholder="Sajek Valley, Rangamati">
       </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="evStart">Starts *</label>
+          <input id="evStart" name="startDate" type="date" required>
+        </div>
+        <div class="field">
+          <label for="evEnd">Ends *</label>
+          <input id="evEnd" name="endDate" type="date" required>
+        </div>
+      </div>
+      <p class="hint duration-hint" id="evDuration"></p>
       <div class="field-row field-row-3">
         <div class="field">
-          <label for="pkDays">Days *</label>
-          <input id="pkDays" name="durationDays" type="number" min="1" max="60" required>
+          <label for="evSeats">Seats *</label>
+          <input id="evSeats" name="seats" type="number" min="1" max="1000" required inputmode="numeric">
         </div>
         <div class="field">
-          <label for="pkNights">Nights</label>
-          <input id="pkNights" name="durationNights" type="number" min="0" max="60">
+          <label for="evPrice">Price per person (৳) *</label>
+          <input id="evPrice" name="priceFrom" type="number" min="0" step="50" required inputmode="numeric">
         </div>
         <div class="field">
-          <label for="pkPrice">Price from (৳) *</label>
-          <input id="pkPrice" name="priceFrom" type="number" min="0" step="50" required>
+          <label for="evDeadline">Registration closes</label>
+          <input id="evDeadline" name="registrationDeadline" type="date">
         </div>
       </div>
       <div class="field">
-        <label for="pkDescription">Description</label>
-        <textarea id="pkDescription" name="description" maxlength="3000" rows="5" placeholder="Day-by-day plan, pickup point, who the trip suits"></textarea>
+        <label for="evMeeting">Meeting point</label>
+        <input id="evMeeting" name="meetingPoint" type="text" maxlength="200" placeholder="Fakirapul bus counter, 9:30 pm">
       </div>
       <div class="field">
-        <label for="pkIncluded">What's included</label>
-        <textarea id="pkIncluded" name="included" rows="3" placeholder="One per line: AC bus both ways, hotel (3 per room), all meals, local guide"></textarea>
+        <label for="evDescription">Description</label>
+        <textarea id="evDescription" name="description" maxlength="3000" rows="5" placeholder="Day-by-day plan, who the trip suits, what to bring"></textarea>
+      </div>
+      <div class="field">
+        <label for="evIncluded">What's included</label>
+        <textarea id="evIncluded" name="included" rows="3" placeholder="One per line: AC bus both ways, cottage (3 per room), all meals, local guide"></textarea>
         <span class="hint">One item per line.</span>
       </div>
       <div class="field">
         <span class="label">Photos</span>
-        <div class="photo-strip" id="pkPhotos"></div>
-        <input id="pkPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top: 10px;">
+        <div class="photo-strip" id="evPhotos"></div>
+        <input id="evPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top: 10px;">
         <span class="hint">Up to 6 photos in total, 5 MB each.</span>
       </div>
       <div class="field">
-        <label for="pkStatus">Status</label>
-        <select id="pkStatus" name="status">
+        <label for="evStatus">Status</label>
+        <select id="evStatus" name="status">
           <option value="draft">Draft (only your team sees it)</option>
-          <option value="published">Published (visible on your agency page)</option>
-          <option value="hidden">Hidden</option>
+          <option value="published">Published (travelers can register)</option>
+          <option value="hidden">Hidden (registrations stay, but it's not listed)</option>
         </select>
       </div>
-      <div class="alert alert-error" id="packageError" role="alert" hidden></div>
+      <div class="alert alert-error" id="eventError" role="alert" hidden></div>
       <div class="drawer-foot">
         <button type="button" class="btn btn-quiet" data-action="close-drawer">Cancel</button>
-        <button type="submit" class="btn btn-primary" id="packageSave">Save package</button>
+        <button type="submit" class="btn btn-primary" id="eventSave">Save event</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Announcement editor -->
+  <div class="drawer-bg" id="announcementDrawer" hidden>
+    <form class="drawer" id="announcementForm" role="dialog" aria-modal="true" aria-labelledby="announcementFormTitle" novalidate>
+      <div class="drawer-head">
+        <h2 id="announcementFormTitle">New announcement</h2>
+        <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
+      </div>
+      <div class="field">
+        <label for="anTitle">Title *</label>
+        <input id="anTitle" type="text" maxlength="120" placeholder="Winter trips are open">
+      </div>
+      <div class="field">
+        <label for="anBody">Announcement *</label>
+        <textarea id="anBody" rows="7" maxlength="3000" placeholder="From December we run Sajek every weekend. Early registrations get a window seat."></textarea>
+      </div>
+      <div class="field">
+        <label for="anEvent">About a tour event (optional)</label>
+        <select id="anEvent"></select>
+      </div>
+      <label class="check"><input type="checkbox" id="anPinned"> <span>Pin to the top of your agency page</span></label>
+      <div class="field">
+        <label for="anStatus">Status</label>
+        <select id="anStatus">
+          <option value="draft">Draft (only your team sees it)</option>
+          <option value="published">Published</option>
+        </select>
+      </div>
+      <div class="field" id="anNotifyField">
+        <label for="anNotify">When published, also notify</label>
+        <select id="anNotify">
+          <option value="none">Nobody, just post it</option>
+          <option value="travelers">Everyone who has registered with you</option>
+          <option value="event">People registered for the linked event</option>
+        </select>
+        <span class="hint" id="anNotifyHint">Counts toward your daily notification limit.</span>
+      </div>
+      <div class="alert alert-error" id="announcementError" role="alert" hidden></div>
+      <div class="drawer-foot">
+        <button type="button" class="btn btn-quiet" data-action="close-drawer">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="announcementSave">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Cancel an event -->
+  <div class="drawer-bg dialog-bg" id="cancelDialog" hidden>
+    <form class="dialog" id="cancelForm" role="dialog" aria-modal="true" aria-labelledby="cancelTitle" novalidate>
+      <h2 id="cancelTitle">Cancel this event?</h2>
+      <p class="muted" id="cancelLead"></p>
+      <div class="field">
+        <label for="cancelReason">Reason travelers will see *</label>
+        <textarea id="cancelReason" rows="3" maxlength="500" placeholder="Heavy rain warning in the hill tracts; roads to Sajek are closed."></textarea>
+      </div>
+      <div class="alert alert-error" id="cancelError" role="alert" hidden></div>
+      <div class="drawer-foot">
+        <button type="button" class="btn btn-quiet" data-action="close-drawer">Keep the event</button>
+        <button type="submit" class="btn btn-danger-solid" id="cancelSubmit">Cancel event and notify</button>
       </div>
     </form>
   </div>

@@ -4,7 +4,7 @@ const User = require('../models/userModel');
 const VendorCategory = require('../models/vendorCategoryModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
-const { sendInvite } = require('../utils/invites');
+const { temporaryPassword, credentialsEmail } = require('../utils/credentials');
 const { logActivity } = require('../utils/activity');
 const { escapeRegex, pageParams, paged, validId } = require('../utils/query');
 const { privateDocumentPath, copyPrivateDocument, removePrivateFolder } = require('../utils/uploads');
@@ -101,10 +101,15 @@ exports.getApplication = catchAsync(async (req, res, next) => {
     licenseRx ? Agency.findOne({ tradeLicenseNumber: licenseRx }).select('name').lean() : null
   ]);
 
+  const owner = lead.agency
+    ? await User.findOne({ agency: lead.agency._id || lead.agency, agencyRole: 'owner' }).select('name email mustChangePassword accountStatus lastLoginAt').lean()
+    : null;
+
   res.status(200).json({
     status: 'success',
     data: {
       application: lead,
+      owner,
       checks: { account, otherApplications, agencyWithLicense },
       statusURL: lead.reference ? statusURL(req, lead) : ''
     }
@@ -170,6 +175,18 @@ exports.reject = catchAsync(async (req, res, next) => {
   });
 });
 
+// Sign-in details for the admin to email to the vendor (the password is never stored in readable form)
+const credentialsFor = (req, owner, agency, password) => {
+  const loginURL = `${req.protocol}://${req.get('host')}/agent`;
+  return {
+    name: owner.name,
+    email: owner.email,
+    password,
+    loginURL,
+    emailDraft: credentialsEmail({ name: owner.name, agencyName: agency.name, email: owner.email, password, loginURL })
+  };
+};
+
 // Accept the agency: create it, carry the documents over, and invite the applicant as its owner
 exports.approve = catchAsync(async (req, res, next) => {
   const lead = await findLead(req.params.id, next, '+documents.file');
@@ -221,6 +238,8 @@ exports.approve = catchAsync(async (req, res, next) => {
     throw err;
   }
 
+  // The owner's account is ready to use straight away, with a temporary password the admin sends by email
+  const password = temporaryPassword();
   let owner;
   try {
     owner = await User.create({
@@ -230,7 +249,9 @@ exports.approve = catchAsync(async (req, res, next) => {
       role: 'agent',
       agency: agency._id,
       agencyRole: 'owner',
-      accountStatus: 'invited'
+      password,
+      confirmPassword: password,
+      mustChangePassword: true
     });
   } catch (err) {
     await Agency.findByIdAndDelete(agency._id);
@@ -245,19 +266,56 @@ exports.approve = catchAsync(async (req, res, next) => {
   lead.decidedAt = new Date();
   await lead.save();
 
-  const { inviteURL, emailSent } = await sendInvite(owner, agency, req, { approved: true });
   await logActivity(req, {
     action: 'agency.created',
-    summary: `Membership application${lead.reference ? ` ${lead.reference}` : ''} approved${agency.verified ? ' and verified' : ''}; owner ${owner.name} invited`,
+    summary: `Membership application${lead.reference ? ` ${lead.reference}` : ''} approved${agency.verified ? ' and verified' : ''}; vendor account created for ${owner.name}`,
     agency: agency._id
   });
 
   res.status(201).json({
     status: 'success',
-    message: emailSent
-      ? `${agency.name} is now a member. ${owner.name} was emailed a link to set their password.`
-      : `${agency.name} is now a member. Email isn't set up, so send this invite link to ${owner.name} yourself.`,
-    data: { application: lead, agency: { _id: agency._id, name: agency.name, verified: agency.verified }, inviteURL, emailSent }
+    message: `${agency.name} is now a member. Email the sign-in details below to ${owner.name}; this is the only time the password is shown.`,
+    data: {
+      application: lead,
+      agency: { _id: agency._id, name: agency.name, verified: agency.verified },
+      credentials: credentialsFor(req, owner, agency, password)
+    }
+  });
+});
+
+// Lost the sign-in details before sending them? Issue a new temporary password,
+// but only while the owner hasn't chosen their own yet.
+exports.resetCredentials = catchAsync(async (req, res, next) => {
+  const lead = await findLead(req.params.id, next);
+  if (!lead) return;
+  if (lead.status !== 'approved' || !lead.agency) return next(new AppError('Only accepted applications have a vendor account.', 400));
+
+  const [agency, owner] = await Promise.all([
+    Agency.findById(lead.agency).select('name'),
+    User.findOne({ agency: lead.agency, agencyRole: 'owner' })
+  ]);
+  if (!agency || !owner) return next(new AppError('The vendor account for this application no longer exists.', 404));
+  // Owners accepted before temporary passwords existed may still be waiting on an invite link
+  const notSignedIn = owner.mustChangePassword || owner.accountStatus === 'invited';
+  if (!notSignedIn) {
+    return next(new AppError(`${owner.name} has already signed in and chosen a password. If they forgot it, they can use "Forgot your password?" on the sign-in page.`, 400));
+  }
+
+  const password = temporaryPassword();
+  owner.password = password;
+  owner.confirmPassword = password;
+  owner.mustChangePassword = true;
+  owner.accountStatus = 'active';
+  owner.inviteToken = undefined;
+  owner.inviteExpires = undefined;
+  owner.$locals.temporaryPassword = true;
+  await owner.save();
+  await logActivity(req, { action: 'agency.credentials_reset', summary: `New temporary password issued for ${owner.name}`, agency: agency._id });
+
+  res.status(200).json({
+    status: 'success',
+    message: 'New temporary password created. The old one no longer works.',
+    data: { credentials: credentialsFor(req, owner, agency, password) }
   });
 });
 

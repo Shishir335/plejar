@@ -93,6 +93,8 @@ const userSchema = new mongoose.Schema({
         enum: ['invited', 'active'],
         default: 'active'
     },
+    // Set when Plezar creates the account with a temporary password; the agency panel asks for a new one first
+    mustChangePassword: { type: Boolean, default: false },
     inviteToken: {
         type: String,
         select: false
@@ -164,6 +166,8 @@ userSchema.pre('save', function (next) {
     if (!this.isModified('password') || this.isNew) return next();
 
     this.passwordChangedAt = Date.now() - 1000;
+    // Choosing your own password ends the temporary one (unless Plezar is issuing a new temporary one)
+    if (!this.$locals.temporaryPassword) this.mustChangePassword = false;
     next();
 });
 

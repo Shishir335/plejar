@@ -1,6 +1,7 @@
 const express = require('express');
 const authController = require('../controllers/authController');
 const agencyController = require('../controllers/agencyController');
+const content = require('../controllers/vendorContentController');
 const { imageUpload, documentUpload } = require('../utils/uploads');
 
 const router = express.Router();
@@ -19,6 +20,14 @@ router
   .route('/me/packages/:id')
   .patch(imageUpload.array('photos', 6), agencyController.updateMyPackage)
   .delete(agencyController.deleteMyPackage);
+router.post('/me/packages/:id/cancel', agencyController.cancelMyPackage);
+router.get('/me/packages/:id/registrations', agencyController.listEventRegistrations);
+
+router.route('/me/announcements').get(content.listAnnouncements).post(content.createAnnouncement);
+router.route('/me/announcements/:id').patch(content.updateAnnouncement).delete(content.deleteAnnouncement);
+
+router.get('/me/audience', content.getAudience);
+router.route('/me/broadcasts').get(content.listBroadcasts).post(content.sendBroadcast);
 
 router.get('/me/bookings', agencyController.listMyBookings);
 router.patch('/me/bookings/:id', agencyController.updateMyBooking);

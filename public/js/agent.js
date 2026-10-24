@@ -9,11 +9,17 @@ const state = {
   me: null,
   agency: null,
   stats: null,
-  packages: [],
+  events: [],
+  eventFilter: 'upcoming',
   team: [],
   verification: null,
-  editing: null, // package being edited, or null for a new one
-  removedPhotos: new Set()
+  editing: null, // event being edited, or null for a new one
+  removedPhotos: new Set(),
+  announcements: [],
+  editingAnnouncement: null,
+  cancelling: null,
+  audience: null,
+  tempPassword: ''
 };
 
 const isOwner = () => state.me && state.me.agencyRole === 'owner';
@@ -62,6 +68,22 @@ async function api(path, { method = 'GET', body, form } = {}) {
 
 const taka = n => `৳${Number(n || 0).toLocaleString('en-US')}`;
 const fmtDate = d => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+const fmtDateTime = d => (d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '');
+const isoDay = d => (d ? new Date(d).toISOString().slice(0, 10) : '');
+// Event dates are calendar days stored at midnight UTC, so show them in UTC to get the same day everywhere
+const fmtDay = d => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '');
+const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+
+// "12–14 Dec 2026", or one date for a day trip
+function dateRange(start, end) {
+  if (!start) return 'No date set';
+  const a = new Date(start);
+  const b = end ? new Date(end) : a;
+  if (isoDay(a) === isoDay(b)) return fmtDay(a);
+  const sameMonth = a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear();
+  if (sameMonth) return `${a.getUTCDate()}–${fmtDay(b)}`;
+  return `${a.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })} – ${fmtDay(b)}`;
+}
 const initials = name => String(name || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
 function setBusy(button, busy, label) {
@@ -80,9 +102,55 @@ function setBusy(button, busy, label) {
 
 function showLogin(notice) {
   $('panelView').hidden = true;
+  $('passwordView').hidden = true;
   $('loginView').hidden = false;
   showAlert('loginNotice', notice);
 }
+
+// ---------- First sign-in: choose your own password ----------
+
+function showPasswordStep() {
+  $('loginView').hidden = true;
+  $('panelView').hidden = true;
+  $('passwordView').hidden = false;
+  showAlert('passwordError', '');
+  // Signed in just now with the temporary password: no need to type it again
+  $('currentPasswordField').hidden = Boolean(state.tempPassword);
+  $('pwCurrent').value = state.tempPassword;
+  (state.tempPassword ? $('pwNew') : $('pwCurrent')).focus();
+}
+
+$('passwordForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('passwordError', '');
+  const current = $('pwCurrent').value;
+  const password = $('pwNew').value;
+  if (!current) return showAlert('passwordError', 'Enter the temporary password from your email.');
+  if (password.length < 8) return showAlert('passwordError', 'Use at least 8 characters.');
+  if (password === current) return showAlert('passwordError', 'Choose a password different from the temporary one.');
+  if (password !== $('pwConfirm').value) return showAlert('passwordError', "The two passwords don't match.");
+
+  const btn = $('passwordSubmit');
+  setBusy(btn, true);
+  try {
+    const data = await api('/api/v1/users/changePassword', { method: 'PATCH', body: { currentPassword: current, password, confirmPassword: password } });
+    state.token = data.token;
+    try { localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still works */ }
+    state.tempPassword = '';
+    $('passwordForm').reset();
+    toast('Password saved. Welcome to your vendor panel.');
+    await boot();
+  } catch (err) {
+    showAlert('passwordError', err.status === 401 ? 'The temporary password is not right. Check the email from Plezar.' : err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
+
+$('passwordLogout').addEventListener('click', e => {
+  e.preventDefault();
+  $('logoutBtn').click();
+});
 
 $('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -102,6 +170,7 @@ $('loginForm').addEventListener('submit', async e => {
     }
     state.token = data.token;
     try { localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still works */ }
+    state.tempPassword = data.data.mustChangePassword ? password : '';
     await boot();
   } catch (err) {
     showAlert('loginError', err.message);
@@ -136,7 +205,10 @@ function showView(view) {
   if (!isOwner() && (view === 'team' || view === 'verification')) view = 'overview';
   document.querySelectorAll('[data-view-pane]').forEach(p => { p.hidden = p.id !== `view-${view}`; });
   document.querySelectorAll('.side-nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  if (view === 'packages') loadPackages();
+  if (view === 'events') loadEvents();
+  if (view === 'registrations') loadRegistrationsView();
+  if (view === 'announcements') loadAnnouncements();
+  if (view === 'notifications') loadNotificationsView();
   if (view === 'team') loadTeam();
   if (view === 'verification') loadVerification();
   try { history.replaceState(null, '', `#${view}`); } catch (e) { /* ignore */ }
@@ -151,10 +223,18 @@ document.addEventListener('click', e => {
   const action = e.target.closest('[data-action]');
   if (!action) return;
   const { action: name, id } = action.dataset;
-  if (name === 'new-package') openPackageEditor(null);
-  if (name === 'edit-package') openPackageEditor(state.packages.find(p => p._id === id));
-  if (name === 'delete-package') deletePackage(id);
-  if (name === 'close-drawer') closePackageEditor();
+  if (name === 'new-event') openEventEditor(null);
+  if (name === 'edit-event') openEventEditor(state.events.find(p => p._id === id));
+  if (name === 'delete-event') deleteEvent(id);
+  if (name === 'cancel-event') openCancelDialog(id);
+  if (name === 'registrations') showRegistrationsFor(id);
+  if (name === 'notify-event') notifyEvent(id);
+  if (name === 'close-drawer') closeDrawers();
+  if (name === 'new-announcement') openAnnouncementEditor(null);
+  if (name === 'edit-announcement') openAnnouncementEditor(state.announcements.find(a => a._id === id));
+  if (name === 'delete-announcement') deleteAnnouncement(id);
+  if (name === 'toggle-pin') togglePin(id);
+  if (name === 'set-registration') setRegistration(id, action.dataset.status);
   if (name === 'go') showView(action.dataset.view);
   if (name === 'resend') resendInvite(id);
   if (name === 'remove-member') removeMember(id);
@@ -178,7 +258,10 @@ async function boot() {
     return showLogin('Could not load your agency. Reload the page to try again.');
   }
 
+  if (state.me.mustChangePassword) return showPasswordStep();
+
   $('loginView').hidden = true;
+  $('passwordView').hidden = true;
   $('panelView').hidden = false;
   document.querySelectorAll('[data-owner-only]').forEach(el => { el.hidden = !isOwner(); });
   renderSide();
@@ -186,7 +269,8 @@ async function boot() {
   renderProfileForm();
 
   const start = (window.location.hash || '#overview').slice(1);
-  showView(['overview', 'profile', 'packages', 'team', 'verification'].includes(start) ? start : 'overview');
+  const views = ['overview', 'events', 'registrations', 'announcements', 'notifications', 'profile', 'team', 'verification'];
+  showView(views.includes(start) ? start : (start === 'packages' ? 'events' : 'overview'));
 }
 
 function logoHTML(agency, cls = '') {
@@ -199,7 +283,7 @@ function renderSide() {
   const a = state.agency;
   $('sideAgency').innerHTML = `
     ${logoHTML(a)}
-    <div><strong>${escapeHTML(a.name)}</strong><small>${a.verified ? 'Verified agency' : 'Not verified yet'}</small></div>
+    <div><strong>${escapeHTML(a.name)}</strong><small>${a.verified ? 'Verified vendor' : 'Not verified yet'}</small></div>
   `;
   $('sideUserName').textContent = state.me.name;
   $('sideUserRole').textContent = isOwner() ? 'Owner' : 'Team member';
@@ -211,15 +295,16 @@ function renderOverview() {
   const a = state.agency;
   const s = state.stats;
   $('overviewTitle').textContent = `Welcome, ${state.me.name.split(' ')[0]}`;
-  $('statPublished').textContent = s.packages.published;
-  $('statDraft').textContent = s.packages.draft;
-  $('statHidden').textContent = s.packages.hidden;
+  $('statUpcoming').textContent = s.upcomingEvents;
+  $('statRegistrations').textContent = s.openRegistrations;
+  $('statAnnouncements').textContent = s.announcements;
   $('statTeam').textContent = s.teamSize;
+  renderNextEvents();
 
   const v = a.verification || { status: 'none' };
   let callout = '';
   if (a.verified) {
-    callout = '<div class="callout callout-ok"><div><strong>Your agency is verified</strong>Travelers see the verified mark on your profile and packages.</div></div>';
+    callout = '<div class="callout callout-ok"><div><strong>Your agency is verified</strong>Travelers see the verified mark on your profile and tour events.</div></div>';
   } else if (v.status === 'pending') {
     callout = '<div class="callout callout-warn"><div><strong>Verification in review</strong>Plezar is checking your documents. This usually takes 1 to 2 working days.</div></div>';
   } else if (v.status === 'rejected') {
@@ -234,7 +319,7 @@ function renderOverview() {
     { done: Boolean(a.description && a.description.length >= 40), label: 'Describe your agency', view: 'profile' },
     { done: a.regions && a.regions.length > 0, label: 'List the places you run tours', view: 'profile' },
     { done: Boolean(a.phone), label: 'Add a phone number', view: 'profile' },
-    { done: s.packages.published > 0, label: 'Publish your first tour package', view: 'packages' }
+    { done: s.packages.published > 0, label: 'Publish your first tour event', view: 'events' }
   ];
   $('profileChecklist').innerHTML = checks.map(c => `
     <li>
@@ -295,7 +380,7 @@ $('profileForm').addEventListener('submit', async e => {
   }
 });
 
-// ---------- Packages ----------
+// ---------- Tour events ----------
 
 async function refreshStats() {
   try {
@@ -305,55 +390,118 @@ async function refreshStats() {
   } catch (e) { /* stats refresh is best effort */ }
 }
 
-async function loadPackages() {
-  $('packageList').innerHTML = '<p class="muted">Loading packages...</p>';
+async function fetchEvents() {
+  const { data } = await api('/api/v1/agency/me/packages');
+  state.events = data.packages;
+  return state.events;
+}
+
+const isPast = e => e.startDate && isoDay(e.endDate || e.startDate) < isoDay(new Date());
+
+function eventPhase(e) {
+  if (e.status === 'cancelled') return 'cancelled';
+  if (isPast(e)) return 'past';
+  if (e.status !== 'published') return 'drafts';
+  return 'upcoming';
+}
+
+const STATUS_TEXT = { published: 'Published', draft: 'Draft', hidden: 'Hidden', cancelled: 'Cancelled' };
+
+async function renderNextEvents() {
+  const box = $('nextEvents');
+  if (!box) return;
   try {
-    const { data } = await api('/api/v1/agency/me/packages');
-    state.packages = data.packages;
-    renderPackages();
-  } catch (err) {
-    $('packageList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+    const events = state.events.length ? state.events : await fetchEvents();
+    const next = events.filter(e => eventPhase(e) === 'upcoming').slice(0, 4);
+    box.innerHTML = next.length ? next.map(e => `
+      <li>
+        <span><strong>${escapeHTML(e.title)}</strong><span class="cell-sub">${escapeHTML(dateRange(e.startDate, e.endDate))}, ${escapeHTML(plural(e.stats.seatsTaken, 'seat'))} of ${e.seats || '—'} taken</span></span>
+        <button class="btn btn-quiet btn-sm" data-action="registrations" data-id="${escapeHTML(e._id)}">Registrations</button>
+      </li>`).join('')
+      : '<li><span>No upcoming published events.</span><button class="btn btn-quiet btn-sm" data-action="new-event">Create one</button></li>';
+  } catch (e) {
+    box.innerHTML = '';
   }
 }
 
-function renderPackages() {
-  if (!state.packages.length) {
-    $('packageList').innerHTML = `
+async function loadEvents() {
+  $('eventList').innerHTML = '<p class="muted">Loading tour events...</p>';
+  try {
+    await fetchEvents();
+    renderEvents();
+  } catch (err) {
+    $('eventList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+document.querySelectorAll('[data-event-filter]').forEach(btn => btn.addEventListener('click', () => {
+  state.eventFilter = btn.dataset.eventFilter;
+  document.querySelectorAll('[data-event-filter]').forEach(b => b.classList.toggle('active', b === btn));
+  renderEvents();
+}));
+
+function seatBar(e) {
+  if (!e.seats) return '';
+  const pct = Math.min(100, Math.round((e.stats.seatsTaken / e.seats) * 100));
+  return `<div class="seats"><div class="seats-bar"><span style="width:${pct}%"></span></div>
+    <span>${e.stats.seatsTaken} of ${e.seats} seats taken${e.seatsLeft === 0 ? ', full' : ''}</span></div>`;
+}
+
+function renderEvents() {
+  const list = state.eventFilter === 'all' ? state.events : state.events.filter(e => eventPhase(e) === state.eventFilter);
+  if (!state.events.length) {
+    $('eventList').innerHTML = `
       <div class="empty">
-        <strong>No tour packages yet</strong>
-        Add your first package with photos, price and what's included.
-        <div style="margin-top: 14px;"><button class="btn btn-primary" data-action="new-package">Add a tour package</button></div>
+        <strong>No tour events yet</strong>
+        Create your first event with dates, seats and price. Once published, travelers can register in the Plezar app.
+        <div style="margin-top: 14px;"><button class="btn btn-primary" data-action="new-event">Create a tour event</button></div>
       </div>`;
     return;
   }
+  if (!list.length) {
+    $('eventList').innerHTML = '<div class="empty"><strong>Nothing here</strong>No events match this filter.</div>';
+    return;
+  }
 
-  $('packageList').innerHTML = `<div class="pkg-grid">${state.packages.map(p => `
-    <article class="pkg">
-      ${p.photos[0] ? `<img class="pkg-photo" src="${escapeHTML(p.photos[0])}" alt="" loading="lazy">` : '<div class="pkg-photo pkg-photo-empty">No photo yet</div>'}
+  $('eventList').innerHTML = `<div class="pkg-grid">${list.map(e => {
+    const id = escapeHTML(e._id);
+    const regs = e.stats.registrations;
+    const canCancel = e.status !== 'cancelled' && !isPast(e) && regs > 0;
+    const closes = e.registrationDeadline && !isPast(e) && e.status !== 'cancelled' ? `<div class="pkg-meta">Registration closes ${escapeHTML(fmtDate(e.registrationDeadline))}</div>` : '';
+    return `
+    <article class="pkg ${e.status === 'cancelled' ? 'is-cancelled' : ''}">
+      ${e.photos[0] ? `<img class="pkg-photo" src="${escapeHTML(e.photos[0])}" alt="" loading="lazy">` : '<div class="pkg-photo pkg-photo-empty">No photo yet</div>'}
       <div class="pkg-body">
-        <div class="pkg-top"><h3>${escapeHTML(p.title)}</h3><span class="badge badge-${escapeHTML(p.status)}">${escapeHTML(p.status)}</span></div>
-        <div class="pkg-meta">${escapeHTML(p.destination)}, ${p.durationDays} day${p.durationDays === 1 ? '' : 's'}${p.durationNights ? ` ${p.durationNights} night${p.durationNights === 1 ? '' : 's'}` : ''}</div>
-        <div class="pkg-price">From ${taka(p.priceFrom)}</div>
-        ${p.hiddenByAdmin ? '<div class="pkg-note">Hidden by Plezar</div>' : ''}
+        <div class="pkg-top"><h3>${escapeHTML(e.title)}</h3><span class="badge badge-${escapeHTML(e.status)}">${escapeHTML(isPast(e) && e.status !== 'cancelled' ? 'Finished' : STATUS_TEXT[e.status])}</span></div>
+        <div class="pkg-date">${escapeHTML(dateRange(e.startDate, e.endDate))}</div>
+        <div class="pkg-meta">${escapeHTML(e.destination)}, ${plural(e.durationDays, 'day')}${e.durationNights ? ` ${plural(e.durationNights, 'night')}` : ''}</div>
+        <div class="pkg-price">${taka(e.priceFrom)} <span class="muted">per person</span></div>
+        ${seatBar(e)}
+        ${closes}
+        ${e.status === 'cancelled' ? `<div class="pkg-note">Cancelled: ${escapeHTML(e.cancelReason)}</div>` : ''}
+        ${e.hiddenByAdmin ? '<div class="pkg-note">Hidden by Plezar</div>' : ''}
         <div class="pkg-actions">
-          <button class="btn btn-quiet btn-sm" data-action="edit-package" data-id="${escapeHTML(p._id)}">Edit</button>
-          <button class="btn btn-danger btn-sm" data-action="delete-package" data-id="${escapeHTML(p._id)}">Delete</button>
+          <button class="btn btn-quiet btn-sm" data-action="registrations" data-id="${id}">Registrations${regs ? ` (${regs})` : ''}</button>
+          ${e.status !== 'cancelled' ? `<button class="btn btn-quiet btn-sm" data-action="edit-event" data-id="${id}">Edit</button>` : ''}
+          ${canCancel ? `<button class="btn btn-danger btn-sm" data-action="cancel-event" data-id="${id}">Cancel event</button>` : ''}
+          ${regs === 0 && e.stats.cancelled === 0 ? `<button class="btn btn-danger btn-sm" data-action="delete-event" data-id="${id}">Delete</button>` : ''}
         </div>
       </div>
-    </article>`).join('')}</div>`;
+    </article>`;
+  }).join('')}</div>`;
 }
 
 function renderEditorPhotos() {
-  const pkg = state.editing;
-  const photos = pkg ? pkg.photos : [];
-  $('pkPhotos').innerHTML = photos.map(url => `
+  const ev = state.editing;
+  const photos = ev ? ev.photos : [];
+  $('evPhotos').innerHTML = photos.map(url => `
     <div class="photo-thumb ${state.removedPhotos.has(url) ? 'is-removed' : ''}">
       <img src="${escapeHTML(url)}" alt="">
       <button type="button" data-photo="${escapeHTML(url)}" aria-label="${state.removedPhotos.has(url) ? 'Keep photo' : 'Remove photo'}">${state.removedPhotos.has(url) ? '↺' : '×'}</button>
     </div>`).join('');
 }
 
-$('pkPhotos').addEventListener('click', e => {
+$('evPhotos').addEventListener('click', e => {
   const btn = e.target.closest('[data-photo]');
   if (!btn) return;
   const url = btn.dataset.photo;
@@ -362,100 +510,482 @@ $('pkPhotos').addEventListener('click', e => {
   renderEditorPhotos();
 });
 
-function openPackageEditor(pkg) {
-  state.editing = pkg || null;
+function updateDurationHint() {
+  const form = $('eventForm');
+  const start = form.startDate.value;
+  const end = form.endDate.value || start;
+  if (!start || end < start) { $('evDuration').textContent = ''; return; }
+  const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
+  $('evDuration').textContent = `${plural(days, 'day')}, ${plural(days - 1, 'night')}.`;
+}
+
+['startDate', 'endDate'].forEach(name => $('eventForm')[name].addEventListener('change', () => {
+  const form = $('eventForm');
+  if (name === 'startDate' && (!form.endDate.value || form.endDate.value < form.startDate.value)) form.endDate.value = form.startDate.value;
+  form.endDate.min = form.startDate.value;
+  form.registrationDeadline.max = form.startDate.value;
+  updateDurationHint();
+}));
+
+function openEventEditor(ev) {
+  state.editing = ev || null;
   state.removedPhotos = new Set();
-  const form = $('packageForm');
+  const form = $('eventForm');
   form.reset();
-  showAlert('packageError', '');
-  $('packageFormTitle').textContent = pkg ? 'Edit tour package' : 'New tour package';
-  $('packageHiddenNote').hidden = !(pkg && pkg.hiddenByAdmin);
-  if (pkg) {
-    form.title.value = pkg.title;
-    form.destination.value = pkg.destination;
-    form.durationDays.value = pkg.durationDays;
-    form.durationNights.value = pkg.durationNights || 0;
-    form.priceFrom.value = pkg.priceFrom;
-    form.description.value = pkg.description || '';
-    form.included.value = (pkg.included || []).join('\n');
-    form.status.value = pkg.status;
+  showAlert('eventError', '');
+  $('eventFormTitle').textContent = ev ? 'Edit tour event' : 'New tour event';
+  $('eventHiddenNote').hidden = !(ev && ev.hiddenByAdmin);
+  const regs = ev ? ev.stats.registrations : 0;
+  $('eventRegisteredNote').hidden = !(ev && ev.stats.seatsTaken);
+  $('eventRegisteredNote').textContent = ev ? `${plural(regs, 'person has', 'people have')} registered. If you change the start date, their registration moves to the new date and they get a notification.` : '';
+  const today = isoDay(new Date());
+  form.startDate.min = today;
+  if (ev) {
+    form.title.value = ev.title;
+    form.destination.value = ev.destination;
+    form.startDate.value = isoDay(ev.startDate);
+    form.endDate.value = isoDay(ev.endDate || ev.startDate);
+    form.registrationDeadline.value = isoDay(ev.registrationDeadline);
+    form.seats.value = ev.seats || '';
+    form.seats.min = Math.max(1, ev.stats.seatsTaken);
+    form.priceFrom.value = ev.priceFrom;
+    form.meetingPoint.value = ev.meetingPoint || '';
+    form.description.value = ev.description || '';
+    form.included.value = (ev.included || []).join('\n');
+    form.status.value = ev.status;
+    if (ev.startDate && isoDay(ev.startDate) < today) form.startDate.min = '';
   } else {
-    form.durationDays.value = 2;
-    form.durationNights.value = 1;
     form.status.value = 'draft';
+    form.seats.min = 1;
   }
-  form.status.querySelector('option[value="published"]').disabled = Boolean(pkg && pkg.hiddenByAdmin);
+  form.endDate.min = form.startDate.value || today;
+  form.registrationDeadline.max = form.startDate.value;
+  form.status.querySelector('option[value="published"]').disabled = Boolean(ev && ev.hiddenByAdmin);
+  updateDurationHint();
   renderEditorPhotos();
-  $('packageDrawer').hidden = false;
+  $('eventDrawer').hidden = false;
   form.title.focus();
 }
 
-function closePackageEditor() {
-  $('packageDrawer').hidden = true;
+function closeDrawers() {
+  ['eventDrawer', 'announcementDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
   state.editing = null;
+  state.editingAnnouncement = null;
+  state.cancelling = null;
 }
 
-$('packageDrawer').addEventListener('click', e => {
-  if (e.target === $('packageDrawer')) closePackageEditor();
-});
+['eventDrawer', 'announcementDrawer', 'cancelDialog'].forEach(id => $(id).addEventListener('click', e => {
+  if (e.target === $(id)) closeDrawers();
+}));
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('packageDrawer').hidden) closePackageEditor();
+  if (e.key === 'Escape') closeDrawers();
 });
 
-$('packageForm').addEventListener('submit', async e => {
+$('eventForm').addEventListener('submit', async e => {
   e.preventDefault();
   const form = e.target;
-  showAlert('packageError', '');
+  showAlert('eventError', '');
+  const v = name => form[name].value.trim();
 
-  if (!form.title.value.trim()) return showAlert('packageError', 'Enter a title.');
-  if (!form.destination.value.trim()) return showAlert('packageError', 'Enter the destination.');
-  if (!(Number(form.durationDays.value) >= 1)) return showAlert('packageError', 'Enter how many days the trip lasts.');
-  if (form.priceFrom.value === '' || Number(form.priceFrom.value) < 0) return showAlert('packageError', 'Enter the starting price in taka.');
+  if (!v('title')) return showAlert('eventError', 'Enter a title.');
+  if (!v('destination')) return showAlert('eventError', 'Enter the destination.');
+  if (!v('startDate')) return showAlert('eventError', 'Choose the start date.');
+  if (!state.editing && v('startDate') <= isoDay(new Date())) return showAlert('eventError', 'Choose a start date after today.');
+  if (v('endDate') && v('endDate') < v('startDate')) return showAlert('eventError', 'The tour cannot end before it starts.');
+  if (v('registrationDeadline') && v('registrationDeadline') > v('startDate')) return showAlert('eventError', 'Registration must close on or before the start date.');
+  const seats = Number(v('seats'));
+  if (!Number.isInteger(seats) || seats < 1) return showAlert('eventError', 'Enter how many seats the tour has.');
+  if (state.editing && seats < state.editing.stats.seatsTaken) return showAlert('eventError', `${state.editing.stats.seatsTaken} seats are already taken, so you need at least that many.`);
+  if (v('priceFrom') === '' || Number(v('priceFrom')) < 0) return showAlert('eventError', 'Enter the price per person in taka.');
 
-  const newFiles = Array.from($('pkPhotoInput').files);
+  const newFiles = Array.from($('evPhotoInput').files);
   const kept = state.editing ? state.editing.photos.filter(p => !state.removedPhotos.has(p)).length : 0;
-  if (kept + newFiles.length > 6) return showAlert('packageError', `A package can have 6 photos. Remove ${kept + newFiles.length - 6} and try again.`);
+  if (kept + newFiles.length > 6) return showAlert('eventError', `An event can have 6 photos. Remove ${kept + newFiles.length - 6} and try again.`);
 
   const fd = new FormData();
-  ['title', 'destination', 'durationDays', 'durationNights', 'priceFrom', 'description', 'status'].forEach(f => fd.append(f, form[f].value.trim()));
+  ['title', 'destination', 'startDate', 'endDate', 'registrationDeadline', 'seats', 'priceFrom', 'meetingPoint', 'description', 'status'].forEach(f => fd.append(f, v(f)));
   fd.append('included', form.included.value.split('\n').map(s => s.trim()).filter(Boolean).join('\n'));
   newFiles.forEach(f => fd.append('photos', f));
   if (state.editing && state.removedPhotos.size) fd.append('removePhotos', Array.from(state.removedPhotos).join(','));
 
-  const btn = $('packageSave');
+  const btn = $('eventSave');
   setBusy(btn, true);
   try {
     if (state.editing) {
-      await api(`/api/v1/agency/me/packages/${state.editing._id}`, { method: 'PATCH', form: fd });
-      toast('Package saved.');
+      const { data } = await api(`/api/v1/agency/me/packages/${state.editing._id}`, { method: 'PATCH', form: fd });
+      toast(data.notified ? `Event saved. ${plural(data.notified, 'registered traveler was', 'registered travelers were')} told about the new date.` : 'Event saved.');
     } else {
-      await api('/api/v1/agency/me/packages', { method: 'POST', form: fd });
-      toast('Package added.');
+      const { data } = await api('/api/v1/agency/me/packages', { method: 'POST', form: fd });
+      toast(data.package.status === 'published' ? 'Event published. Travelers can register now.' : 'Event saved as a draft.');
     }
-    closePackageEditor();
-    await loadPackages();
+    closeDrawers();
+    await loadEvents();
     refreshStats();
-    if ($('view-packages').hidden) showView('packages');
+    if ($('view-events').hidden) showView('events');
   } catch (err) {
-    showAlert('packageError', err.message);
+    showAlert('eventError', err.message);
   } finally {
     setBusy(btn, false);
   }
 });
 
-async function deletePackage(id) {
-  const pkg = state.packages.find(p => p._id === id);
-  if (!pkg || !window.confirm(`Delete "${pkg.title}"? Its photos will be deleted too. This can't be undone.`)) return;
+async function deleteEvent(id) {
+  const ev = state.events.find(p => p._id === id);
+  if (!ev || !window.confirm(`Delete "${ev.title}"? Its photos will be deleted too. This can't be undone.`)) return;
   try {
     await api(`/api/v1/agency/me/packages/${id}`, { method: 'DELETE' });
-    toast('Package deleted.');
-    await loadPackages();
+    toast('Event deleted.');
+    await loadEvents();
     refreshStats();
   } catch (err) {
     toast(err.message, 'error');
   }
 }
+
+function openCancelDialog(id) {
+  const ev = state.events.find(p => p._id === id);
+  if (!ev) return;
+  state.cancelling = ev;
+  $('cancelTitle').textContent = `Cancel ${ev.title}?`;
+  $('cancelLead').textContent = `${plural(ev.stats.registrations, 'registration')} will be cancelled and those travelers get a notification with your reason. If anyone has paid, arrange their refund with Plezar support. This can't be undone.`;
+  $('cancelReason').value = '';
+  showAlert('cancelError', '');
+  $('cancelDialog').hidden = false;
+  $('cancelReason').focus();
+}
+
+$('cancelForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const reason = $('cancelReason').value.trim();
+  if (reason.length < 3) return showAlert('cancelError', 'Tell travelers why the event is cancelled.');
+  const btn = $('cancelSubmit');
+  setBusy(btn, true, 'Cancelling...');
+  try {
+    const { message } = await api(`/api/v1/agency/me/packages/${state.cancelling._id}/cancel`, { method: 'POST', body: { reason } });
+    closeDrawers();
+    toast(message);
+    await loadEvents();
+    refreshStats();
+  } catch (err) {
+    showAlert('cancelError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
+
+// ---------- Registrations ----------
+
+const REG_TEXT = { pending: 'Waiting for you', confirmed: 'Confirmed', completed: 'Completed', cancelled: 'Cancelled' };
+const PAY_TEXT = { unpaid: 'Not paid', paid: 'Paid', partially_refunded: 'Part refunded', refunded: 'Refunded' };
+
+function showRegistrationsFor(id) {
+  state.regEvent = id;
+  showView('registrations');
+}
+
+async function loadRegistrationsView() {
+  const select = $('regEvent');
+  try {
+    const events = (await fetchEvents()).filter(e => e.startDate);
+    if (!events.length) {
+      select.innerHTML = '<option value="">No tour events yet</option>';
+      $('regSummary').innerHTML = '';
+      $('regBody').innerHTML = '<tr><td colspan="6">Create a tour event first. Registrations show up here as travelers sign up in the app.</td></tr>';
+      $('regCsv').hidden = true;
+      return;
+    }
+    select.innerHTML = events.map(e => `<option value="${escapeHTML(e._id)}">${escapeHTML(e.title)}, ${escapeHTML(dateRange(e.startDate, e.endDate))}${e.stats.registrations ? ` (${e.stats.registrations})` : ''}</option>`).join('');
+    if (!state.regEvent || !events.some(e => e._id === state.regEvent)) {
+      state.regEvent = (events.find(e => eventPhase(e) === 'upcoming') || events[0])._id;
+    }
+    select.value = state.regEvent;
+    $('regCsv').hidden = false;
+    loadRegistrations();
+  } catch (err) {
+    $('regBody').innerHTML = `<tr><td colspan="6">${escapeHTML(err.message)}</td></tr>`;
+  }
+}
+
+$('regEvent').addEventListener('change', e => { state.regEvent = e.target.value; loadRegistrations(); });
+$('regStatus').addEventListener('change', () => loadRegistrations());
+
+async function loadRegistrations() {
+  if (!state.regEvent) return;
+  const status = $('regStatus').value;
+  $('regCsv').href = `/api/v1/agency/me/packages/${encodeURIComponent(state.regEvent)}/registrations?format=csv`;
+  $('regBody').innerHTML = '<tr><td colspan="6">Loading registrations...</td></tr>';
+  try {
+    const { data } = await api(`/api/v1/agency/me/packages/${state.regEvent}/registrations${status ? `?status=${status}` : ''}`);
+    const e = data.event;
+    const s = e.stats;
+    $('regSummary').innerHTML = `
+      <dl class="stats stats-tight">
+        <div class="stat"><dt>Seats taken</dt><dd>${s.seatsTaken}${e.seats ? `<small> / ${e.seats}</small>` : ''}</dd></div>
+        <div class="stat"><dt>Waiting for you</dt><dd>${s.pending}</dd></div>
+        <div class="stat"><dt>Confirmed</dt><dd>${s.confirmed}</dd></div>
+        <div class="stat"><dt>Cancelled</dt><dd>${s.cancelled}</dd></div>
+      </dl>
+      ${e.status === 'cancelled' ? `<div class="callout callout-error"><div><strong>This event was cancelled</strong>${escapeHTML(e.cancelReason)}</div></div>` : ''}
+      <div class="reg-meta">
+        <span class="muted">${e.meetingPoint ? `Meeting point: ${escapeHTML(e.meetingPoint)}` : ''}</span>
+        ${s.registrations && e.status !== 'cancelled' ? `<button class="btn btn-quiet btn-sm" data-action="notify-event" data-id="${escapeHTML(e._id)}">Send these travelers a notification</button>` : ''}
+      </div>`;
+
+    const rows = data.registrations;
+    $('regBody').innerHTML = rows.length ? rows.map(r => {
+      const u = r.user || {};
+      const id = escapeHTML(r._id);
+      const actions = [];
+      if (r.status === 'pending') actions.push(`<button class="btn btn-primary btn-sm" data-action="set-registration" data-status="confirmed" data-id="${id}">Confirm</button>`);
+      if (r.status === 'confirmed' && isPast(e)) actions.push(`<button class="btn btn-quiet btn-sm" data-action="set-registration" data-status="completed" data-id="${id}">Mark trip done</button>`);
+      if (['pending', 'confirmed'].includes(r.status)) actions.push(`<button class="btn btn-danger btn-sm" data-action="set-registration" data-status="cancelled" data-id="${id}">Cancel</button>`);
+      return `
+        <tr>
+          <td><strong>${escapeHTML(u.name || 'Deleted account')}</strong>
+            <span class="cell-sub">${u.phone ? `<a href="tel:${escapeHTML(u.phone)}">${escapeHTML(u.phone)}</a>` : ''}${u.phone && u.email ? ', ' : ''}${u.email ? `<a href="mailto:${escapeHTML(u.email)}">${escapeHTML(u.email)}</a>` : ''}</span>
+            ${r.note ? `<span class="cell-sub">Note: ${escapeHTML(r.note)}</span>` : ''}</td>
+          <td>${r.travelers}</td>
+          <td>${taka(r.amount)}<span class="cell-sub">${escapeHTML(PAY_TEXT[r.paymentStatus] || r.paymentStatus)}</span></td>
+          <td>${escapeHTML(fmtDate(r.createdAt))}<span class="cell-sub">${escapeHTML(r.reference)}</span></td>
+          <td><span class="badge badge-${escapeHTML(r.status)}">${escapeHTML(REG_TEXT[r.status])}</span>${r.status === 'cancelled' && r.cancelReason ? `<span class="cell-sub">${escapeHTML(r.cancelReason)}</span>` : ''}</td>
+          <td class="actions">${actions.join('')}</td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="6">${status ? 'No registrations with this status.' : 'Nobody has registered yet. Published events show in the Plezar app, where travelers register.'}</td></tr>`;
+  } catch (err) {
+    $('regBody').innerHTML = `<tr><td colspan="6">${escapeHTML(err.message)}</td></tr>`;
+  }
+}
+
+async function setRegistration(id, status) {
+  let reason = '';
+  if (status === 'cancelled') {
+    reason = window.prompt('Why are you cancelling this registration? The traveler sees this.');
+    if (reason === null) return;
+    if (reason.trim().length < 3) return toast('Write a short reason to cancel the registration.', 'error');
+  }
+  try {
+    await api(`/api/v1/agency/me/bookings/${id}`, { method: 'PATCH', body: { status, reason: reason.trim() } });
+    toast({ confirmed: 'Registration confirmed.', completed: 'Marked as done.', cancelled: 'Registration cancelled.' }[status]);
+    loadRegistrations();
+    refreshStats();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function notifyEvent(id) {
+  state.notifyEvent = id;
+  showView('notifications');
+}
+
+// ---------- Announcements ----------
+
+async function loadAnnouncements() {
+  $('announcementList').innerHTML = '<p class="muted">Loading announcements...</p>';
+  try {
+    const { data } = await api('/api/v1/agency/me/announcements');
+    state.announcements = data.announcements;
+    renderAnnouncements();
+  } catch (err) {
+    $('announcementList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+function renderAnnouncements() {
+  if (!state.announcements.length) {
+    $('announcementList').innerHTML = `
+      <div class="empty">
+        <strong>No announcements yet</strong>
+        Share news with travelers: a new trip, a winter schedule, an early-bird price.
+        <div style="margin-top: 14px;"><button class="btn btn-primary" data-action="new-announcement">Write an announcement</button></div>
+      </div>`;
+    return;
+  }
+  $('announcementList').innerHTML = `<div class="ann-list">${state.announcements.map(a => {
+    const id = escapeHTML(a._id);
+    return `
+    <article class="ann ${a.pinned ? 'is-pinned' : ''}">
+      <div class="ann-top">
+        <h3>${escapeHTML(a.title)}</h3>
+        <div class="ann-badges">${a.pinned ? '<span class="badge badge-pinned">Pinned</span>' : ''}<span class="badge badge-${a.status}">${a.status === 'published' ? 'Published' : 'Draft'}</span></div>
+      </div>
+      <p class="ann-body">${escapeHTML(a.body)}</p>
+      <div class="ann-meta">${a.status === 'published' ? `Published ${escapeHTML(fmtDateTime(a.publishedAt))}` : `Last edited ${escapeHTML(fmtDateTime(a.updatedAt))}`}${a.event ? `, about ${escapeHTML(a.event.title)}` : ''}${a.notifiedAt ? ', travelers notified' : ''}</div>
+      <div class="pkg-actions">
+        <button class="btn btn-quiet btn-sm" data-action="edit-announcement" data-id="${id}">Edit</button>
+        <button class="btn btn-quiet btn-sm" data-action="toggle-pin" data-id="${id}">${a.pinned ? 'Unpin' : 'Pin'}</button>
+        <button class="btn btn-danger btn-sm" data-action="delete-announcement" data-id="${id}">Delete</button>
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+async function fillEventSelect(select, { blank, withCounts } = {}) {
+  const events = (state.events.length ? state.events : await fetchEvents()).filter(e => e.startDate && e.status !== 'cancelled');
+  select.innerHTML = (blank ? `<option value="">${escapeHTML(blank)}</option>` : '') + events.map(e => `<option value="${escapeHTML(e._id)}">${escapeHTML(e.title)}, ${escapeHTML(dateRange(e.startDate, e.endDate))}${withCounts ? ` (${plural(e.stats.registrations, 'registered', 'registered')})` : ''}</option>`).join('');
+  return events;
+}
+
+function syncNotifyField() {
+  const published = $('anStatus').value === 'published';
+  const already = state.editingAnnouncement && state.editingAnnouncement.notifiedAt;
+  $('anNotifyField').hidden = !published || Boolean(already);
+  $('anNotify').querySelector('option[value="event"]').disabled = !$('anEvent').value;
+  if (!$('anEvent').value && $('anNotify').value === 'event') $('anNotify').value = 'none';
+}
+$('anStatus').addEventListener('change', syncNotifyField);
+$('anEvent').addEventListener('change', syncNotifyField);
+
+async function openAnnouncementEditor(item) {
+  state.editingAnnouncement = item || null;
+  $('announcementForm').reset();
+  showAlert('announcementError', '');
+  $('announcementFormTitle').textContent = item ? 'Edit announcement' : 'New announcement';
+  try { await fillEventSelect($('anEvent'), { blank: 'Not about a specific event' }); } catch (e) { /* the event link is optional */ }
+  if (item) {
+    $('anTitle').value = item.title;
+    $('anBody').value = item.body;
+    $('anEvent').value = item.event ? item.event._id : '';
+    $('anPinned').checked = item.pinned;
+    $('anStatus').value = item.status;
+  }
+  $('anNotify').value = 'none';
+  syncNotifyField();
+  $('announcementDrawer').hidden = false;
+  $('anTitle').focus();
+}
+
+$('announcementForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('announcementError', '');
+  const title = $('anTitle').value.trim();
+  const body = $('anBody').value.trim();
+  if (!title) return showAlert('announcementError', 'Give the announcement a title.');
+  if (!body) return showAlert('announcementError', 'Write the announcement.');
+
+  const payload = { title, body, event: $('anEvent').value || '', pinned: $('anPinned').checked, status: $('anStatus').value };
+  if (!$('anNotifyField').hidden) payload.notify = $('anNotify').value;
+  const item = state.editingAnnouncement;
+  const btn = $('announcementSave');
+  setBusy(btn, true);
+  try {
+    const { message } = item
+      ? await api(`/api/v1/agency/me/announcements/${item._id}`, { method: 'PATCH', body: payload })
+      : await api('/api/v1/agency/me/announcements', { method: 'POST', body: payload });
+    closeDrawers();
+    toast(message);
+    await loadAnnouncements();
+    refreshStats();
+  } catch (err) {
+    showAlert('announcementError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
+
+async function togglePin(id) {
+  const item = state.announcements.find(a => a._id === id);
+  if (!item) return;
+  try {
+    await api(`/api/v1/agency/me/announcements/${id}`, { method: 'PATCH', body: { pinned: !item.pinned } });
+    toast(item.pinned ? 'Unpinned.' : 'Pinned to the top of your agency page.');
+    loadAnnouncements();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function deleteAnnouncement(id) {
+  const item = state.announcements.find(a => a._id === id);
+  if (!item || !window.confirm(`Delete "${item.title}"? Travelers won't see it any more.`)) return;
+  try {
+    await api(`/api/v1/agency/me/announcements/${id}`, { method: 'DELETE' });
+    toast('Announcement deleted.');
+    await loadAnnouncements();
+    refreshStats();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ---------- Notifications ----------
+
+function syncAudience() {
+  const audience = $('broadcastForm').querySelector('input[name="audience"]:checked').value;
+  $('audienceEventField').hidden = audience !== 'event';
+}
+$('broadcastForm').querySelectorAll('input[name="audience"]').forEach(r => r.addEventListener('change', syncAudience));
+$('bcBody').addEventListener('input', () => { $('bcCount').textContent = `${$('bcBody').value.length} / 1000`; });
+
+async function loadNotificationsView() {
+  $('broadcastList').innerHTML = '<li class="muted">Loading...</li>';
+  try {
+    const [{ data: audience }, { data: sent }] = await Promise.all([
+      api('/api/v1/agency/me/audience'),
+      api('/api/v1/agency/me/broadcasts')
+    ]);
+    state.audience = audience;
+    // Upcoming events first (soonest at the top), then past ones; start on the next event people registered for
+    const today = isoDay(new Date());
+    const upcoming = audience.events.filter(e => e.status !== 'cancelled' && isoDay(e.startDate) >= today).reverse();
+    const past = audience.events.filter(e => e.status !== 'cancelled' && isoDay(e.startDate) < today);
+    const events = [...upcoming, ...past];
+    $('bcEvent').innerHTML = events.length
+      ? events.map(e => `<option value="${escapeHTML(e._id)}">${escapeHTML(e.title)}, ${escapeHTML(fmtDay(e.startDate))} (${plural(e.registered, 'person', 'people')})</option>`).join('')
+      : '<option value="">No tour events yet</option>';
+    const first = events.find(e => e.registered);
+    if (state.notifyEvent && events.some(e => e._id === state.notifyEvent)) $('bcEvent').value = state.notifyEvent;
+    else if (first) $('bcEvent').value = first._id;
+    state.notifyEvent = null;
+    $('audienceTravelers').textContent = `(${plural(audience.travelers, 'person', 'people')})`;
+    $('broadcastLimit').textContent = audience.left
+      ? `You can send ${plural(audience.left, 'more notification')} today (up to ${audience.limit} in 24 hours).`
+      : `You've sent ${audience.limit} notifications in the last 24 hours. You can send more later.`;
+    $('broadcastSubmit').disabled = !audience.left;
+    syncAudience();
+
+    $('broadcastList').innerHTML = sent.broadcasts.length ? sent.broadcasts.map(b => `
+      <li>
+        <div class="sent-top"><strong>${escapeHTML(b.title)}</strong><span class="muted">${escapeHTML(fmtDateTime(b.createdAt))}</span></div>
+        ${b.body ? `<p>${escapeHTML(b.body)}</p>` : ''}
+        <span class="cell-sub">To ${escapeHTML(plural(b.recipientCount, 'person', 'people'))}: ${b.audience === 'event' ? `registered for ${escapeHTML(b.eventTitle)}` : 'everyone who registered with you'}${b.announcement ? ', with an announcement' : ''}. Sent by ${escapeHTML(b.sentByName)}.</span>
+      </li>`).join('') : '<li class="muted">Nothing sent yet.</li>';
+  } catch (err) {
+    $('broadcastList').innerHTML = `<li class="alert alert-error">${escapeHTML(err.message)}</li>`;
+  }
+}
+
+$('broadcastForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('broadcastError', '');
+  const audience = $('broadcastForm').querySelector('input[name="audience"]:checked').value;
+  const title = $('bcTitle').value.trim();
+  const body = $('bcBody').value.trim();
+  const eventId = $('bcEvent').value;
+  if (audience === 'event' && !eventId) return showAlert('broadcastError', 'Choose the tour event.');
+  if (!title) return showAlert('broadcastError', 'Write a short title.');
+
+  const a = state.audience;
+  const count = audience === 'event' ? (a.events.find(x => x._id === eventId) || {}).registered : a.travelers;
+  if (!count) return showAlert('broadcastError', audience === 'event' ? 'Nobody is registered for this event yet.' : 'Nobody has registered with you yet.');
+  if (!window.confirm(`Send "${title}" to ${plural(count, 'person', 'people')}? This can't be undone.`)) return;
+
+  const btn = $('broadcastSubmit');
+  setBusy(btn, true, 'Sending...');
+  try {
+    const { message } = await api('/api/v1/agency/me/broadcasts', { method: 'POST', body: { audience, eventId, title, body } });
+    $('bcTitle').value = '';
+    $('bcBody').value = '';
+    $('bcCount').textContent = '0 / 1000';
+    toast(message);
+    loadNotificationsView();
+  } catch (err) {
+    showAlert('broadcastError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
 
 // ---------- Team ----------
 

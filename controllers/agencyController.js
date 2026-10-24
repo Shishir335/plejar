@@ -11,6 +11,9 @@ const Payout = require('../models/payoutModel');
 const { moveBooking } = require('../utils/bookings');
 const { earningsFor, monthlyEarnings } = require('../utils/earnings');
 const { getDefaultRate, isCustom } = require('../utils/commission');
+const { HOLDS_SEAT, scheduleFrom, registrationStats, withStats } = require('../utils/events');
+const { notifyUsers } = require('../utils/notify');
+const Announcement = require('../models/announcementModel');
 const {
   saveAgencyImage,
   removeAgencyImage,
@@ -20,7 +23,7 @@ const {
 } = require('../utils/uploads');
 
 const PROFILE_FIELDS = ['name', 'description', 'phone', 'email', 'website', 'tradeLicenseNumber'];
-const PACKAGE_FIELDS = ['title', 'destination', 'durationDays', 'durationNights', 'priceFrom', 'description'];
+const PACKAGE_FIELDS = ['title', 'destination', 'priceFrom', 'description', 'meetingPoint'];
 
 // "Sajek, Bandarban" or ["Sajek", "Bandarban"] -> ["Sajek", "Bandarban"]
 const toList = (value, max = 20, separator = /[,\n]/) => {
@@ -54,6 +57,11 @@ exports.requireAgent = catchAsync(async (req, res, next) => {
     return next(new AppError(blocked, agency ? 403 : 404));
   }
 
+  // Accounts created with a temporary password must choose their own before using the panel
+  if (req.user.mustChangePassword && !(req.method === 'GET' && req.path === '/me')) {
+    return next(new AppError('Choose your own password before using the agency panel.', 403));
+  }
+
   req.agency = agency;
   next();
 });
@@ -72,16 +80,20 @@ const packageCounts = async agencyId => {
     { $match: { agency: agencyId } },
     { $group: { _id: '$status', count: { $sum: 1 } } }
   ]);
-  const counts = { draft: 0, published: 0, hidden: 0 };
+  const counts = { draft: 0, published: 0, hidden: 0, cancelled: 0 };
   rows.forEach(r => { counts[r._id] = r.count; });
   return counts;
 };
 exports.packageCounts = packageCounts;
 
 exports.getMyAgency = catchAsync(async (req, res, next) => {
-  const [packages, teamSize] = await Promise.all([
+  const now = new Date();
+  const [packages, teamSize, upcomingEvents, openRegistrations, announcements] = await Promise.all([
     packageCounts(req.agency._id),
-    User.countDocuments({ agency: req.agency._id })
+    User.countDocuments({ agency: req.agency._id }),
+    Package.countDocuments({ agency: req.agency._id, status: 'published', startDate: { $gte: now } }),
+    Booking.countDocuments({ agency: req.agency._id, status: { $in: HOLDS_SEAT }, travelDate: { $gte: now } }),
+    Announcement.countDocuments({ agency: req.agency._id, status: 'published' })
   ]);
 
   res.status(200).json({
@@ -92,9 +104,10 @@ exports.getMyAgency = catchAsync(async (req, res, next) => {
         id: req.user._id,
         name: req.user.name,
         email: req.user.email,
-        agencyRole: req.user.agencyRole
+        agencyRole: req.user.agencyRole,
+        mustChangePassword: Boolean(req.user.mustChangePassword)
       },
-      stats: { packages, teamSize }
+      stats: { packages, teamSize, upcomingEvents, openRegistrations, announcements }
     }
   });
 });
@@ -116,12 +129,12 @@ exports.updateMyAgency = catchAsync(async (req, res, next) => {
   res.status(200).json({ status: 'success', data: { agency } });
 });
 
-// ---------- Tour packages ----------
+// ---------- Tour events (stored as packages with a schedule) ----------
 
 const findOwnPackage = async (req, next) => {
   const pkg = await Package.findOne({ _id: req.params.id, agency: req.agency._id });
   if (!pkg) {
-    next(new AppError('No package found with that ID in your agency.', 404));
+    next(new AppError('No tour event found with that ID in your agency.', 404));
     return null;
   }
   return pkg;
@@ -130,46 +143,88 @@ const findOwnPackage = async (req, next) => {
 const applyPackageStatus = (pkg, status, next) => {
   if (status === undefined) return true;
   if (!['draft', 'published', 'hidden'].includes(status)) {
-    next(new AppError('Status must be draft, published or hidden.', 400));
+    next(new AppError('Status must be draft, published or hidden. Use "Cancel event" to cancel it.', 400));
     return false;
   }
   if (status === 'published' && pkg.hiddenByAdmin) {
-    next(new AppError('Plezar has hidden this package. Contact support before publishing it again.', 403));
+    next(new AppError('Plezar has hidden this tour event. Contact support before publishing it again.', 403));
     return false;
   }
   pkg.status = status;
   return true;
 };
 
+const readSeats = (value, next) => {
+  const seats = Number(value);
+  if (!Number.isInteger(seats) || seats < 1 || seats > 1000) {
+    next(new AppError('Enter the number of seats, between 1 and 1000.', 400));
+    return null;
+  }
+  return seats;
+};
+
+// Upcoming events first (soonest at the top), then past and undated ones, newest first
+const eventOrder = (a, b) => {
+  const now = Date.now();
+  const upA = a.startDate && new Date(a.startDate) >= now;
+  const upB = b.startDate && new Date(b.startDate) >= now;
+  if (upA !== upB) return upA ? -1 : 1;
+  if (upA) return new Date(a.startDate) - new Date(b.startDate);
+  return new Date(b.startDate || b.updatedAt) - new Date(a.startDate || a.updatedAt);
+};
+
 exports.listMyPackages = catchAsync(async (req, res, next) => {
-  const packages = await Package.find({ agency: req.agency._id }).sort({ updatedAt: -1 });
-  res.status(200).json({ status: 'success', results: packages.length, data: { packages } });
+  const packages = await Package.find({ agency: req.agency._id });
+  const stats = await registrationStats(packages.map(p => p._id));
+  const events = packages.map(p => withStats(p, stats)).sort(eventOrder);
+  res.status(200).json({ status: 'success', results: events.length, data: { packages: events } });
 });
 
 exports.createMyPackage = catchAsync(async (req, res, next) => {
+  const seats = readSeats(req.body.seats, next);
+  if (seats === null) return;
+
   const pkg = new Package({
     ...pick(req.body, PACKAGE_FIELDS),
+    ...scheduleFrom(req.body),
+    seats,
     included: toList(req.body.included, 30, /\n/),
     agency: req.agency._id,
     createdBy: req.user._id
   });
+  if (pkg.startDate <= new Date()) return next(new AppError('Choose a start date in the future.', 400));
   if (!applyPackageStatus(pkg, req.body.status, next)) return;
 
   await pkg.validate();
   const files = (req.files || []).slice(0, 6);
   pkg.photos = await Promise.all(files.map(file => saveAgencyImage(file, req.agency._id)));
   await pkg.save();
-  await logActivity(req, { action: 'package.created', summary: `Added tour package "${pkg.title}" (${pkg.status})`, agency: req.agency._id });
+  await logActivity(req, { action: 'package.created', summary: `Created tour event "${pkg.title}" (${pkg.status})`, agency: req.agency._id });
 
-  res.status(201).json({ status: 'success', data: { package: pkg } });
+  res.status(201).json({ status: 'success', data: { package: withStats(pkg, {}) } });
 });
 
 exports.updateMyPackage = catchAsync(async (req, res, next) => {
   const pkg = await findOwnPackage(req, next);
   if (!pkg) return;
+  if (pkg.status === 'cancelled') return next(new AppError('This tour event was cancelled and can no longer be edited.', 400));
+
+  const stats = (await registrationStats([pkg._id]))[String(pkg._id)];
+  const oldStart = pkg.startDate ? pkg.startDate.getTime() : null;
 
   Object.assign(pkg, pick(req.body, PACKAGE_FIELDS));
   if (req.body.included !== undefined) pkg.included = toList(req.body.included, 30, /\n/);
+  if (['startDate', 'endDate', 'registrationDeadline', 'durationNights'].some(f => req.body[f] !== undefined)) {
+    Object.assign(pkg, scheduleFrom(req.body, pkg));
+  }
+  if (req.body.seats !== undefined) {
+    const seats = readSeats(req.body.seats, next);
+    if (seats === null) return;
+    if (stats && seats < stats.seatsTaken) {
+      return next(new AppError(`${stats.seatsTaken} seats are already taken, so the event needs at least ${stats.seatsTaken} seats.`, 400));
+    }
+    pkg.seats = seats;
+  }
   if (!applyPackageStatus(pkg, req.body.status, next)) return;
 
   // Remove photos the agent deleted, then add new uploads (max 6 in total)
@@ -179,7 +234,7 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
 
   const files = req.files || [];
   if (pkg.photos.length + files.length > 6) {
-    return next(new AppError('A package can have at most 6 photos.', 400));
+    return next(new AppError('A tour event can have at most 6 photos.', 400));
   }
 
   await pkg.validate();
@@ -187,20 +242,110 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
   pkg.photos.push(...added);
   await pkg.save();
   await Promise.all(removed.map(removeAgencyImage));
-  await logActivity(req, { action: 'package.updated', summary: `Edited tour package "${pkg.title}" (${pkg.status})`, agency: req.agency._id });
 
-  res.status(200).json({ status: 'success', data: { package: pkg } });
+  // A new date moves everyone's registration with it, and they are told
+  let moved = 0;
+  if (oldStart && pkg.startDate && pkg.startDate.getTime() !== oldStart) {
+    const filter = { package: pkg._id, status: { $in: HOLDS_SEAT } };
+    const users = await Booking.distinct('user', filter);
+    await Booking.updateMany(filter, { travelDate: pkg.startDate });
+    moved = await notifyUsers(users, {
+      agency: req.agency._id,
+      kind: 'event_changed',
+      title: `New date for ${pkg.title}`,
+      body: `${req.agency.name} moved this tour to ${pkg.startDate.toISOString().slice(0, 10)}. Your registration moves with it.`,
+      event: pkg._id
+    });
+  }
+  await logActivity(req, { action: 'package.updated', summary: `Edited tour event "${pkg.title}" (${pkg.status})${moved ? `; ${moved} registered travelers told about the new date` : ''}`, agency: req.agency._id });
+
+  const fresh = await registrationStats([pkg._id]);
+  res.status(200).json({ status: 'success', data: { package: withStats(pkg, fresh), notified: moved } });
+});
+
+// Cancel an event: every open registration is cancelled and the travelers are told why
+exports.cancelMyPackage = catchAsync(async (req, res, next) => {
+  const pkg = await findOwnPackage(req, next);
+  if (!pkg) return;
+  if (pkg.status === 'cancelled') return next(new AppError('This tour event is already cancelled.', 400));
+  const reason = String(req.body.reason || '').trim();
+  if (reason.length < 3) return next(new AppError('Tell travelers why the event is cancelled.', 400));
+
+  const filter = { package: pkg._id, status: { $in: HOLDS_SEAT } };
+  const users = await Booking.distinct('user', filter);
+  const result = await Booking.updateMany(filter, { status: 'cancelled', cancelledAt: new Date(), cancelReason: `Cancelled by the agency: ${reason}`.slice(0, 500) });
+
+  pkg.status = 'cancelled';
+  pkg.cancelledAt = new Date();
+  pkg.cancelReason = reason.slice(0, 500);
+  await pkg.save();
+
+  const notified = await notifyUsers(users, {
+    agency: req.agency._id,
+    kind: 'event_cancelled',
+    title: `${pkg.title} is cancelled`,
+    body: `${req.agency.name} cancelled this tour. Reason: ${reason}`.slice(0, 3000),
+    event: pkg._id
+  });
+  await logActivity(req, { action: 'package.cancelled', summary: `Cancelled tour event "${pkg.title}" (${result.modifiedCount} registrations cancelled): ${reason}`, agency: req.agency._id });
+
+  res.status(200).json({
+    status: 'success',
+    message: notified ? `Event cancelled. ${notified} registered traveler${notified === 1 ? ' was' : 's were'} notified.` : 'Event cancelled.',
+    data: { package: withStats(pkg, await registrationStats([pkg._id])), cancelledRegistrations: result.modifiedCount, notified }
+  });
 });
 
 exports.deleteMyPackage = catchAsync(async (req, res, next) => {
   const pkg = await findOwnPackage(req, next);
   if (!pkg) return;
+  if (await Booking.exists({ package: pkg._id })) {
+    return next(new AppError('People have registered for this event, so it can\'t be deleted. Cancel the event instead.', 400));
+  }
 
   await pkg.deleteOne();
   await Promise.all(pkg.photos.map(removeAgencyImage));
-  await logActivity(req, { action: 'package.deleted', summary: `Deleted tour package "${pkg.title}"`, agency: req.agency._id });
+  await logActivity(req, { action: 'package.deleted', summary: `Deleted tour event "${pkg.title}"`, agency: req.agency._id });
 
   res.status(204).json({ status: 'success', data: null });
+});
+
+const csvCell = value => {
+  const text = String(value == null ? '' : value);
+  // Prefix formula-like values so spreadsheets don't run them
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
+
+// Who registered for one event (add ?format=csv for a spreadsheet)
+exports.listEventRegistrations = catchAsync(async (req, res, next) => {
+  const pkg = await findOwnPackage(req, next);
+  if (!pkg) return;
+
+  const filter = { package: pkg._id };
+  if (['pending', 'confirmed', 'completed', 'cancelled'].includes(req.query.status)) filter.status = req.query.status;
+  const registrations = await Booking.find(filter)
+    .sort({ createdAt: 1 })
+    .populate({ path: 'user', select: 'name email phone', options: { includeInactive: true } })
+    .lean();
+
+  if (req.query.format === 'csv') {
+    const header = ['Reference', 'Name', 'Phone', 'Email', 'Travelers', 'Amount (BDT)', 'Status', 'Payment', 'Registered on', 'Note'];
+    const lines = registrations.map(r => [
+      r.reference, r.user && r.user.name, r.user && r.user.phone, r.user && r.user.email, r.travelers, r.amount,
+      r.status, r.paymentStatus, new Date(r.createdAt).toISOString().slice(0, 10), r.note
+    ].map(csvCell).join(','));
+    const name = pkg.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'event';
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${name}-registrations.csv"`,
+      'Cache-Control': 'private, no-store'
+    });
+    return res.status(200).send(`\uFEFF${[header.join(','), ...lines].join('\n')}`);
+  }
+
+  const stats = await registrationStats([pkg._id]);
+  res.status(200).json({ status: 'success', data: { event: withStats(pkg, stats), registrations } });
 });
 
 // ---------- Team ----------

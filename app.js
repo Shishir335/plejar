@@ -22,6 +22,7 @@ const cors = require('cors');
 const userRouter = require('./routes/userRoutes');
 const subscriberRouter = require('./routes/subscriberRoutes');
 const applicationRouter = require('./routes/applicationRoutes');
+const travelerRoutes = require('./routes/travelerRoutes');
 const adminApplicationRouter = require('./routes/adminApplicationRoutes');
 const bookingRouter = require('./routes/bookingRoutes');
 const reviewRouter = require('./routes/reviewRoutes');
@@ -187,6 +188,9 @@ app.get('/accept-invite', (req, res) => {
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/subscribers', subscriberRouter);
 app.use('/api/v1/applications', applicationRouter);
+app.use('/api/v1/events', travelerRoutes.events);
+app.use('/api/v1/announcements', travelerRoutes.announcements);
+app.use('/api/v1/notifications', travelerRoutes.notifications);
 app.use('/api/v1/bookings', bookingRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/complaints', complaintRouter);

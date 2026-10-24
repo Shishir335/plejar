@@ -142,8 +142,16 @@ function renderApplication() {
 
   let outcome = '';
   if (a.status === 'approved') {
-    outcome = `<div class="callout callout-ok"><div><strong>Accepted ${E(fmtDate(a.decidedAt))}${a.decidedBy ? ` by ${E(a.decidedBy.name)}` : ''}</strong>The agency is now a vendor and the applicant was invited as its owner.</div>
-      ${a.agency ? `<button class="btn btn-secondary btn-sm" onclick="openVendor('${E(a.agency._id)}')">Open vendor</button>` : ''}</div>`;
+    const owner = AP.detail.owner;
+    const signIn = !owner ? 'The owner account no longer exists.'
+      : owner.mustChangePassword || owner.accountStatus === 'invited'
+        ? `${owner.name} hasn't signed in yet. Send them the sign-in details if you haven't.`
+        : `${owner.name} has signed in and chosen their own password${owner.lastLoginAt ? ` (last sign-in ${fmtDateTime(owner.lastLoginAt)})` : ''}.`;
+    outcome = `<div class="callout callout-ok"><div><strong>Accepted ${E(fmtDate(a.decidedAt))}${a.decidedBy ? ` by ${E(a.decidedBy.name)}` : ''}</strong>The agency is now a vendor. ${E(signIn)}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${owner && (owner.mustChangePassword || owner.accountStatus === 'invited') ? '<button class="btn btn-secondary btn-sm" onclick="resetVendorCredentials()">Create new sign-in details</button>' : ''}
+        ${a.agency ? `<button class="btn btn-secondary btn-sm" onclick="openVendor('${E(a.agency._id)}')">Open vendor</button>` : ''}
+      </div></div>`;
   } else if (a.status === 'rejected') {
     outcome = `<div class="callout callout-error"><div><strong>Rejected ${E(fmtDate(a.decidedAt))}${a.decidedBy ? ` by ${E(a.decidedBy.name)}` : ''}</strong>Reason given: ${E(a.rejectedReason)}</div></div>`;
   } else if (a.status === 'needs_info') {
@@ -292,7 +300,7 @@ async function deleteApplication() {
 async function openApproveModal() {
   const a = AP.detail.application;
   document.getElementById('approveLead').textContent =
-    `${a.agencyName} becomes a vendor. ${a.contactName} (${a.email}) gets an email to set a password and becomes the owner.`;
+    `${a.agencyName} becomes a vendor and ${a.contactName} (${a.email}) gets an owner account with a temporary password. You'll see the sign-in details next, ready to email to them.`;
   document.getElementById('apVerify').checked = true;
   document.getElementById('approveForm').hidden = false;
   document.getElementById('approveResult').hidden = true;
@@ -311,7 +319,7 @@ async function submitApprove(e) {
   const btn = document.getElementById('approveSubmit');
   const categories = [...document.querySelectorAll('input[name="apCategory"]:checked')].map(box => box.value);
   btn.disabled = true;
-  btn.textContent = 'Accepting...';
+  btn.textContent = 'Creating account...';
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/applications/${AP.detail.application._id}/approve`, {
       method: 'POST',
@@ -324,7 +332,7 @@ async function submitApprove(e) {
     result.hidden = false;
     result.innerHTML = `
       <p style="margin-bottom: 12px;">${E(data.message)}</p>
-      ${data.data.emailSent ? '' : inviteLinkBox(data.data.inviteURL, 'Invite link (works for 7 days):')}
+      ${credentialsBox(data.data.credentials)}
       <div style="display:flex; gap:8px; margin-top: 16px;">
         <button class="btn btn-primary" onclick="closeModal('approveModal'); openVendor('${E(data.data.agency._id)}')">Open vendor</button>
         <button class="btn btn-secondary" onclick="closeModal('approveModal'); reloadApplication();">Done</button>
@@ -335,6 +343,49 @@ async function submitApprove(e) {
     formError('approveError', 'Could not reach the server.');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Accept and send invite';
+    btn.textContent = 'Accept and create account';
   }
+}
+
+// ---------- Sign-in details for a new vendor ----------
+
+// The temporary password, an email ready to copy, and a button that opens it in the admin's email app
+function credentialsBox(c) {
+  const draft = c.emailDraft;
+  const mailto = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
+  return `
+    <div class="cred-box">
+      <dl class="kv">
+        <div class="kv-row"><dt>Sign-in page</dt><dd>${E(c.loginURL)}</dd></div>
+        <div class="kv-row"><dt>Email</dt><dd>${E(c.email)}</dd></div>
+        <div class="kv-row"><dt>Temporary password</dt><dd><code class="cred-pass">${E(c.password)}</code></dd></div>
+      </dl>
+      <label class="form-label" for="credDraft" style="margin-top: 12px;">Email to send</label>
+      <textarea id="credDraft" class="form-input" rows="8" readonly>${E(`Subject: ${draft.subject}\n\n${draft.body}`)}</textarea>
+      <div style="display:flex; gap:8px; flex-wrap: wrap; margin-top: 10px;">
+        <a class="btn btn-primary btn-sm" href="${E(mailto)}">Open in my email app</a>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="copyCredentials()">Copy email text</button>
+      </div>
+      <p class="detail-muted" style="margin-top: 10px;">The password is shown only now. They choose their own the first time they sign in. Lost it before sending? Open the application and create a new one.</p>
+    </div>`;
+}
+
+function copyCredentials() {
+  const text = document.getElementById('credDraft').value.replace(/^Subject: .*\n\n/, '');
+  navigator.clipboard.writeText(text).then(() => showAdminToast('Email text copied.', 'success')).catch(() => showAdminToast('Select the text and copy it yourself.', 'info'));
+}
+
+async function resetVendorCredentials() {
+  const a = AP.detail.application;
+  if (!confirm(`Create a new temporary password for ${a.contactName}? The old one stops working.`)) return;
+  const { ok, data } = await adminFetch(`/api/v1/admin/applications/${a._id}/credentials`, { method: 'POST' });
+  if (!ok) return showAdminToast(data.message || 'Could not create a new password.', 'error');
+  document.getElementById('approveForm').hidden = true;
+  const result = document.getElementById('approveResult');
+  result.hidden = false;
+  result.innerHTML = `
+    <p style="margin-bottom: 12px;">${E(data.message)}</p>
+    ${credentialsBox(data.data.credentials)}
+    <div style="display:flex; gap:8px; margin-top: 16px;"><button class="btn btn-secondary" onclick="closeModal('approveModal')">Done</button></div>`;
+  openModal('approveModal');
 }

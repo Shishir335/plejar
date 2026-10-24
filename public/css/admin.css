@@ -828,3 +828,8 @@ select.form-select[hidden], [hidden] { display: none !important; }
 @media (max-width: 900px) {
   .kv-row { grid-template-columns: 1fr; gap: 2px; }
 }
+
+.cred-box { border: 1px solid var(--admin-border); border-radius: 12px; padding: 14px; background: var(--surface-subtle); }
+.cred-pass { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; user-select: all; }
+#credDraft { font-size: 0.82rem; line-height: 1.45; }
+#approveModal .modal-card { max-width: 560px; }
