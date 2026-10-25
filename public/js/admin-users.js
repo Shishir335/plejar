@@ -68,7 +68,7 @@ function standingBadges(u) {
   else if (u.accountStatus === 'invited') b.push('<span class="badge badge-manager">Invited</span>');
   else b.push('<span class="badge badge-active">Active</span>');
   const r = u.restrictions || {};
-  if (r.booking || r.reviews || r.messaging) b.push('<span class="badge badge-manager">Restricted</span>');
+  if (r.booking || r.reviews || r.messaging || r.posting) b.push('<span class="badge badge-manager">Restricted</span>');
   const v = (u.verification || {}).status;
   if (v === 'approved') b.push('<span class="badge badge-active">ID verified</span>');
   else if (v === 'pending') b.push('<span class="badge badge-manager">ID pending</span>');
@@ -150,6 +150,7 @@ async function loadUserSummary() {
     };
     setBadge('subVerifyCount', s.pendingVerification);
     setBadge('subComplaintCount', s.openComplaints);
+    if (typeof loadSocialSummary === 'function') loadSocialSummary();
     setBadge('usersAttentionCount', s.pendingVerification + s.openComplaints);
   } catch (e) { /* badges are informational */ }
 }
@@ -550,7 +551,7 @@ async function renderUserTab(tab) {
 function overviewPanel() {
   const { user: u, counts } = U.detail;
   const r = u.restrictions;
-  const restricted = [r.booking && 'booking', r.reviews && 'reviews', r.messaging && 'messaging'].filter(Boolean);
+  const restricted = [r.booking && 'booking', r.reviews && 'reviews', r.messaging && 'messaging', r.posting && 'posting and commenting'].filter(Boolean);
   return `
     <div class="kpi-grid" style="margin-bottom: 18px;">
       <div class="kpi"><div class="kpi-label">Bookings</div><div class="kpi-value">${counts.bookings}</div><div class="kpi-note">${takaFmt(counts.spent)} paid</div></div>
@@ -759,6 +760,7 @@ function openRestrictModal() {
   document.getElementById('rsBooking').checked = r.booking;
   document.getElementById('rsReviews').checked = r.reviews;
   document.getElementById('rsMessaging').checked = r.messaging;
+  document.getElementById('rsPosting').checked = r.posting;
   document.getElementById('rsReason').value = r.reason || '';
   document.getElementById('rsUntil').value = r.until ? String(r.until).slice(0, 10) : '';
   document.getElementById('rsUntil').min = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -770,7 +772,7 @@ async function submitRestrictions(e) {
   e.preventDefault();
   const body = {
     booking: document.getElementById('rsBooking').checked, reviews: document.getElementById('rsReviews').checked,
-    messaging: document.getElementById('rsMessaging').checked, reason: val('rsReason').trim()
+    messaging: document.getElementById('rsMessaging').checked, posting: document.getElementById('rsPosting').checked, reason: val('rsReason').trim()
   };
   if ((body.booking || body.reviews || body.messaging) && body.reason.length < 3) return formError('restrictError', 'Add a reason for the restriction.');
   if (val('rsUntil')) body.until = new Date(`${val('rsUntil')}T23:59:59`).toISOString();

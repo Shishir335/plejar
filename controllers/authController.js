@@ -276,6 +276,24 @@ exports.protect = catchAsync(async (req, res, next) => {
     next();
 });
 
+// Like protect, but lets visitors through: req.user is set only when a valid sign-in is present.
+// Used by app screens anyone can browse (e.g. the agencies list) that show more when signed in.
+exports.optionalAuth = async (req, res, next) => {
+    try {
+        let token;
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) token = req.headers.authorization.split(' ')[1];
+        else if (req.cookies && req.cookies.jwt && req.cookies.jwt !== 'loggedout') token = req.cookies.jwt;
+        if (!token) return next();
+        const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.id);
+        if (!user || (user.changedPasswordAfter && user.changedPasswordAfter(decoded.iat)) || (await blockedReason(user))) return next();
+        req.user = user;
+    } catch (err) {
+        // A bad or expired token just means "not signed in" here
+    }
+    next();
+};
+
 exports.restrictTo = (...roles) => Object.assign((req, res, next) => {
     if (req.user && isAdminEmail(req.user.email)) {
         req.user.role = 'admin';

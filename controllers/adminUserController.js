@@ -64,6 +64,7 @@ const userView = u => {
       booking: effective(r.booking, r.until),
       reviews: effective(r.reviews, r.until),
       messaging: effective(r.messaging, r.until),
+      posting: effective(r.posting, r.until),
       reason: r.reason || '',
       until: r.until || null
     },
@@ -109,7 +110,7 @@ exports.summary = catchAsync(async (req, res, next) => {
     User.countDocuments({ ...live, status: 'deactivated' }),
     User.countDocuments(DELETED),
     User.countDocuments({ ...live, 'verification.status': 'pending' }),
-    User.countDocuments({ ...live, $or: [{ 'restrictions.booking': true }, { 'restrictions.reviews': true }, { 'restrictions.messaging': true }] }),
+    User.countDocuments({ ...live, $or: [{ 'restrictions.booking': true }, { 'restrictions.reviews': true }, { 'restrictions.messaging': true }, { 'restrictions.posting': true }] }),
     Complaint.countDocuments({ status: { $in: ['open', 'in_review'] } })
   ]);
 
@@ -136,7 +137,7 @@ exports.listUsers = catchAsync(async (req, res, next) => {
   else if (['pending', 'approved', 'rejected'].includes(q.verification)) and.push({ 'verification.status': q.verification });
 
   if (q.restricted === 'true') {
-    and.push({ $or: [{ 'restrictions.booking': true }, { 'restrictions.reviews': true }, { 'restrictions.messaging': true }] });
+    and.push({ $or: [{ 'restrictions.booking': true }, { 'restrictions.reviews': true }, { 'restrictions.messaging': true }, { 'restrictions.posting': true }] });
   }
 
   if (q.deleted === 'only') and.push(DELETED);
@@ -268,7 +269,8 @@ exports.setRestrictions = catchAsync(async (req, res, next) => {
   const flags = {
     booking: req.body.booking === true || req.body.booking === 'true',
     reviews: req.body.reviews === true || req.body.reviews === 'true',
-    messaging: req.body.messaging === true || req.body.messaging === 'true'
+    messaging: req.body.messaging === true || req.body.messaging === 'true',
+    posting: req.body.posting === true || req.body.posting === 'true'
   };
   const any = Object.values(flags).some(Boolean);
   const reason = String(req.body.reason || '').trim().slice(0, 500);

@@ -58,6 +58,7 @@ const userSchema = new mongoose.Schema({
         booking: { type: Boolean, default: false },
         reviews: { type: Boolean, default: false },
         messaging: { type: Boolean, default: false },
+        posting: { type: Boolean, default: false },
         reason: { type: String, trim: true, maxlength: 500, default: '' },
         until: Date,
         setBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
@@ -107,6 +108,29 @@ const userSchema = new mongoose.Schema({
     phone: {
         type: String,
         default: ''
+    },
+
+    // Public profile in the app
+    bio: { type: String, trim: true, maxlength: [300, 'Keep your bio under 300 characters'], default: '' },
+    coverPhoto: { type: String, default: '' },
+    hometown: { type: String, trim: true, maxlength: [80, 'Hometown is too long'], default: '' },
+
+    // App settings (Settings tab)
+    settings: {
+        privacy: {
+            defaultAudience: { type: String, enum: ['public', 'followers', 'private'], default: 'public' },
+            whoCanComment: { type: String, enum: ['everyone', 'followers', 'nobody'], default: 'everyone' },
+            showTrips: { type: Boolean, default: true }
+        },
+        notifications: {
+            reactions: { type: Boolean, default: true },
+            comments: { type: Boolean, default: true },
+            replies: { type: Boolean, default: true },
+            shares: { type: Boolean, default: true },
+            follows: { type: Boolean, default: true },
+            tours: { type: Boolean, default: true }
+        },
+        language: { type: String, enum: ['en', 'bn'], default: 'en' }
     },
     address: {
         type: String,

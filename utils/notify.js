@@ -18,11 +18,15 @@ const audienceUsers = (agencyId, audience, eventId) => {
   return Booking.distinct('user', match);
 };
 
-// Create one notification per traveler
+// Create one notification per traveler (skipping anyone who switched off tour updates in Settings)
 const notifyUsers = async (userIds, fields) => {
   if (!userIds.length) return 0;
-  await Notification.insertMany(userIds.map(user => ({ ...fields, user })), { ordered: false });
-  return userIds.length;
+  const User = require('../models/userModel'); // eslint-disable-line global-require
+  const optedOut = new Set((await User.find({ _id: { $in: userIds }, 'settings.notifications.tours': false }).select('_id').lean()).map(u => String(u._id)));
+  const recipients = userIds.filter(id => !optedOut.has(String(id)));
+  if (!recipients.length) return 0;
+  await Notification.insertMany(recipients.map(user => ({ ...fields, user })), { ordered: false });
+  return recipients.length;
 };
 
 const broadcastsLeft = async agencyId => {

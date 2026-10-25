@@ -172,6 +172,7 @@
             <button type="button" role="tab" class="subtab" data-sub="verification" aria-selected="false">Verification <span class="mini-count" id="subVerifyCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-sub="complaints" aria-selected="false">Complaints &amp; reports <span class="mini-count" id="subComplaintCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-sub="reviews" aria-selected="false">Reviews</button>
+            <button type="button" role="tab" class="subtab" data-sub="social" aria-selected="false">Posts &amp; reports <span class="mini-count" id="subSocialCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-sub="logins" aria-selected="false">Login history</button>
             <button type="button" role="tab" class="subtab" data-sub="activity" aria-selected="false">Activity</button>
           </div>
@@ -318,6 +319,37 @@
               </table>
             </div>
             <div class="pager" id="reviewsPager"></div>
+          </div>
+
+          <!-- Posts and reports from the traveler app -->
+          <div class="subpane" id="sub-social">
+            <div class="control-bar">
+              <div class="filters">
+                <select id="sView" class="form-select" aria-label="Show" onchange="loadSocial(1)">
+                  <option value="reports">Open reports</option>
+                  <option value="closed">Closed reports</option>
+                  <option value="reported">Reported posts</option>
+                  <option value="posts">All posts</option>
+                  <option value="hidden">Hidden posts</option>
+                </select>
+                <select id="sTarget" class="form-select" aria-label="Reported item" onchange="loadSocial(1)">
+                  <option value="">Posts, comments and people</option>
+                  <option value="post">Posts</option>
+                  <option value="comment">Comments</option>
+                  <option value="user">People</option>
+                </select>
+                <div class="search-input-wrapper" id="sSearchWrap" hidden><span class="search-icon">🔍</span><input type="text" id="sSearch" class="search-input" placeholder="Search post text" aria-label="Search posts" oninput="debouncedSocial()"></div>
+              </div>
+              <button class="btn btn-secondary" onclick="loadSocial()">↻ Refresh</button>
+            </div>
+            <p class="lead-sub" id="socialSummary" style="margin: 0 0 12px;"></p>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead id="socialTableHead"></thead>
+                <tbody id="socialTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="socialPager"></div>
           </div>
 
           <!-- Login history -->
@@ -981,6 +1013,7 @@
           <label class="check"><input type="checkbox" id="rsBooking"> Book trips</label>
           <label class="check"><input type="checkbox" id="rsReviews"> Write reviews</label>
           <label class="check"><input type="checkbox" id="rsMessaging"> Send messages</label>
+          <label class="check"><input type="checkbox" id="rsPosting"> Post, comment and share in the app</label>
         </div>
         <div class="form-group" style="margin-top: 14px;">
           <label class="form-label" for="rsReason">Reason</label>
@@ -1249,6 +1282,7 @@
 
   <script src="/js/admin.js"></script>
   <script src="/js/admin-users.js"></script>
+  <script src="/js/admin-social.js"></script>
   <script src="/js/admin-vendors.js"></script>
   <script src="/js/admin-vendor-profile.js"></script>
   <script src="/js/admin-applications.js"></script>

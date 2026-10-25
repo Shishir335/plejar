@@ -21,7 +21,9 @@ destinationCategories.get('/', places.listCategories);
 const notifications = express.Router();
 notifications.use(authController.protect);
 notifications.get('/', traveler.myNotifications);
+notifications.get('/unread-count', traveler.unreadCount);
 notifications.patch('/read-all', traveler.markAllRead);
 notifications.patch('/:id/read', traveler.markRead);
+notifications.delete('/:id', traveler.deleteNotification);
 
 module.exports = { events, announcements, notifications, destinations, destinationCategories };

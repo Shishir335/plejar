@@ -7,6 +7,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { escapeRegex, pageParams, paged, validId } = require('../utils/query');
 const { registrationStats, withStats, registrationClosedReason } = require('../utils/events');
+const { userCard, snippet } = require('../utils/social');
 
 // Endpoints the mobile app uses: browsing tour events and announcements, and a traveler's notifications
 
@@ -129,19 +130,48 @@ exports.listAnnouncements = catchAsync(async (req, res, next) => {
 
 // ---------- The signed-in traveler's notifications ----------
 
+// Notifications tab: newest first, with who did it and a peek at the post it's about
+const NOTE_GROUPS = {
+  social: ['post_reaction', 'post_comment', 'comment_reply', 'comment_reaction', 'post_share', 'new_follower'],
+  tours: ['vendor_message', 'announcement', 'event_cancelled', 'event_changed'],
+  plezar: ['post_hidden']
+};
+
 exports.myNotifications = catchAsync(async (req, res) => {
   const filter = { user: req.user._id };
   if (req.query.unread === 'true') filter.readAt = null;
+  if (NOTE_GROUPS[req.query.group]) filter.kind = { $in: NOTE_GROUPS[req.query.group] };
   const page = pageParams(req.query);
-  const [notifications, total, unread] = await Promise.all([
+  const [rows, total, unread] = await Promise.all([
     Notification.find(filter).sort({ createdAt: -1 }).skip(page.skip).limit(page.limit)
       .select('-user -broadcast')
       .populate('agency', 'name logo verified')
+      .populate('actor', 'name photo verification.status')
+      .populate('post', 'text media status')
+      .populate('event', 'title startDate')
       .lean(),
     Notification.countDocuments(filter),
     Notification.countDocuments({ user: req.user._id, readAt: null })
   ]);
+  const notifications = rows.map(n => ({
+    ...n,
+    group: Object.keys(NOTE_GROUPS).find(g => NOTE_GROUPS[g].includes(n.kind)) || 'other',
+    actor: n.actor ? userCard(n.actor) : null,
+    post: n.post && n.post.status === 'active' ? { _id: n.post._id, text: snippet(n.post.text, 100), thumbnail: (n.post.media || []).find(m => m.type === 'image') ? n.post.media.find(m => m.type === 'image').url : '' } : null
+  }));
   res.status(200).json({ status: 'success', data: { notifications, unread, ...paged(total, page) } });
+});
+
+// The number on the Notifications tab
+exports.unreadCount = catchAsync(async (req, res) => {
+  const unread = await Notification.countDocuments({ user: req.user._id, readAt: null });
+  res.status(200).json({ status: 'success', data: { unread } });
+});
+
+exports.deleteNotification = catchAsync(async (req, res, next) => {
+  const gone = validId(req.params.id) ? await Notification.findOneAndDelete({ _id: req.params.id, user: req.user._id }) : null;
+  if (!gone) return next(new AppError('No notification found with that ID.', 404));
+  res.status(204).json({ status: 'success', data: null });
 });
 
 exports.markRead = catchAsync(async (req, res, next) => {
