@@ -97,6 +97,13 @@ app.use('/api/v1/users/google-login', authLimiter);
 app.use('/api/v1/users/forgotPassword', authLimiter);
 app.use('/api/v1/users/resetPassword', authLimiter);
 app.use('/api/v1/users/acceptInvite', authLimiter);
+// Checking whether an email is free (30 / 15 minutes, so the list of members can't be harvested)
+app.use('/api/v1/users/check-email', rateLimit({
+    max: 30,
+    windowMs: 15 * 60 * 1000,
+    validate: { trustProxy: false },
+    message: { status: 'fail', message: 'Too many checks from this IP. Please try again after 15 minutes.' }
+}));
 
 // PUBLIC FORM RATE LIMITERS: membership applications (10 accepted / hour per IP to limit spam;
 // a form sent back with errors doesn't count), and status checks and replies

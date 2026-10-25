@@ -1,5 +1,4 @@
 const express = require('express');
-const multer = require('multer');
 const authController = require('../controllers/authController');
 const posts = require('../controllers/postController');
 const people = require('../controllers/peopleController');
@@ -7,18 +6,11 @@ const agencies = require('../controllers/agencyDirectoryController');
 const me = require('../controllers/meController');
 const appConfig = require('../controllers/appConfigController');
 const { postMediaUpload } = require('../utils/social');
-const AppError = require('../utils/appError');
+const { profileUpload } = require('../utils/userImages');
 
 // The traveler side of the mobile app
 
 const { protect, optionalAuth } = authController;
-
-// Profile photo and cover uploads for Settings
-const profileUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 2 },
-  fileFilter: (req, file, cb) => (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype) ? cb(null, true) : cb(new AppError('Use a JPG, PNG or WebP photo.', 400), false))
-}).fields([{ name: 'photo', maxCount: 1 }, { name: 'cover', maxCount: 1 }]);
 
 // App start-up and the Live tab (coming soon)
 const app = express.Router();

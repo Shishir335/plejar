@@ -8,6 +8,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please tell ur your name']
     },
+    // Travelers register with first and last name; name is kept as "first last" for the rest of the system
+    firstName: { type: String, trim: true, maxlength: [30, 'First name is too long'], default: '' },
+    lastName: { type: String, trim: true, maxlength: [30, 'Last name is too long'], default: '' },
+    dateOfBirth: Date,
     email: {
         type: String,
         required: [true, 'Please provide your email'],
@@ -177,6 +181,16 @@ const userSchema = new mongoose.Schema({
         select: false
     }
 });
+
+// Keep name as "first last" (on validate for new accounts, on save for updates that skip validation)
+function syncName(next) {
+    if ((this.isModified('firstName') || this.isModified('lastName')) && (this.firstName || this.lastName)) {
+        this.name = `${this.firstName || ''} ${this.lastName || ''}`.trim();
+    }
+    next();
+}
+userSchema.pre('validate', syncName);
+userSchema.pre('save', syncName);
 
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password') || !this.password) return next();

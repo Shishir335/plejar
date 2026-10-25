@@ -1,7 +1,4 @@
-const sharp = require('sharp');
 const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 const User = require('../models/userModel');
 const Post = require('../models/postModel');
 const SavedPost = require('../models/savedPostModel');
@@ -11,6 +8,8 @@ const Agency = require('../models/agencyModel');
 const Booking = require('../models/bookingModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { saveProfileImage, removeProfileImage } = require('../utils/userImages');
+const { readPersonName, readDateOfBirth } = require('../utils/registration');
 const { viewerContext, userCard, POPULATE, hydratePosts, pageSize, cursorFilter, nextCursor } = require('../utils/social');
 
 // The Settings tab: your profile, privacy and notification choices, saved posts, people you blocked
@@ -24,6 +23,9 @@ const profileView = async user => {
   ]);
   return {
     ...userCard(user),
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().slice(0, 10) : null,
     email: user.email,
     phone: user.phone,
     bio: user.bio,
@@ -40,22 +42,7 @@ exports.getProfile = catchAsync(async (req, res) => {
   res.status(200).json({ status: 'success', data: { profile: await profileView(req.user) } });
 });
 
-const USER_IMG_DIR = path.join(__dirname, '..', 'public', 'img', 'users');
-
-const saveProfileImage = async (file, userId, kind) => {
-  await fs.promises.mkdir(USER_IMG_DIR, { recursive: true });
-  const name = `${kind}-${userId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.jpg`;
-  const size = kind === 'cover' ? { width: 1500, height: 500 } : { width: 500, height: 500 };
-  await sharp(file.buffer).rotate().resize({ ...size, fit: 'cover' }).jpeg({ quality: 85 }).toFile(path.join(USER_IMG_DIR, name));
-  return name;
-};
-
-const removeProfileImage = async name => {
-  if (!name || name === 'profile.png' || name.includes('/') || name.includes('..')) return;
-  await fs.promises.unlink(path.join(USER_IMG_DIR, name)).catch(() => {});
-};
-
-// PATCH /me/profile (multipart: photo, cover) name, bio, hometown, phone
+// PATCH /me/profile (multipart: photo, cover) firstName, lastName, dateOfBirth, bio, hometown, phone (name still works)
 exports.updateProfile = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user._id);
   const b = req.body;
@@ -64,6 +51,9 @@ exports.updateProfile = catchAsync(async (req, res, next) => {
     if (name.length < 2 || name.length > 60) return next(new AppError('Your name should be 2 to 60 characters.', 400));
     user.name = name;
   }
+  if (b.firstName !== undefined) user.firstName = readPersonName(b.firstName, 'first name');
+  if (b.lastName !== undefined) user.lastName = readPersonName(b.lastName, 'last name');
+  if (b.dateOfBirth !== undefined) user.dateOfBirth = readDateOfBirth(b.dateOfBirth);
   if (b.bio !== undefined) user.bio = String(b.bio).trim().slice(0, 300);
   if (b.hometown !== undefined) user.hometown = String(b.hometown).trim().slice(0, 80);
   if (b.phone !== undefined) {

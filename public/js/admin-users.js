@@ -481,7 +481,7 @@ function renderUserDetail(tab = 'overview') {
         ${avatarOf(u.name, 56)}
         <div>
           <h2>${E(u.name)}</h2>
-          <p>${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}</p>
+          <p>${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}${u.dateOfBirth ? ` · Born ${E(fmtDate(u.dateOfBirth))}` : ''}</p>
           <p class="profile-badges"><span class="badge badge-${E(u.role)}">${E(u.role)}${u.agencyRole ? ` · ${E(u.agencyRole)}` : ''}</span> ${standingBadges(u)}</p>
         </div>
       </div>
