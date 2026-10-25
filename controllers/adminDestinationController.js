@@ -11,6 +11,8 @@ const {
   uniqueSlug, slugify, placeUnder, refreshDescendants, rollupStats, statsOf, trendingScore, popularityScore, pathNames, toMonths, toLocation
 } = require('../utils/destinations');
 
+const { ensureCountry, ensureDivision, ensureDistrict, geographyWithExisting, findDivision, findDistrict } = require('../utils/geography');
+
 const MAX_PHOTOS = 20;
 
 const findDestination = async (id, next) => {
@@ -41,14 +43,15 @@ const listView = (d, stats, pathOf) => {
 // ---------- Overview ----------
 
 exports.summary = catchAsync(async (req, res) => {
-  const [byType, byStatus, featured, noLocation, noCover, limited, categories] = await Promise.all([
+  const [byType, byStatus, featured, noLocation, noCover, limited, categories, vendorPending] = await Promise.all([
     Destination.aggregate([{ $group: { _id: '$type', count: { $sum: 1 } } }]),
     Destination.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
     Destination.countDocuments({ featured: true, status: 'published' }),
     Destination.countDocuments({ 'location.coordinates.1': { $exists: false } }),
     Destination.countDocuments({ coverImage: '' }),
     Destination.countDocuments({ 'availability.status': { $in: ['seasonal', 'restricted', 'closed'] } }),
-    DestinationCategory.countDocuments()
+    DestinationCategory.countDocuments(),
+    Destination.countDocuments({ source: 'vendor', status: 'draft' })
   ]);
   const count = (rows, key) => (rows.find(r => r._id === key) || { count: 0 }).count;
   res.status(200).json({
@@ -67,7 +70,8 @@ exports.summary = catchAsync(async (req, res) => {
         noLocation,
         noCover,
         limited,
-        categories
+        categories,
+        vendorPending
       }
     }
   });
@@ -86,6 +90,7 @@ exports.listDestinations = catchAsync(async (req, res) => {
   if (validId(q.within)) filter.ancestors = toId(q.within);
   if (q.parent === 'none') filter.parent = null;
   else if (validId(q.parent)) filter.parent = toId(q.parent);
+  if (['admin', 'vendor'].includes(q.source)) filter.source = q.source;
   if (q.missing === 'location') filter['location.coordinates.1'] = { $exists: false };
   if (q.missing === 'cover') filter.coverImage = '';
   if (q.missing === 'seo') filter.$or = [{ 'seo.title': '' }, { 'seo.description': '' }];
@@ -102,14 +107,14 @@ exports.listDestinations = catchAsync(async (req, res) => {
   let stats;
   if (statSorts.includes(q.sort)) {
     // Sorting by numbers: work them out for every match, then page
-    [rows, stats] = await Promise.all([Destination.find(filter).populate('categories', 'name').lean(), rollupStats()]);
+    [rows, stats] = await Promise.all([Destination.find(filter).populate('categories', 'name').populate('addedByAgency', 'name').lean(), rollupStats()]);
     total = rows.length;
     const key = { popular: x => popularityScore(x, statsOf(stats, x._id)), trending: x => trendingScore(x, statsOf(stats, x._id)), travelers: x => statsOf(stats, x._id).travelers }[q.sort];
     rows = rows.sort((a, b) => key(b) - key(a)).slice(page.skip, page.skip + page.limit);
   } else {
     const sort = { name: { name: 1 }, updated: { updatedAt: -1 }, views: { views: -1 }, created: { createdAt: -1 } }[q.sort] || { level: 1, name: 1 };
     [rows, total, stats] = await Promise.all([
-      Destination.find(filter).sort(sort).skip(page.skip).limit(page.limit).populate('categories', 'name').lean(),
+      Destination.find(filter).sort(sort).skip(page.skip).limit(page.limit).populate('categories', 'name').populate('addedByAgency', 'name').lean(),
       Destination.countDocuments(filter),
       rollupStats()
     ]);
@@ -158,7 +163,7 @@ const monthlySeries = async ids => {
 };
 
 const detailPayload = async dest => {
-  await dest.populate('categories', 'name active');
+  await dest.populate([{ path: 'categories', select: 'name active' }, { path: 'addedByAgency', select: 'name' }]);
   const subtree = [dest._id, ...(await Destination.find({ ancestors: dest._id }).select('_id').lean()).map(d => d._id)];
   const [stats, pathOf, children, events, series] = await Promise.all([
     rollupStats(),
@@ -252,12 +257,78 @@ const applyFields = async (dest, body, isNew) => {
   if (dest.status === 'published' && !dest.name) throw new AppError('Enter the name.', 400);
 };
 
+// The built-in divisions and districts, for the "where is it?" pickers
+exports.geography = catchAsync(async (req, res) => {
+  res.status(200).json({ status: 'success', data: await geographyWithExisting() });
+});
+
+/**
+ * Work out where a new place goes from the division and district the admin picked
+ * (creating the country, division or district on the way if they don't exist yet).
+ * Returns { parent, geoCode, defaults, createdNames } or { duplicate } when the place already exists.
+ */
+const placeFromGeography = async (type, picked, userId) => {
+  const opts = { userId };
+  if (type === 'country') return {};
+  if (type === 'region') {
+    const division = findDivision(picked.division);
+    if (!division) throw new AppError('Choose the division.', 400);
+    const existing = await Destination.findOne({ geoCode: division.code }).select('name');
+    if (existing) return { duplicate: existing };
+    const country = await ensureCountry(opts);
+    return { parent: country.node._id, geoCode: division.code, defaults: division, createdNames: country.created ? [country.node.name] : [] };
+  }
+  if (type === 'city') {
+    if (!findDivision(picked.division)) throw new AppError('Choose the division.', 400);
+    if (picked.district) {
+      const found = findDistrict(picked.district);
+      if (!found || found.division.code !== picked.division) throw new AppError('Choose a district in that division.', 400);
+      const existing = await Destination.findOne({ geoCode: found.district.code }).select('name');
+      if (existing) return { duplicate: existing };
+      const division = await ensureDivision(found.division.code, opts);
+      return { parent: division.node._id, geoCode: found.district.code, defaults: found.district, createdNames: division.createdNames };
+    }
+    const division = await ensureDivision(picked.division, opts);
+    return { parent: division.node._id, createdNames: division.createdNames };
+  }
+  // An attraction sits inside a district
+  const found = picked.district && findDistrict(picked.district);
+  if (!found || found.division.code !== picked.division) throw new AppError('Choose the division and then the district this place is in.', 400);
+  const district = await ensureDistrict(found.district.code, opts);
+  return { parent: district.node._id, createdNames: district.createdNames };
+};
+
 exports.createDestination = catchAsync(async (req, res) => {
+  const body = { ...req.body };
+  let placed = {};
+  // Bangladesh places come with a division and district; other countries pick a parent directly
+  if (body.geo && (body.geo.division || body.geo.district)) {
+    placed = await placeFromGeography(body.type, body.geo, req.user._id);
+    if (placed.duplicate) {
+      return res.status(409).json({
+        status: 'fail',
+        message: `${placed.duplicate.name} already exists. Open it instead of adding it again.`,
+        data: { existing: { _id: placed.duplicate._id, name: placed.duplicate.name } }
+      });
+    }
+    if (placed.parent) body.parent = placed.parent;
+    const d = placed.defaults;
+    if (d) {
+      if (!String(body.name || '').trim()) body.name = d.name;
+      if (!String(body.nameBn || '').trim()) body.nameBn = d.nameBn;
+      if ((body.lat === undefined || body.lat === '') && (body.lng === undefined || body.lng === '')) {
+        body.lat = d.lat;
+        body.lng = d.lng;
+      }
+    }
+  }
+
   const dest = new Destination({ createdBy: req.user._id, updatedBy: req.user._id });
-  await applyFields(dest, req.body, true);
+  await applyFields(dest, body, true);
+  if (placed.geoCode) dest.geoCode = placed.geoCode;
   await dest.save();
-  await logActivity(req, { action: 'destination.created', summary: `Added ${dest.type} "${dest.name}" (${dest.status})` });
-  res.status(201).json({ status: 'success', data: await detailPayload(dest) });
+  await logActivity(req, { action: 'destination.created', summary: `Added ${dest.type} "${dest.name}" (${dest.status})${placed.createdNames && placed.createdNames.length ? `; also added ${placed.createdNames.join(', ')}` : ''}` });
+  res.status(201).json({ status: 'success', data: { ...(await detailPayload(dest)), alsoCreated: placed.createdNames || [] } });
 });
 
 exports.updateDestination = catchAsync(async (req, res, next) => {

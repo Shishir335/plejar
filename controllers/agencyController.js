@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const Agency = require('../models/agencyModel');
 const Package = require('../models/packageModel');
 const User = require('../models/userModel');
@@ -14,8 +13,10 @@ const { earningsFor, monthlyEarnings } = require('../utils/earnings');
 const { getDefaultRate, isCustom } = require('../utils/commission');
 const { HOLDS_SEAT, scheduleFrom, registrationStats, withStats } = require('../utils/events');
 const { notifyUsers } = require('../utils/notify');
+const { applyPlan, planProblems, describeMissing } = require('../utils/tourPlan');
 const Announcement = require('../models/announcementModel');
 const Destination = require('../models/destinationModel');
+const { usableDestination } = require('./vendorDestinationController');
 const {
   saveAgencyImage,
   removeAgencyImage,
@@ -156,13 +157,16 @@ const applyPackageStatus = (pkg, status, next) => {
   return true;
 };
 
-// Link an event to a published destination (or clear the link with an empty value)
+// Link an event to a shared destination (or clear the link with an empty value).
+// Returns { id, label } where label is the text shown on the event, e.g. "Sajek Valley, Rangamati".
 const readDestination = async value => {
   if (value === undefined) return undefined;
   if (!value) return null;
-  const dest = mongoose.isValidObjectId(value) ? await Destination.findOne({ _id: value, status: 'published' }).select('_id') : null;
-  if (!dest) throw new AppError('Choose a destination from the list.', 400);
-  return dest._id;
+  const dest = await usableDestination(value);
+  if (!dest) throw new AppError('Choose a destination from the list, or add a new one.', 400);
+  const parent = dest.parent ? await Destination.findById(dest.parent).select('name type').lean() : null;
+  const label = parent && parent.type !== 'country' ? `${dest.name}, ${parent.name}` : dest.name;
+  return { id: dest._id, label: label.slice(0, 120) };
 };
 
 const readSeats = (value, next) => {
@@ -172,6 +176,21 @@ const readSeats = (value, next) => {
     return null;
   }
   return seats;
+};
+
+// Published events must carry the full tour plan; drafts can be saved half-done
+const publishBlocked = (pkg, next) => {
+  if (pkg.status !== 'published') return false;
+  const missing = planProblems(pkg);
+  if (!missing.length) return false;
+  next(new AppError(`Finish the tour plan before publishing. Still missing: ${describeMissing(missing)}. You can save it as a draft meanwhile.`, 400));
+  return true;
+};
+
+// An event with its registration numbers and what its plan still lacks
+const eventView = (pkg, stats) => {
+  const missing = planProblems(pkg);
+  return { ...withStats(pkg, stats), planComplete: !missing.length, planMissing: missing };
 };
 
 // Upcoming events first (soonest at the top), then past and undated ones, newest first
@@ -184,20 +203,10 @@ const eventOrder = (a, b) => {
   return new Date(b.startDate || b.updatedAt) - new Date(a.startDate || a.updatedAt);
 };
 
-// Published destinations a vendor can link events to
-exports.listDestinationOptions = catchAsync(async (req, res, next) => {
-  const rows = await Destination.find({ status: 'published' }).sort({ name: 1 }).select('name type ancestors').lean();
-  const names = new Map(rows.map(r => [String(r._id), r.name]));
-  res.status(200).json({
-    status: 'success',
-    data: { destinations: rows.map(r => ({ _id: r._id, name: r.name, type: r.type, path: (r.ancestors || []).map(a => names.get(String(a))).filter(Boolean) })) }
-  });
-});
-
 exports.listMyPackages = catchAsync(async (req, res, next) => {
-  const packages = await Package.find({ agency: req.agency._id }).populate('destinationRef', 'name slug');
+  const packages = await Package.find({ agency: req.agency._id }).populate('destinationRef', 'name slug status');
   const stats = await registrationStats(packages.map(p => p._id));
-  const events = packages.map(p => withStats(p, stats)).sort(eventOrder);
+  const events = packages.map(p => eventView(p, stats)).sort(eventOrder);
   res.status(200).json({ status: 'success', results: events.length, data: { packages: events } });
 });
 
@@ -214,9 +223,14 @@ exports.createMyPackage = catchAsync(async (req, res, next) => {
     createdBy: req.user._id
   });
   if (pkg.startDate <= new Date()) return next(new AppError('Choose a start date in the future.', 400));
-  const destinationRef = await readDestination(req.body.destinationRef);
-  if (destinationRef) pkg.destinationRef = destinationRef;
+  const linked = await readDestination(req.body.destinationRef);
+  if (linked) {
+    pkg.destinationRef = linked.id;
+    pkg.destination = linked.label;
+  }
+  await applyPlan(pkg, req.body.plan);
   if (!applyPackageStatus(pkg, req.body.status, next)) return;
+  if (publishBlocked(pkg, next)) return;
 
   await pkg.validate();
   const files = (req.files || []).slice(0, 6);
@@ -224,7 +238,7 @@ exports.createMyPackage = catchAsync(async (req, res, next) => {
   await pkg.save();
   await logActivity(req, { action: 'package.created', summary: `Created tour event "${pkg.title}" (${pkg.status})`, agency: req.agency._id });
 
-  res.status(201).json({ status: 'success', data: { package: withStats(pkg, {}) } });
+  res.status(201).json({ status: 'success', data: { package: eventView(pkg, {}) } });
 });
 
 exports.updateMyPackage = catchAsync(async (req, res, next) => {
@@ -237,9 +251,12 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
 
   Object.assign(pkg, pick(req.body, PACKAGE_FIELDS));
   if (req.body.included !== undefined) pkg.included = toList(req.body.included, 30, /\n/);
-  const destinationRef = await readDestination(req.body.destinationRef);
-  const destinationChanged = destinationRef !== undefined && String(destinationRef || '') !== String(pkg.destinationRef || '');
-  if (destinationRef !== undefined) pkg.destinationRef = destinationRef;
+  const linked = await readDestination(req.body.destinationRef);
+  const destinationChanged = linked !== undefined && String(linked ? linked.id : '') !== String(pkg.destinationRef || '');
+  if (linked !== undefined) {
+    pkg.destinationRef = linked ? linked.id : null;
+    if (linked) pkg.destination = linked.label;
+  }
   if (['startDate', 'endDate', 'registrationDeadline', 'durationNights'].some(f => req.body[f] !== undefined)) {
     Object.assign(pkg, scheduleFrom(req.body, pkg));
   }
@@ -251,7 +268,9 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
     }
     pkg.seats = seats;
   }
+  await applyPlan(pkg, req.body.plan);
   if (!applyPackageStatus(pkg, req.body.status, next)) return;
+  if (publishBlocked(pkg, next)) return;
 
   // Remove photos the agent deleted, then add new uploads (max 6 in total)
   const removePhotos = toList(req.body.removePhotos, 6);
@@ -288,7 +307,7 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
   await logActivity(req, { action: 'package.updated', summary: `Edited tour event "${pkg.title}" (${pkg.status})${moved ? `; ${moved} registered travelers told about the new date` : ''}`, agency: req.agency._id });
 
   const fresh = await registrationStats([pkg._id]);
-  res.status(200).json({ status: 'success', data: { package: withStats(pkg, fresh), notified: moved } });
+  res.status(200).json({ status: 'success', data: { package: eventView(pkg, fresh), notified: moved } });
 });
 
 // Cancel an event: every open registration is cancelled and the travelers are told why
@@ -386,6 +405,7 @@ const teamView = u => ({
   accountStatus: u.accountStatus,
   mustChangePassword: Boolean(u.mustChangePassword),
   lastLoginAt: u.lastLoginAt,
+  credentialsSentAt: u.credentialsSentAt,
   createdAt: u.createdAt
 });
 exports.teamView = teamView;
@@ -623,3 +643,7 @@ exports.requestPayout = catchAsync(async (req, res, next) => {
   await logActivity(req, { action: 'payout.requested', summary: `Requested a payout of ৳${amount} via ${payout.method}`, agency: req.agency._id });
   res.status(201).json({ status: 'success', message: 'Payout requested. Plezar will send it and update the status.', data: { payout } });
 });
+
+// Labels for the endpoint list in the admin panel (utils/routeCatalog.js)
+exports.requireAgent.access = 'vendor';
+exports.requireOwner.access = 'vendor-owner';

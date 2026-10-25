@@ -121,17 +121,19 @@ async function loadDestinationSummary() {
     const chips = [
       ['all', 'All places', s.total], ['country', 'Countries', s.countries], ['region', 'Regions', s.regions], ['city', 'Cities', s.cities],
       ['attraction', 'Attractions', s.attractions], ['draft', 'Drafts', s.draft], ['featured', 'Featured', s.featured],
-      ['location', 'No map location', s.noLocation], ['cover', 'No cover photo', s.noCover], ['limited', 'Seasonal or closed', s.limited]
+      ['location', 'No map location', s.noLocation], ['cover', 'No cover photo', s.noCover], ['limited', 'Seasonal or closed', s.limited],
+      ['vendor', 'Added by vendors, to review', s.vendorPending]
     ];
     const box = document.getElementById('destinationChips');
     if (box) box.innerHTML = chips.map(([key, text, count]) => `<button type="button" class="chip" onclick="applyDestinationChip('${key}')"><strong>${count}</strong> ${E(text)}</button>`).join('');
     const badge = document.getElementById('destinationsAttentionCount');
-    if (badge) { badge.textContent = s.draft; badge.hidden = !s.draft; badge.title = `${s.draft} draft destination${s.draft === 1 ? '' : 's'}`; }
+    if (badge) { badge.textContent = s.vendorPending; badge.hidden = !s.vendorPending; badge.title = `${s.vendorPending} place${s.vendorPending === 1 ? '' : 's'} added by vendors to review`; }
   } catch (e) { /* chips are informational */ }
 }
 
 function applyDestinationChip(key) {
-  ['dSearch', 'dTypeF', 'dWithinF', 'dStatusF', 'dCategoryF', 'dAvailF', 'dMissingF'].forEach(id => { document.getElementById(id).value = ''; });
+  ['dSearch', 'dTypeF', 'dWithinF', 'dStatusF', 'dCategoryF', 'dAvailF', 'dMissingF', 'dSourceF'].forEach(id => { document.getElementById(id).value = ''; });
+  if (key === 'vendor') { document.getElementById('dSourceF').value = 'vendor'; document.getElementById('dStatusF').value = 'draft'; }
   if (['country', 'region', 'city', 'attraction'].includes(key)) document.getElementById('dTypeF').value = key;
   if (key === 'draft') document.getElementById('dStatusF').value = 'draft';
   if (key === 'location' || key === 'cover') document.getElementById('dMissingF').value = key;
@@ -148,7 +150,7 @@ async function loadDestinations(page = D.page) {
   ensureDestinationOptions();
   tableMessage('destinationsTableBody', 8, 'Loading destinations...');
   const params = new URLSearchParams({ page, limit: 25 });
-  [['search', 'dSearch'], ['type', 'dTypeF'], ['within', 'dWithinF'], ['status', 'dStatusF'], ['category', 'dCategoryF'], ['availability', 'dAvailF'], ['missing', 'dMissingF'], ['sort', 'dSortF']]
+  [['search', 'dSearch'], ['type', 'dTypeF'], ['within', 'dWithinF'], ['status', 'dStatusF'], ['category', 'dCategoryF'], ['availability', 'dAvailF'], ['missing', 'dMissingF'], ['source', 'dSourceF'], ['sort', 'dSortF']]
     .forEach(([k, id]) => { const v = val(id).trim(); if (v) params.set(k, v); });
   const { ok, data } = await adminFetch(`/api/v1/admin/destinations?${params}`);
   if (!ok) return tableMessage('destinationsTableBody', 8, data.message || 'Could not load destinations.', 'var(--color-danger)');
@@ -165,7 +167,8 @@ async function loadDestinations(page = D.page) {
         <td><div class="dest-cell">
           ${d.coverImage ? `<img class="dest-thumb" src="${E(d.coverImage)}" alt="" loading="lazy">` : '<span class="dest-thumb dest-thumb-empty">No photo</span>'}
           <div><span class="lead-main">${E(d.name)}${d.featured ? ' <span class="tag">Featured</span>' : ''}${d.trendingPinned ? ' <span class="tag">Trending</span>' : ''}</span>
-          <span class="lead-sub">${E(pathText(d)) || 'Top level'}${d.nameBn ? ` · <span lang="bn">${E(d.nameBn)}</span>` : ''}</span></div>
+          <span class="lead-sub">${E(pathText(d)) || 'Top level'}${d.nameBn ? ` · <span lang="bn">${E(d.nameBn)}</span>` : ''}</span>
+          ${d.source === 'vendor' ? `<span class="lead-sub vendor-added">Added by ${E(d.addedByAgency ? d.addedByAgency.name : 'a vendor')}${d.status === 'draft' ? ', waiting for review' : ''}</span>` : ''}</div>
         </div></td>
         <td>${E(DEST_TYPES[d.type])}${d.childCount ? `<span class="lead-sub">${n(d.childCount)} inside</span>` : ''}</td>
         <td><span class="lead-sub" style="margin:0">${d.hasLocation ? '📍 On the map' : '<span style="color:var(--color-danger)">No location</span>'}</span><span class="lead-sub">${d.photoCount} photo${d.photoCount === 1 ? '' : 's'}</span></td>
@@ -424,30 +427,222 @@ async function openNewDestination(parentId) {
   D.creating = true;
   D.detail = null;
   switchTab('destinationDetail');
-  await ensureDestinationOptions();
+  const box = document.getElementById('destinationDetail');
+  box.innerHTML = '<p style="color: var(--text-dim); padding: 24px;">Loading...</p>';
+  const [{ ok, data }] = await Promise.all([adminFetch('/api/v1/admin/destinations/geography'), ensureDestinationOptions(true)]);
+  D.geo = ok ? data.data : { divisions: [] };
+  D.autoFilled = {};
+
+  // Started from "+ Add a place inside": work out the type, division and district from the parent
   const parent = parentId ? D.options.find(o => o._id === parentId) : null;
-  const suggested = parent ? { country: 'region', region: 'city', city: 'attraction' }[parent.type] || 'attraction' : (D.options.some(o => o.type === 'country') ? 'attraction' : 'country');
-  document.getElementById('destinationDetail').innerHTML = `
+  let type = 'attraction';
+  let division = '';
+  let district = '';
+  let other = false;
+  if (parent) {
+    type = { country: 'region', region: 'city', city: 'attraction' }[parent.type] || 'attraction';
+    const hit = geoCodeOf(parent._id);
+    if (hit && hit.division) { division = hit.division.code; district = hit.district ? hit.district.code : ''; }
+    else if (parent.type !== 'country' || !hit) other = true;
+  }
+
+  box.innerHTML = `
     <div class="profile-head">
       <button class="btn btn-secondary btn-sm" onclick="backToDestinations()">&larr; Destinations</button>
-      <div class="profile-id"><div><h2>New destination</h2><p>Start with the basics. You can add the map location, photos and the rest next.</p></div></div>
+      <div class="profile-id"><div><h2>New destination</h2><p>Start with the basics. You can add photos, the description and the rest next.</p></div></div>
     </div>
-    <form class="detail-card" style="max-width: 640px" onsubmit="submitNewDestination(event)" novalidate>
+    <form class="detail-card" style="max-width: 720px" onsubmit="submitNewDestination(event)" novalidate>
+      <div class="form-group"><span class="form-label">What are you adding? *</span>
+        <div class="type-pick">${[['attraction', 'A place to visit', 'Sajek Valley, Ratargul'], ['city', 'A district or city', 'Cox’s Bazar, Sreemangal'], ['region', 'A division', 'Chattogram, Sylhet'], ['country', 'A country', 'Bangladesh, Nepal']].map(([k, t, eg]) => `
+          <label class="type-option"><input type="radio" name="ndType" value="${k}" ${k === type ? 'checked' : ''} onchange="syncNewDestinationForm()"><span><strong>${t}</strong><small>${eg}</small></span></label>`).join('')}</div>
+      </div>
+
+      <fieldset class="where-box" id="ndWhere">
+        <legend class="form-label">Where is it?</legend>
+        <div class="where-country">
+          <label class="check"><input type="radio" name="ndCountry" value="bd" ${other ? '' : 'checked'} onchange="syncNewDestinationForm()"> Bangladesh</label>
+          <label class="check"><input type="radio" name="ndCountry" value="other" ${other ? 'checked' : ''} onchange="syncNewDestinationForm()"> Another country</label>
+        </div>
+        <div class="form-row-2" id="ndBdPickers">
+          <div class="form-group"><label class="form-label" for="ndDivision">Division *</label>
+            <select id="ndDivision" class="form-select" onchange="fillDistrictSelect(); applyGeoDefaults()">
+              <option value="">Choose a division</option>
+              ${D.geo.divisions.map(dv => `<option value="${E(dv.code)}">${E(dv.name)} (${E(dv.nameBn)})</option>`).join('')}
+            </select></div>
+          <div class="form-group" id="ndDistrictGroup"><label class="form-label" for="ndDistrict" id="ndDistrictLabel">District *</label>
+            <select id="ndDistrict" class="form-select" onchange="applyGeoDefaults()" disabled><option value="">Choose the division first</option></select></div>
+        </div>
+        <div class="form-group" id="ndOtherParent" hidden><label class="form-label" for="ndParent">Inside</label><select id="ndParent" class="form-select"></select>
+          <p class="detail-muted" style="margin:4px 0 0">Add the country first if it isn't in the list.</p></div>
+        <div id="ndExisting"></div>
+      </fieldset>
+
       <div class="form-row-2">
         <div class="form-group"><label class="form-label" for="ndName">Name *</label><input id="ndName" class="form-input" maxlength="120" placeholder="Sajek Valley"></div>
         <div class="form-group"><label class="form-label" for="ndNameBn">Name in Bangla</label><input id="ndNameBn" class="form-input" maxlength="120" lang="bn" placeholder="সাজেক ভ্যালি"></div>
       </div>
       <div class="form-row-2">
-        <div class="form-group"><label class="form-label" for="ndType">Type *</label>
-          <select id="ndType" class="form-select" onchange="fillParentSelect('ndParent', this.value)">${Object.entries(DEST_TYPES).map(([k, t]) => `<option value="${k}" ${k === suggested ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-        <div class="form-group"><label class="form-label" for="ndParent">Inside</label><select id="ndParent" class="form-select"></select></div>
+        <div class="form-group"><label class="form-label" for="ndLat">Latitude <span class="detail-muted">(optional)</span></label><input id="ndLat" class="form-input" inputmode="decimal" placeholder="23.3820"></div>
+        <div class="form-group"><label class="form-label" for="ndLng">Longitude <span class="detail-muted">(optional)</span></label><input id="ndLng" class="form-input" inputmode="decimal" placeholder="92.2938"></div>
       </div>
+      <p class="detail-muted" id="ndCoordHint" style="margin:-6px 0 12px">Leave empty to set it on the map later. Tip: right-click a spot in Google Maps to copy its coordinates.</p>
       <div class="form-group"><label class="form-label" for="ndSummary">Short summary</label><textarea id="ndSummary" class="form-input" rows="2" maxlength="300" placeholder="One or two lines travelers see on the card."></textarea></div>
+      <div class="form-group"><label class="form-label" for="ndPhoto">Cover photo <span class="detail-muted">(optional)</span></label>
+        <input id="ndPhoto" type="file" class="form-input" accept="image/jpeg,image/png,image/webp" onchange="previewNewPhoto(this)">
+        <img id="ndPhotoPreview" class="new-photo-preview" alt="" hidden>
+        <p class="detail-muted" style="margin:4px 0 0">JPG, PNG or WebP, up to 5 MB. You can add more photos, captions and credits afterwards.</p></div>
       <div class="form-error-box" id="ndError" role="alert" hidden></div>
       <button type="submit" class="btn btn-primary" id="ndSubmit">Create as draft</button>
     </form>`;
-  fillParentSelect('ndParent', suggested, parentId);
+
+  if (division) document.getElementById('ndDivision').value = division;
+  fillDistrictSelect(district);
+  syncNewDestinationForm();
+  if (other && parent) document.getElementById('ndParent').value = parent._id;
   document.getElementById('ndName').focus();
+}
+
+// Which built-in division or district a destination is (by its code), if any
+function geoCodeOf(destinationId) {
+  for (const dv of (D.geo && D.geo.divisions) || []) {
+    if (dv.existing && dv.existing._id === destinationId) return { division: dv };
+    const dt = dv.districts.find(x => x.existing && x.existing._id === destinationId);
+    if (dt) return { division: dv, district: dt };
+  }
+  if (D.geo && D.geo.country && D.geo.country.existing && D.geo.country.existing._id === destinationId) return { country: true };
+  return null;
+}
+
+const newType = () => (document.querySelector('input[name="ndType"]:checked') || {}).value || 'attraction';
+const inBangladesh = () => ((document.querySelector('input[name="ndCountry"]:checked') || {}).value || 'bd') === 'bd';
+const pickedDivision = () => D.geo.divisions.find(dv => dv.code === val('ndDivision'));
+const pickedDistrict = () => { const dv = pickedDivision(); return dv ? dv.districts.find(x => x.code === val('ndDistrict')) : null; };
+
+function syncNewDestinationForm() {
+  const type = newType();
+  const bd = inBangladesh();
+  document.getElementById('ndWhere').hidden = type === 'country';
+  document.getElementById('ndBdPickers').hidden = !bd;
+  document.getElementById('ndOtherParent').hidden = bd;
+  // A division is picked from the division list; districts and attractions also pick a district
+  document.getElementById('ndDistrictGroup').hidden = type === 'region';
+  document.getElementById('ndDistrictLabel').textContent = type === 'city' ? 'Which district (fills in the name)' : 'District *';
+  const placeholders = { attraction: 'Sajek Valley', city: 'Cox’s Bazar', region: 'Chattogram', country: 'Nepal' };
+  document.getElementById('ndName').placeholder = placeholders[type];
+  document.getElementById('ndNameBn').placeholder = { attraction: 'সাজেক ভ্যালি', city: 'কক্সবাজার', region: 'চট্টগ্রাম', country: 'নেপাল' }[type];
+  if (!bd) fillParentSelect('ndParent', type, val('ndParent'));
+  fillDistrictSelect(val('ndDistrict'));
+  applyGeoDefaults();
+}
+
+function fillDistrictSelect(selected) {
+  const select = document.getElementById('ndDistrict');
+  const dv = pickedDivision();
+  if (!dv) {
+    select.innerHTML = '<option value="">Choose the division first</option>';
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  select.innerHTML = `<option value="">${newType() === 'city' ? 'Another city in this division' : 'Choose a district'}</option>`
+    + dv.districts.map(dt => `<option value="${E(dt.code)}">${E(dt.name)} (${E(dt.nameBn)})${dt.existing ? ' ✓' : ''}</option>`).join('');
+  if (selected) select.value = selected;
+}
+
+// Fill name and coordinates from the picked division or district (without overwriting what the admin typed)
+function applyGeoDefaults() {
+  const type = newType();
+  const dv = pickedDivision();
+  const dt = pickedDistrict();
+  const source = type === 'region' ? dv : (type === 'city' ? dt : null);
+  const fill = (id, value) => {
+    const el = document.getElementById(id);
+    if (!el.value.trim() || el.value === D.autoFilled[id]) {
+      el.value = value == null ? '' : value;
+      D.autoFilled[id] = el.value;
+    }
+  };
+  if (type !== 'country' && inBangladesh()) {
+    fill('ndName', source ? source.name : '');
+    fill('ndNameBn', source ? source.nameBn : '');
+    fill('ndLat', source ? source.lat : '');
+    fill('ndLng', source ? source.lng : '');
+  }
+  const near = dt || dv;
+  document.getElementById('ndLat').placeholder = near ? String(near.lat) : '23.3820';
+  document.getElementById('ndLng').placeholder = near ? String(near.lng) : '92.2938';
+  document.getElementById('ndCoordHint').textContent = source
+    ? `Filled in with ${source.name}'s approximate centre. Change it if you know better, or fix it on the map later.`
+    : 'Leave empty to set it on the map later. Tip: right-click a spot in Google Maps to copy its coordinates.';
+
+  // Already a destination? Say so before the admin fills in the rest
+  const existing = source && source.existing;
+  document.getElementById('ndExisting').innerHTML = existing
+    ? `<div class="callout callout-warn"><div><strong>${E(existing.name)} is already a destination.</strong>Open it instead of adding it again.</div><button type="button" class="btn btn-secondary btn-sm" onclick="openDestination('${E(existing._id)}')">Open ${E(existing.name)}</button></div>`
+    : '';
+  if (type === 'attraction' && dv && !dt) document.getElementById('ndExisting').innerHTML = '';
+}
+
+function previewNewPhoto(input) {
+  const img = document.getElementById('ndPhotoPreview');
+  const file = input.files[0];
+  if (!file) { img.hidden = true; return; }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+    input.value = '';
+    img.hidden = true;
+    return formError('ndError', 'Use a JPG, PNG or WebP photo under 5 MB.');
+  }
+  formError('ndError');
+  img.src = URL.createObjectURL(file);
+  img.hidden = false;
+}
+
+async function submitNewDestination(e) {
+  e.preventDefault();
+  const type = newType();
+  const body = { name: val('ndName').trim(), nameBn: val('ndNameBn').trim(), type, summary: val('ndSummary').trim(), lat: val('ndLat').trim(), lng: val('ndLng').trim() };
+  if (!body.name) return formError('ndError', 'Enter the name.');
+  if ((body.lat === '') !== (body.lng === '')) return formError('ndError', 'Enter both latitude and longitude, or leave both empty.');
+  if (body.lat !== '' && (!Number.isFinite(Number(body.lat)) || Math.abs(Number(body.lat)) > 90)) return formError('ndError', 'Latitude must be a number between -90 and 90.');
+  if (body.lng !== '' && (!Number.isFinite(Number(body.lng)) || Math.abs(Number(body.lng)) > 180)) return formError('ndError', 'Longitude must be a number between -180 and 180.');
+  if (type !== 'country') {
+    if (inBangladesh()) {
+      if (!val('ndDivision')) return formError('ndError', 'Choose the division.');
+      if (type === 'attraction' && !val('ndDistrict')) return formError('ndError', 'Choose the district this place is in.');
+      body.geo = { division: val('ndDivision'), district: type === 'region' ? '' : val('ndDistrict') };
+    } else {
+      if (!val('ndParent')) return formError('ndError', 'Choose where this place is.');
+      body.parent = val('ndParent');
+    }
+  }
+  formError('ndError');
+  const btn = document.getElementById('ndSubmit');
+  btn.disabled = true;
+  try {
+    const { ok, status, data } = await adminFetch('/api/v1/admin/destinations', { method: 'POST', body: JSON.stringify(body) });
+    if (status === 409 && data.data && data.data.existing) {
+      document.getElementById('ndExisting').innerHTML = `<div class="callout callout-warn"><div><strong>${E(data.message)}</strong></div><button type="button" class="btn btn-secondary btn-sm" onclick="openDestination('${E(data.data.existing._id)}')">Open ${E(data.data.existing.name)}</button></div>`;
+      return formError('ndError', data.message);
+    }
+    if (!ok) return formError('ndError', data.message || 'Could not create the destination.');
+    D.creating = false;
+    D.detail = data.data;
+    const also = data.data.alsoCreated || [];
+    // The cover photo goes up once the destination exists
+    const photo = document.getElementById('ndPhoto').files[0];
+    if (photo) {
+      const fd = new FormData();
+      fd.append('photos', photo);
+      const up = await adminForm(`/api/v1/admin/destinations/${data.data.destination._id}/photos`, 'POST', fd);
+      if (up.ok) D.detail = up.data.data;
+      else showAdminToast(`Created, but the photo didn't upload: ${up.data.message || 'try again in Photos'}.`, 'error');
+    }
+    showAdminToast(`${body.name} created as a draft.${also.length ? ` Also added ${also.join(', ')}.` : ''}`, 'success');
+    ensureDestinationOptions(true);
+    renderDestinationDetail(D.detail.destination.hasLocation ? 'photos' : 'location');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // Fill a "put this under" select with the places a destination of `type` may sit under
@@ -461,26 +656,6 @@ function fillParentSelect(selectId, type, selected, excludeId) {
     + choices.map(o => `<option value="${E(o._id)}">${E([...o.path, o.name].join(' › '))} (${E(DEST_TYPES[o.type])})</option>`).join('');
   select.disabled = type === 'country';
   if (selected) select.value = selected;
-}
-
-async function submitNewDestination(e) {
-  e.preventDefault();
-  const body = { name: val('ndName').trim(), nameBn: val('ndNameBn').trim(), type: val('ndType'), parent: val('ndParent') || null, summary: val('ndSummary').trim() };
-  if (!body.name) return formError('ndError', 'Enter the name.');
-  if (body.type !== 'country' && !body.parent) return formError('ndError', 'Choose where this place is.');
-  const btn = document.getElementById('ndSubmit');
-  btn.disabled = true;
-  try {
-    const { ok, data } = await adminFetch('/api/v1/admin/destinations', { method: 'POST', body: JSON.stringify(body) });
-    if (!ok) return formError('ndError', data.message || 'Could not create the destination.');
-    D.creating = false;
-    D.detail = data.data;
-    showAdminToast(`${body.name} created as a draft. Add its location and photos next.`, 'success');
-    ensureDestinationOptions(true);
-    renderDestinationDetail('location');
-  } finally {
-    btn.disabled = false;
-  }
 }
 
 function renderDestinationDetail(tab = 'details') {
@@ -509,6 +684,7 @@ function renderDestinationDetail(tab = 'details') {
         ${isMoneyAdmin() ? '<button class="btn btn-danger" onclick="deleteDestination()">Delete</button>' : ''}
       </div>
     </div>
+    ${d.source === 'vendor' ? `<div class="callout ${d.status === 'draft' ? 'callout-warn' : ''}"><div><strong>Added by ${E(d.addedByAgency ? d.addedByAgency.name : 'a vendor')} on ${E(fmtDate(d.createdAt))}</strong>${d.status === 'draft' ? 'The vendor can already link tours to it. Check the name, location and photo, then publish it so travelers can see it.' : 'Reviewed and published.'}</div>${d.addedByAgency ? `<button class="btn btn-secondary btn-sm" onclick="openVendor('${E(d.addedByAgency._id)}')">Open vendor</button>` : ''}</div>` : ''}
     ${destinationChecklist(d)}
     <div class="subtabs" role="tablist" aria-label="Destination sections">
       ${DEST_TABS.map(([key, t]) => `<button type="button" role="tab" class="subtab ${key === tab ? 'active' : ''}" data-dtab="${key}" aria-selected="${key === tab}" onclick="renderDestinationTab('${key}')">${t}</button>`).join('')}

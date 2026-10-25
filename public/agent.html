@@ -347,84 +347,249 @@
     </main>
   </div>
 
-  <!-- Tour event editor -->
+  <!-- Tour event editor: the full tour plan -->
   <div class="drawer-bg" id="eventDrawer" hidden>
-    <form class="drawer" id="eventForm" role="dialog" aria-modal="true" aria-labelledby="eventFormTitle" novalidate>
+    <form class="drawer drawer-wide" id="eventForm" role="dialog" aria-modal="true" aria-labelledby="eventFormTitle" novalidate>
       <div class="drawer-head">
         <h2 id="eventFormTitle">New tour event</h2>
         <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
       </div>
+      <p class="drawer-lead">Travelers see the whole plan before they register, so declare everything: price, stops, transport and stay. You can save a draft any time; publishing needs the full plan.</p>
       <div class="alert alert-warn" id="eventHiddenNote" hidden>Plezar has hidden this event. You can edit it, but contact support before publishing it again.</div>
       <div class="alert alert-warn" id="eventRegisteredNote" hidden></div>
-      <div class="field">
-        <label for="evTitle">Title *</label>
-        <input id="evTitle" name="title" type="text" maxlength="120" required placeholder="Sajek Valley weekend">
-      </div>
-      <div class="field">
-        <label for="evDestination">Destination *</label>
-        <input id="evDestination" name="destination" type="text" maxlength="120" required placeholder="Sajek Valley, Rangamati">
-      </div>
-      <div class="field">
-        <label for="evPlace">Place on Plezar</label>
-        <select id="evPlace" name="destinationRef"><option value="">Not linked</option></select>
-        <span class="hint">Linking the event lets travelers find it on the destination's page in the app.</span>
-      </div>
-      <div class="field-row">
+
+      <section class="plan-section">
+        <h3>The tour</h3>
         <div class="field">
-          <label for="evStart">Starts *</label>
-          <input id="evStart" name="startDate" type="date" required>
+          <label for="evTitle">Title *</label>
+          <input id="evTitle" name="title" type="text" maxlength="120" required placeholder="Sajek Valley weekend">
         </div>
         <div class="field">
-          <label for="evEnd">Ends *</label>
-          <input id="evEnd" name="endDate" type="date" required>
-        </div>
-      </div>
-      <p class="hint duration-hint" id="evDuration"></p>
-      <div class="field-row field-row-3">
-        <div class="field">
-          <label for="evSeats">Seats *</label>
-          <input id="evSeats" name="seats" type="number" min="1" max="1000" required inputmode="numeric">
-        </div>
-        <div class="field">
-          <label for="evPrice">Price per person (৳) *</label>
-          <input id="evPrice" name="priceFrom" type="number" min="0" step="50" required inputmode="numeric">
+          <label for="evPlaceSearch">Destination *</label>
+          <div class="place-picker">
+            <input id="evPlaceSearch" list="destinationOptions" maxlength="160" autocomplete="off" placeholder="Search Plezar's destinations, e.g. Sajek Valley">
+            <button type="button" class="btn btn-quiet" data-action="add-place">+ Add a new destination</button>
+          </div>
+          <datalist id="destinationOptions"></datalist>
+          <input type="hidden" id="evPlace" name="destinationRef">
+          <span class="hint" id="evPlaceHint">Pick from the list. Can't find it? Add it, and it's saved to Plezar's destinations for everyone.</span>
         </div>
         <div class="field">
-          <label for="evDeadline">Registration closes</label>
-          <input id="evDeadline" name="registrationDeadline" type="date">
+          <label for="evDescription">Overview</label>
+          <textarea id="evDescription" name="description" maxlength="3000" rows="3" placeholder="Who the trip suits and what makes it special"></textarea>
         </div>
-      </div>
-      <div class="field">
-        <label for="evMeeting">Meeting point</label>
-        <input id="evMeeting" name="meetingPoint" type="text" maxlength="200" placeholder="Fakirapul bus counter, 9:30 pm">
-      </div>
-      <div class="field">
-        <label for="evDescription">Description</label>
-        <textarea id="evDescription" name="description" maxlength="3000" rows="5" placeholder="Day-by-day plan, who the trip suits, what to bring"></textarea>
-      </div>
-      <div class="field">
-        <label for="evIncluded">What's included</label>
-        <textarea id="evIncluded" name="included" rows="3" placeholder="One per line: AC bus both ways, cottage (3 per room), all meals, local guide"></textarea>
-        <span class="hint">One item per line.</span>
-      </div>
-      <div class="field">
-        <span class="label">Photos</span>
-        <div class="photo-strip" id="evPhotos"></div>
-        <input id="evPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top: 10px;">
-        <span class="hint">Up to 6 photos in total, 5 MB each.</span>
-      </div>
-      <div class="field">
-        <label for="evStatus">Status</label>
-        <select id="evStatus" name="status">
-          <option value="draft">Draft (only your team sees it)</option>
-          <option value="published">Published (travelers can register)</option>
-          <option value="hidden">Hidden (registrations stay, but it's not listed)</option>
-        </select>
-      </div>
+      </section>
+
+      <section class="plan-section">
+        <h3>Dates and seats</h3>
+        <div class="field-row">
+          <div class="field">
+            <label for="evStart">Starts *</label>
+            <input id="evStart" name="startDate" type="date" required>
+          </div>
+          <div class="field">
+            <label for="evEnd">Ends *</label>
+            <input id="evEnd" name="endDate" type="date" required>
+          </div>
+        </div>
+        <p class="hint duration-hint" id="evDuration"></p>
+        <div class="field-row">
+          <div class="field">
+            <label for="evSeats">Seats *</label>
+            <input id="evSeats" name="seats" type="number" min="1" max="1000" required inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="evDeadline">Registration closes</label>
+            <input id="evDeadline" name="registrationDeadline" type="date">
+          </div>
+        </div>
+      </section>
+
+      <section class="plan-section">
+        <h3>Price and payment</h3>
+        <div class="field-row field-row-3">
+          <div class="field">
+            <label for="evPrice">Price per person (৳) *</label>
+            <input id="evPrice" name="priceFrom" type="number" min="0" step="50" required inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="evChildPrice">Child price (৳)</label>
+            <input id="evChildPrice" type="number" min="0" step="50" inputmode="numeric" placeholder="Same as adult">
+          </div>
+          <div class="field">
+            <label for="evAdvance">Booking advance (৳) *</label>
+            <input id="evAdvance" type="number" min="0" step="50" inputmode="numeric" placeholder="0 if none">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="evIncluded">Included in the price *</label>
+            <textarea id="evIncluded" name="included" rows="4" placeholder="One per line:&#10;AC bus Dhaka to Khagrachari and back&#10;Jeep to Sajek&#10;Cottage, 3 per room&#10;All meals"></textarea>
+          </div>
+          <div class="field">
+            <label for="evExcluded">Not included *</label>
+            <textarea id="evExcluded" rows="4" placeholder="One per line:&#10;Personal expenses&#10;Entry tickets at Konglak&#10;Anything not listed as included"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="plan-section">
+        <h3>Getting there and staying</h3>
+        <div class="field-row">
+          <div class="field">
+            <label for="evMeeting">Meeting point *</label>
+            <input id="evMeeting" name="meetingPoint" type="text" maxlength="200" placeholder="Fakirapul bus counter, Dhaka">
+          </div>
+          <div class="field">
+            <label for="evDeparture">Departure time *</label>
+            <input id="evDeparture" type="time">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="evTransport">Transport *</label>
+            <select id="evTransport">
+              <option value="">Choose</option>
+              <option value="ac_bus">AC bus</option><option value="bus">Non-AC bus</option><option value="train">Train</option>
+              <option value="launch">Launch</option><option value="plane">Plane</option><option value="jeep">Jeep (chander gari)</option>
+              <option value="boat">Boat</option><option value="car">Car or microbus</option><option value="walking">On foot</option><option value="mixed">A mix</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="evTransportDetails">Transport details</label>
+            <input id="evTransportDetails" type="text" maxlength="300" placeholder="Shyamoli AC bus to Khagrachari, then jeep">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="evStay">Stay <span id="evStayRequired">*</span></label>
+            <select id="evStay">
+              <option value="">Choose</option>
+              <option value="none">No overnight stay</option><option value="hotel">Hotel</option><option value="resort">Resort</option>
+              <option value="cottage">Cottage</option><option value="camp">Camping</option><option value="houseboat">Houseboat</option>
+              <option value="homestay">Homestay</option><option value="mixed">A mix</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="evStayDetails">Stay details</label>
+            <input id="evStayDetails" type="text" maxlength="300" placeholder="Hill-view cottage, 3 per room, shared bathroom">
+          </div>
+        </div>
+        <div class="field">
+          <label for="evReturn">Tour ends *</label>
+          <input id="evReturn" type="text" maxlength="200" placeholder="Back at Fakirapul around 6 am on Sunday">
+        </div>
+      </section>
+
+      <section class="plan-section">
+        <h3>Day-by-day plan</h3>
+        <p class="hint" id="evItineraryHint">Choose the dates first. One card appears for each day of the tour.</p>
+        <datalist id="placeOptions"></datalist>
+        <div id="evItinerary"></div>
+      </section>
+
+      <section class="plan-section">
+        <h3>Good to know</h3>
+        <div class="field-row">
+          <div class="field">
+            <label for="evDifficulty">Difficulty *</label>
+            <select id="evDifficulty">
+              <option value="">Choose</option>
+              <option value="easy">Easy: little walking, suits families</option>
+              <option value="moderate">Moderate: some hiking or long days</option>
+              <option value="challenging">Challenging: steep treks, good fitness needed</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="evBring">What to bring</label>
+            <textarea id="evBring" rows="3" placeholder="One per line: National ID, power bank, light jacket"></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label for="evPolicy">Cancellation and refund policy *</label>
+          <textarea id="evPolicy" rows="3" maxlength="1500" placeholder="Full refund up to 7 days before departure. 50% refund 3 to 6 days before. No refund after that. If we cancel, you get everything back."></textarea>
+        </div>
+      </section>
+
+      <section class="plan-section">
+        <h3>Photos and status</h3>
+        <div class="field">
+          <div class="photo-strip" id="evPhotos"></div>
+          <input id="evPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top: 10px;">
+          <span class="hint">Up to 6 photos in total, 5 MB each.</span>
+        </div>
+        <div class="field">
+          <label for="evStatus">Status</label>
+          <select id="evStatus" name="status">
+            <option value="draft">Draft (only your team sees it)</option>
+            <option value="published">Published (travelers can register)</option>
+            <option value="hidden">Hidden (registrations stay, but it's not listed)</option>
+          </select>
+        </div>
+      </section>
+
+      <div class="plan-check" id="evPlanCheck" aria-live="polite"></div>
       <div class="alert alert-error" id="eventError" role="alert" hidden></div>
       <div class="drawer-foot">
         <button type="button" class="btn btn-quiet" data-action="close-drawer">Cancel</button>
         <button type="submit" class="btn btn-primary" id="eventSave">Save event</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Add a destination to Plezar's shared list -->
+  <div class="drawer-bg dialog-bg" id="placeDialog" hidden>
+    <form class="dialog dialog-wide" id="placeForm" role="dialog" aria-modal="true" aria-labelledby="placeTitle" novalidate>
+      <h2 id="placeTitle">Add a new destination</h2>
+      <p class="muted">It's saved to Plezar's destinations, so you and other agencies can use it. You can link it to your tour straight away; travelers see it once Plezar's team has reviewed it.</p>
+      <div class="field">
+        <span class="label">What is it? *</span>
+        <label class="radio"><input type="radio" name="plType" value="attraction" checked> <span>A place to visit (a hill, beach, waterfall, lake...)</span></label>
+        <label class="radio"><input type="radio" name="plType" value="city"> <span>A district or town</span></label>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="plDivision">Division *</label>
+          <select id="plDivision"><option value="">Choose a division</option></select>
+        </div>
+        <div class="field">
+          <label for="plDistrict" id="plDistrictLabel">District *</label>
+          <select id="plDistrict" disabled><option value="">Choose the division first</option></select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="plName">Name *</label>
+          <input id="plName" type="text" maxlength="120" placeholder="Debotakhum">
+        </div>
+        <div class="field">
+          <label for="plNameBn">Name in Bangla</label>
+          <input id="plNameBn" type="text" maxlength="120" lang="bn" placeholder="দেবতাখুম">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="plLat">Latitude <span class="muted">(optional)</span></label>
+          <input id="plLat" type="text" inputmode="decimal" placeholder="21.96">
+        </div>
+        <div class="field">
+          <label for="plLng">Longitude <span class="muted">(optional)</span></label>
+          <input id="plLng" type="text" inputmode="decimal" placeholder="92.37">
+        </div>
+      </div>
+      <div class="field">
+        <label for="plSummary">Short description</label>
+        <textarea id="plSummary" rows="2" maxlength="300" placeholder="A narrow canyon you explore by bamboo raft."></textarea>
+      </div>
+      <div class="field">
+        <label for="plPhoto">Photo <span class="muted">(optional)</span></label>
+        <input id="plPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+        <span class="hint">Only a photo you took or have permission to use. JPG, PNG or WebP, up to 5 MB.</span>
+      </div>
+      <div class="alert alert-error" id="placeError" role="alert" hidden></div>
+      <div class="drawer-foot">
+        <button type="button" class="btn btn-quiet" data-action="close-place">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="placeSubmit">Save destination</button>
       </div>
     </form>
   </div>

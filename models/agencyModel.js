@@ -113,6 +113,19 @@ const agencySchema = new mongoose.Schema(
       reviewedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
     },
 
+    // Performance reports emailed to the owner by Plezar
+    reports: {
+      schedule: { type: String, enum: ['off', 'daily', 'monthly'], default: 'off' },
+      alsoToAgencyEmail: { type: Boolean, default: false },
+      lastKey: { type: String, default: '' }, // the period last sent automatically, e.g. D:2026-10-24
+      lastSentAt: Date,
+      lastAttemptAt: Date,
+      lastError: { type: String, default: '' },
+      // The site address seen when the schedule was set (for the link in scheduled emails)
+      baseURL: { type: String, default: '' },
+      updatedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
+    },
+
     sourceLead: { type: mongoose.Schema.ObjectId, ref: 'AgentLead' },
     createdBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
   },

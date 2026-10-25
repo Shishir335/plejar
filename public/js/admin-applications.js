@@ -325,7 +325,7 @@ async function submitApprove(e) {
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/applications/${AP.detail.application._id}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ verify: document.getElementById('apVerify').checked, categories })
+      body: JSON.stringify({ verify: document.getElementById('apVerify').checked, categories, send: document.getElementById('apSend').checked })
     });
     if (!ok) return formError('approveError', data.message || 'Could not accept this application.');
 
@@ -333,7 +333,7 @@ async function submitApprove(e) {
     const result = document.getElementById('approveResult');
     result.hidden = false;
     result.innerHTML = `
-      <p style="margin-bottom: 12px;">${E(data.message)}</p>
+      <div class="callout ${data.data.emailSent === true ? 'callout-ok' : (data.data.emailSent === false ? 'callout-warn' : '')}"><div>${E(data.message)}</div></div>
       ${credentialsBox(data.data.credentials)}
       <div style="display:flex; gap:8px; margin-top: 16px;">
         <button class="btn btn-primary" onclick="closeModal('approveModal'); openVendor('${E(data.data.agency._id)}')">Open vendor</button>
@@ -359,6 +359,7 @@ function credentialsBox(c) {
     <div class="cred-box">
       <dl class="kv">
         <div class="kv-row"><dt>Sign-in page</dt><dd>${E(c.loginURL)}</dd></div>
+        ${c.vendorId ? `<div class="kv-row"><dt>Vendor ID</dt><dd>${E(c.vendorId)}</dd></div>` : ''}
         <div class="kv-row"><dt>Email</dt><dd>${E(c.email)}</dd></div>
         <div class="kv-row"><dt>${c.temporary === false ? 'Password' : 'Temporary password'}</dt><dd><code class="cred-pass">${E(c.password)}</code></dd></div>
       </dl>

@@ -1,0 +1,32 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  if kind === 'new'
+    p Good news: #{agencyName} has been accepted as a #{appName} member agency. Here are your sign-in details for the vendor panel.
+  else
+    p Here are your sign-in details for the #{agencyName} vendor panel on #{appName}. Any password you used before no longer works.
+  table(role='presentation', border='0', cellpadding='0', cellspacing='0', style='margin:0 0 16px;border:1px solid #d8e2da;border-radius:8px;')
+    tbody
+      tr
+        td(style='padding:8px 12px;color:#6f8279;') Vendor ID
+        td(style='padding:8px 12px;font-weight:bold;') #{vendorCode}
+      tr
+        td(style='padding:8px 12px;color:#6f8279;') Sign-in email
+        td(style='padding:8px 12px;font-weight:bold;') #{email}
+      tr
+        td(style='padding:8px 12px;color:#6f8279;')= temporary ? 'Temporary password' : 'Password'
+        td(style='padding:8px 12px;font-weight:bold;font-family:monospace;font-size:16px;') #{password}
+  table.btn.btn-primary(role='presentation', border='0', cellpadding='0', cellspacing='0')
+    tbody
+      tr
+        td(align='left')
+          table(role='presentation', border='0', cellpadding='0', cellspacing='0')
+            tbody
+              tr
+                td
+                  a(href=`${url}`, target='_blank') Open the vendor panel
+  p Or go to #{url}
+  if temporary
+    p You will be asked to choose your own password when you sign in.
+  p If you weren't expecting this email, reply to it straight away.

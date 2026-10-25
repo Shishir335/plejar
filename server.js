@@ -10,6 +10,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const app = require('./app');
+const { startReportScheduler } = require('./utils/reportScheduler');
 
 // Handle uncaught exceptions gracefully
 process.on('uncaughtException', err => {
@@ -76,6 +77,7 @@ if (isPlaceholderUri) {
       console.log('============================================================');
       console.log(`[MONGODB SUCCESS] Connected to ${dbLabel} successfully!`);
       console.log('============================================================');
+      startReportScheduler();
     })
     .catch(err => {
       console.warn('------------------------------------------------------------');

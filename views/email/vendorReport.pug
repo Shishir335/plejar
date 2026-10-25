@@ -1,0 +1,60 @@
+extends baseEmail
+
+block content
+  - const taka = n => 'Tk ' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })
+  - const row = 'padding:8px 12px;border-bottom:1px solid #e3efe8;'
+  p Hi #{firstName},
+  p Here is the #{report.period.kind === 'daily' ? 'daily' : 'monthly'} report for #{report.agency.name} on #{appName}, covering #{report.period.label}.
+  h3(style='margin:20px 0 8px;') Registrations and trips
+  table(role='presentation', border='0', cellpadding='0', cellspacing='0', style='width:100%;border:1px solid #d8e2da;border-radius:8px;')
+    tbody
+      tr
+        td(style=row) New registrations
+        td(style=row + 'text-align:right;font-weight:bold;') #{report.registrations.new} (#{report.registrations.travelers} travelers)
+      tr
+        td(style=row) Value of new registrations
+        td(style=row + 'text-align:right;font-weight:bold;') #{taka(report.registrations.value)}
+      tr
+        td(style=row) Cancelled
+        td(style=row + 'text-align:right;font-weight:bold;') #{report.registrations.cancelled}
+      tr
+        td(style='padding:8px 12px;') Trips completed
+        td(style='padding:8px 12px;text-align:right;font-weight:bold;') #{report.trips.completed} (#{report.trips.travelers} travelers)
+  h3(style='margin:20px 0 8px;') Money
+  table(role='presentation', border='0', cellpadding='0', cellspacing='0', style='width:100%;border:1px solid #d8e2da;border-radius:8px;')
+    tbody
+      tr
+        td(style=row) Payments received
+        td(style=row + 'text-align:right;font-weight:bold;') #{taka(report.money.paid)}
+      tr
+        td(style=row) Plezar commission
+        td(style=row + 'text-align:right;font-weight:bold;') #{taka(report.money.commission)}
+      tr
+        td(style=row) Your earnings
+        td(style=row + 'text-align:right;font-weight:bold;') #{taka(report.money.earned)}
+      tr
+        td(style=row) Payouts sent to you
+        td(style=row + 'text-align:right;font-weight:bold;') #{taka(report.money.payoutsPaid)}
+      tr
+        td(style='padding:8px 12px;') Available to pay out now
+        td(style='padding:8px 12px;text-align:right;font-weight:bold;') #{taka(report.money.available)}
+  p(style='margin-top:12px;')
+    | New reviews: #{report.reviews.count}
+    if report.reviews.average
+      |  (average #{report.reviews.average} of 5)
+  h3(style='margin:20px 0 8px;') Coming up
+  if report.upcoming.length
+    ul
+      each e in report.upcoming
+        li #{e.title}, #{new Date(e.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}: #{e.seatsTaken}#{e.seats ? ' of ' + e.seats : ''} seats taken
+  else
+    p No published tour events in the next 30 days.
+  table.btn.btn-primary(role='presentation', border='0', cellpadding='0', cellspacing='0')
+    tbody
+      tr
+        td(align='left')
+          table(role='presentation', border='0', cellpadding='0', cellspacing='0')
+            tbody
+              tr
+                td
+                  a(href=`${url}`, target='_blank') Open the vendor panel

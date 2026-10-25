@@ -30,6 +30,8 @@ const destinationSchema = new mongoose.Schema(
     // 0 country, 1 region, 2 city, 3 attraction: lets lists sort from the top of the tree down
     level: { type: Number, default: 0 },
     parent: { type: mongoose.Schema.ObjectId, ref: 'Destination', default: null },
+    // Ties a place to the built-in Bangladesh geography (BD, BD-B, BD-B-coxs-bazar), so pickers find it
+    geoCode: { type: String, unique: true, sparse: true },
     ancestors: [{ type: mongoose.Schema.ObjectId, ref: 'Destination' }],
 
     // Content
@@ -75,6 +77,9 @@ const destinationSchema = new mongoose.Schema(
     status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' },
     views: { type: Number, default: 0 },
 
+    // Who added it: Plezar's team, or a vendor while planning a tour (vendor places start as drafts for review)
+    source: { type: String, enum: ['admin', 'vendor'], default: 'admin' },
+    addedByAgency: { type: mongoose.Schema.ObjectId, ref: 'Agency' },
     createdBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
   },
@@ -86,6 +91,7 @@ destinationSchema.index({ parent: 1, type: 1 });
 destinationSchema.index({ ancestors: 1 });
 destinationSchema.index({ status: 1, featured: 1, featuredOrder: 1 });
 destinationSchema.index({ name: 'text', nameBn: 'text', summary: 'text' });
+destinationSchema.index({ source: 1, status: 1 });
 
 destinationSchema.pre('save', function (next) {
   this.level = TYPES.indexOf(this.type);

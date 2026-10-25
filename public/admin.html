@@ -112,7 +112,7 @@
           <span id="destinationsAttentionCount" class="nav-count" hidden>0</span>
         </button>
 
-        <button class="nav-link-btn" data-tab="system" onclick="switchTab('system')">
+        <button class="nav-link-btn" data-tab="system" onclick="switchTab('system'); loadEndpoints();">
           <span>⚙️</span>
           <span class="sidebar-text">System Status</span>
         </button>
@@ -421,6 +421,9 @@
                 <select id="dCategoryF" class="form-select" aria-label="Category" onchange="loadDestinations(1)"><option value="">Any category</option></select>
                 <select id="dAvailF" class="form-select" aria-label="Availability" onchange="loadDestinations(1)">
                   <option value="">Any availability</option><option value="open">Open all year</option><option value="seasonal">Seasonal</option><option value="restricted">Restricted</option><option value="closed">Closed</option>
+                </select>
+                <select id="dSourceF" class="form-select" aria-label="Added by" onchange="loadDestinations(1)">
+                  <option value="">Added by anyone</option><option value="admin">Added by Plezar</option><option value="vendor">Added by vendors</option>
                 </select>
                 <select id="dMissingF" class="form-select" aria-label="Missing" onchange="loadDestinations(1)">
                   <option value="">Complete or not</option><option value="location">No map location</option><option value="cover">No cover photo</option><option value="description">No description</option><option value="seo">No search text</option>
@@ -770,32 +773,33 @@
               </div>
             </div>
 
-            <div class="stat-card">
-              <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">Registered API Endpoints</h3>
-              <div style="display: flex; flex-direction: column; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
-                <div class="endpoint-row">
-                  <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/health
-                </div>
-                <div class="endpoint-row">
-                  <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/users/signup
-                </div>
-                <div class="endpoint-row">
-                  <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/users/login
-                </div>
-                <div class="endpoint-row">
-                  <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/users/me
-                </div>
-                <div class="endpoint-row">
-                  <span style="color: var(--color-warning); font-weight: 700;">PATCH</span> /api/v1/users/updateMe
-                </div>
-                <div class="endpoint-row">
-                  <span style="color: var(--color-success); font-weight: 700;">GET</span> /api/v1/users (Admin)
-                </div>
-                <div class="endpoint-row">
-                  <span style="color: var(--color-info); font-weight: 700;">POST</span> /api/v1/subscribers
-                </div>
+          </div>
+
+          <div class="endpoint-catalog">
+            <div class="control-bar">
+              <div><h3 class="pane-title">API endpoints</h3><p class="pane-sub" id="epSummary">Every endpoint the server answers, read from the running server, grouped by what it's for.</p></div>
+              <div class="actions">
+                <button class="btn btn-secondary btn-sm" onclick="toggleAllEndpointGroups(true)">Expand all</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleAllEndpointGroups(false)">Collapse all</button>
+                <button class="btn btn-secondary btn-sm" onclick="loadEndpoints()">↻ Refresh</button>
               </div>
             </div>
+            <div class="filters" style="margin-bottom: 12px;">
+              <div class="search-input-wrapper" style="flex: 1 1 260px;"><span class="search-icon">🔍</span><input type="search" id="epSearch" class="search-input" placeholder="Search a path, e.g. destinations or /me" aria-label="Search endpoints" oninput="renderEndpoints()"></div>
+              <select id="epAccess" class="form-select" aria-label="Who can use it" onchange="renderEndpoints()">
+                <option value="">Anyone can use</option>
+                <option value="public">Public</option>
+                <option value="signed-in">Signed in</option>
+                <option value="vendor">Vendor team</option>
+                <option value="vendor-owner">Vendor owner</option>
+                <option value="admin-team">Admin team</option>
+                <option value="administrators">Administrators only</option>
+              </select>
+              <select id="epMethod" class="form-select" aria-label="Method" onchange="renderEndpoints()">
+                <option value="">Any method</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+              </select>
+            </div>
+            <div id="endpointGroups"><p class="detail-muted">Loading endpoints...</p></div>
           </div>
         </section>
 
@@ -998,6 +1002,7 @@
       <div class="modal-head"><h3>Accept this agency</h3><button class="modal-x" onclick="closeModal('approveModal')" aria-label="Close">&times;</button></div>
       <form id="approveForm" onsubmit="submitApprove(event)" novalidate>
         <p class="modal-lead" id="approveLead"></p>
+        <label class="check"><input type="checkbox" id="apSend" checked><span>Email the sign-in details (vendor ID, email, temporary password and the vendor panel link) to the applicant now. You'll also see them here.</span></label>
         <label class="check"><input type="checkbox" id="apVerify" checked><span>Mark as verified. The trade license and NID they sent become the vendor's verification documents. Untick to send them to the Verification queue instead.</span></label>
         <div class="form-group" id="apCategoriesGroup" hidden>
           <span class="form-label">Categories</span>
@@ -1015,6 +1020,10 @@
       <div class="modal-head"><h3 id="vpTitle">Set password</h3><button class="modal-x" onclick="closeModal('vendorPasswordModal')" aria-label="Close">&times;</button></div>
       <form id="vendorPasswordForm" onsubmit="submitVendorPassword(event)" novalidate>
         <p class="modal-lead" id="vpLead"></p>
+        <div class="form-group" id="vpMemberGroup" hidden>
+          <label class="form-label" for="vpMember">Send to</label>
+          <select id="vpMember" class="form-select" onchange="pickVendorPasswordMember()"></select>
+        </div>
         <div class="check-list">
           <label class="check"><input type="radio" name="vpMode" value="generate" checked onchange="syncVendorPasswordForm()"> Make a strong password for me</label>
           <label class="check"><input type="radio" name="vpMode" value="type" onchange="syncVendorPasswordForm()"> I'll type the password</label>
@@ -1034,6 +1043,7 @@
           </div>
         </div>
         <label class="check" style="margin-top: 12px;"><input type="checkbox" id="vpRequireChange" checked> Ask them to choose their own password the next time they sign in</label>
+        <label class="check"><input type="checkbox" id="vpSend"> Email the sign-in details to them now</label>
         <div class="form-error-box" id="vpError" role="alert" hidden></div>
         <button type="submit" class="btn btn-primary btn-block" id="vpSubmit" style="margin-top: 14px;">Set password</button>
       </form>
@@ -1051,6 +1061,50 @@
         <div class="form-error-box" id="dcError" role="alert" hidden></div>
         <button type="submit" class="btn btn-primary btn-block" id="dcSubmit">Save category</button>
       </form>
+    </div>
+  </div>
+
+  <div id="eventPlanModal" class="modal-overlay">
+    <div class="modal-card modal-wide">
+      <div class="modal-head"><h3 id="epTitle">Tour plan</h3><button class="modal-x" onclick="closeModal('eventPlanModal')" aria-label="Close">&times;</button></div>
+      <div id="epBody"></div>
+    </div>
+  </div>
+
+  <div id="vendorReportModal" class="modal-overlay">
+    <div class="modal-card modal-wide">
+      <div class="modal-head"><h3 id="vrTitle">Vendor report</h3><button class="modal-x" onclick="closeModal('vendorReportModal')" aria-label="Close">&times;</button></div>
+      <p class="modal-lead">Email the vendor how they did: registrations, trips, money, payouts, reviews and their upcoming events.</p>
+      <div class="form-row-2">
+        <div class="form-group"><span class="form-label">Report</span>
+          <div class="check-list" style="flex-direction:row; gap:16px;">
+            <label class="check"><input type="radio" name="vrKind" value="daily" checked onchange="syncReportForm()"> Daily</label>
+            <label class="check"><input type="radio" name="vrKind" value="monthly" onchange="syncReportForm()"> Monthly</label>
+          </div>
+        </div>
+        <div class="form-group" id="vrDayGroup"><label class="form-label" for="vrDay">Day</label><input type="date" id="vrDay" class="form-input" onchange="previewVendorReport()"></div>
+        <div class="form-group" id="vrMonthGroup" hidden><label class="form-label" for="vrMonth">Month</label><input type="month" id="vrMonth" class="form-input" onchange="previewVendorReport()"></div>
+      </div>
+      <p class="detail-muted" id="vrRecipients"></p>
+      <label class="check" id="vrAgencyEmailRow" hidden><input type="checkbox" id="vrAgencyEmail" onchange="previewVendorReport()"> <span id="vrAgencyEmailText"></span></label>
+      <div id="vrPreview" class="report-preview"></div>
+      <div class="form-error-box" id="vrError" role="alert" hidden></div>
+      <div id="vrResult"></div>
+      <div class="lead-actions" style="margin-top: 12px;">
+        <button class="btn btn-primary" id="vrSend" onclick="sendVendorReport()">Send report now</button>
+      </div>
+      <div class="report-schedule">
+        <h4>Send automatically</h4>
+        <div class="lead-actions">
+          <select id="vrSchedule" class="form-select" style="max-width: 360px;">
+            <option value="off">Off</option>
+            <option value="daily">Daily: every morning at 9:00, for the day before</option>
+            <option value="monthly">Monthly: on the 1st at 9:00, for the month before</option>
+          </select>
+          <button class="btn btn-secondary" onclick="saveReportSchedule()">Save</button>
+        </div>
+        <p class="detail-muted" id="vrScheduleStatus"></p>
+      </div>
     </div>
   </div>
 
@@ -1200,5 +1254,6 @@
   <script src="/js/admin-applications.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/js/admin-destinations.js"></script>
+  <script src="/js/admin-system.js"></script>
 </body>
 </html>

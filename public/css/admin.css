@@ -889,3 +889,61 @@ tr.is-muted td { opacity: 0.6; }
   .dest-map { height: 420px; }
 }
 #dsub-all .search-input-wrapper { flex: 1 1 260px; }
+
+/* Tour plan view */
+.modal-card.modal-wide { max-width: 760px; max-height: 88vh; overflow-y: auto; }
+.plan-ul { margin: 0; padding-left: 18px; }
+.plan-day { border: 1px solid var(--admin-border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.plan-day h4 { font-size: 0.92rem; margin-bottom: 6px; }
+.plan-stops { list-style: none; display: grid; gap: 6px; }
+.plan-stops li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 0.88rem; }
+.plan-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* New destination form */
+.type-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.type-option { position: relative; cursor: pointer; }
+.type-option input { position: absolute; opacity: 0; }
+.type-option span { display: block; padding: 10px 12px; border: 1.5px solid var(--admin-border); border-radius: 10px; background: var(--admin-card-bg); }
+.type-option strong { display: block; font-size: 0.88rem; }
+.type-option small { color: var(--text-muted); font-size: 0.76rem; }
+.type-option input:checked + span { border-color: var(--accent-primary); box-shadow: 0 0 0 1px var(--accent-primary); }
+.type-option input:focus-visible + span { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.where-box { border: 1px solid var(--admin-border); border-radius: 12px; padding: 12px 14px 4px; margin-bottom: 14px; }
+.where-box legend { padding: 0 6px; }
+.where-country { display: flex; gap: 18px; margin-bottom: 10px; }
+
+/* Vendor report */
+.report-preview { border: 1px solid var(--admin-border); border-radius: 12px; padding: 12px 14px; margin: 8px 0; min-height: 40px; }
+.report-title { font-size: 0.95rem; margin-bottom: 8px; }
+.report-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 20px; }
+.report-schedule { border-top: 1px solid var(--admin-border); margin-top: 16px; padding-top: 12px; }
+.report-schedule h4 { font-size: 0.92rem; margin-bottom: 8px; }
+#vrText { font-size: 0.82rem; margin-top: 8px; }
+
+.vendor-added { color: var(--color-warning, #b7791f) !important; font-weight: 600; }
+.new-photo-preview { display: block; margin-top: 8px; max-width: 240px; max-height: 160px; border-radius: 10px; object-fit: cover; }
+
+/* System Status: API endpoints */
+.endpoint-catalog { margin-top: 24px; }
+.ep-group { border: 1px solid var(--admin-border); border-radius: var(--radius-lg); background: var(--admin-card-bg); margin-bottom: 10px; overflow: hidden; }
+.ep-group > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.ep-group > summary::-webkit-details-marker { display: none; }
+.ep-group > summary::before { content: '▸'; color: var(--text-muted); transition: transform 0.15s ease; }
+.ep-group[open] > summary::before { transform: rotate(90deg); }
+.ep-group-name { font-weight: 700; }
+.ep-group-desc { flex-basis: 100%; padding-left: 18px; color: var(--text-muted); font-size: 0.82rem; }
+.ep-group .table-container { border: none; border-top: 1px solid var(--admin-border); border-radius: 0; box-shadow: none; }
+.ep-table td { padding-top: 8px; padding-bottom: 8px; }
+.ep-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; word-break: break-all; }
+.ep-param { color: var(--accent-primary); }
+.ep-method { display: inline-block; min-width: 58px; text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
+.ep-get { background: #e6f4ea; color: #1e7b3d; }
+.ep-post { background: #e8f0fe; color: #1a56c4; }
+.ep-put { background: #fef3e0; color: #a35a00; }
+.ep-patch { background: #f3e8fd; color: #7a3fb8; }
+.ep-delete { background: #fde8ea; color: #b3261e; }
+[data-theme="dark"] .ep-get { background: rgba(52, 168, 83, 0.18); color: #81c995; }
+[data-theme="dark"] .ep-post { background: rgba(66, 133, 244, 0.18); color: #8ab4f8; }
+[data-theme="dark"] .ep-put { background: rgba(251, 188, 4, 0.18); color: #fdd663; }
+[data-theme="dark"] .ep-patch { background: rgba(161, 66, 244, 0.18); color: #d7aefb; }
+[data-theme="dark"] .ep-delete { background: rgba(234, 67, 53, 0.18); color: #f28b82; }

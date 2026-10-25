@@ -103,6 +103,14 @@ module.exports = class Email {
         await this.send('applicationRejected', `Your application to ${process.env.APP_NAME || 'Plezar'} (${this.data.reference})`);
     }
 
+    async sendVendorLogin(subject) {
+        await this.send('vendorLogin', subject);
+    }
+
+    async sendVendorReport(subject) {
+        await this.send('vendorReport', subject);
+    }
+
     async sendPasswordReset() {
         await this.send('passwordReset', 'Your password reset token (valid for only 10 minutes)');
     }

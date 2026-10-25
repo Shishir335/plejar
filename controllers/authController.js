@@ -276,7 +276,7 @@ exports.protect = catchAsync(async (req, res, next) => {
     next();
 });
 
-exports.restrictTo = (...roles) => (req, res, next) => {
+exports.restrictTo = (...roles) => Object.assign((req, res, next) => {
     if (req.user && isAdminEmail(req.user.email)) {
         req.user.role = 'admin';
         return next();
@@ -288,7 +288,7 @@ exports.restrictTo = (...roles) => (req, res, next) => {
     }
 
     next();
-};
+}, { roles }); // roles: read by the endpoint list in the admin panel
 
 exports.logout = (req, res) => {
     const isSecure = process.env.NODE_ENV === 'production' || 
@@ -464,3 +464,6 @@ exports.changePassword = catchAsync(async (req, res, next) => {
     createAndSendToken(user, 200, req, res);
 
 });
+
+// Labels for the endpoint list in the admin panel (utils/routeCatalog.js)
+exports.protect.access = 'signed-in';

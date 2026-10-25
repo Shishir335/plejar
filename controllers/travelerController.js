@@ -40,8 +40,33 @@ const publicEvent = (event, stats) => {
     registered: e.stats.registrations,
     registrationOpen: !closed && (e.seatsLeft === null || e.seatsLeft > 0),
     registrationClosedReason: closed || (e.seatsLeft === 0 ? 'This tour event is full.' : null),
+    // The declared plan
+    departureTime: e.departureTime,
+    returnInfo: e.returnInfo,
+    childPrice: e.childPrice,
+    advanceAmount: e.advanceAmount,
+    excluded: e.excluded,
+    whatToBring: e.whatToBring,
+    difficulty: e.difficulty,
+    cancellationPolicy: e.cancellationPolicy,
+    transport: e.transport,
+    accommodation: e.accommodation,
+    itinerary: (e.itinerary || []).map(d => ({
+      day: d.day,
+      date: e.startDate ? new Date(new Date(e.startDate).getTime() + (d.day - 1) * 86400000).toISOString().slice(0, 10) : null,
+      title: d.title,
+      stay: d.stay,
+      meals: d.meals,
+      stops: (d.stops || []).map(st => ({
+        time: st.time,
+        place: st.place,
+        kind: st.kind,
+        note: st.note,
+        destination: st.destinationRef && st.destinationRef.slug && st.destinationRef.status === 'published' ? { _id: st.destinationRef._id, name: st.destinationRef.name, slug: st.destinationRef.slug } : null
+      }))
+    })),
     agency: e.agency,
-    place: e.destinationRef && e.destinationRef.status !== 'archived' ? { _id: e.destinationRef._id, name: e.destinationRef.name, slug: e.destinationRef.slug, type: e.destinationRef.type } : null
+    place: e.destinationRef && e.destinationRef.status === 'published' ? { _id: e.destinationRef._id, name: e.destinationRef.name, slug: e.destinationRef.slug, type: e.destinationRef.type } : null
   };
 };
 
@@ -66,7 +91,7 @@ exports.listEvents = catchAsync(async (req, res, next) => {
 
   const page = pageParams(q);
   const [events, total] = await Promise.all([
-    Package.find(filter).sort({ startDate: 1 }).skip(page.skip).limit(page.limit).populate('agency', AGENCY_CARD).populate('destinationRef', 'name slug type'),
+    Package.find(filter).sort({ startDate: 1 }).skip(page.skip).limit(page.limit).populate('agency', AGENCY_CARD).populate('destinationRef', 'name slug type status').populate('itinerary.stops.destinationRef', 'name slug status'),
     Package.countDocuments(filter)
   ]);
   const stats = await registrationStats(events.map(e => e._id));
@@ -75,7 +100,7 @@ exports.listEvents = catchAsync(async (req, res, next) => {
 
 exports.getEvent = catchAsync(async (req, res, next) => {
   const event = validId(req.params.id)
-    ? await Package.findOne({ _id: req.params.id, status: { $in: ['published', 'cancelled'] } }).populate('agency', `${AGENCY_CARD} status`).populate('destinationRef', 'name slug type status')
+    ? await Package.findOne({ _id: req.params.id, status: { $in: ['published', 'cancelled'] } }).populate('agency', `${AGENCY_CARD} status`).populate('destinationRef', 'name slug type status').populate('itinerary.stops.destinationRef', 'name slug status')
     : null;
   if (!event || !event.agency || event.agency.status !== 'active') return next(new AppError('That tour event is not available.', 404));
   const stats = await registrationStats([event._id]);

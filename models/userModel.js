@@ -95,6 +95,7 @@ const userSchema = new mongoose.Schema({
     },
     // Set when Plezar creates the account with a temporary password; the agency panel asks for a new one first
     mustChangePassword: { type: Boolean, default: false },
+    credentialsSentAt: Date,
     inviteToken: {
         type: String,
         select: false

@@ -10,6 +10,7 @@ const adminOnly = authController.restrictTo('admin', 'dev');
 
 router.get('/destinations/summary', d.summary);
 router.get('/destinations/options', d.options);
+router.get('/destinations/geography', d.geography);
 router.get('/destinations/statistics', d.statistics);
 router.get('/destinations/trending', d.listTrending);
 router.route('/destinations/featured').get(d.listFeatured).put(d.setFeatured);

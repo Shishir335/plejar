@@ -13,7 +13,7 @@ const temporaryPassword = () => {
 // The email the admin copies and sends to a vendor.
 // kind 'new': a just-accepted agency; 'changed': Plezar set a new password on an existing account.
 // temporary: they must choose their own at the next sign-in.
-const credentialsEmail = ({ name, agencyName, email, password, loginURL, kind = 'new', temporary = true }) => {
+const credentialsEmail = ({ name, agencyName, email, password, loginURL, kind = 'new', temporary = true, vendorId }) => {
   const opening = kind === 'new'
     ? `Good news: ${agencyName} has been accepted as a Plezar member agency.`
     : `Here are your new sign-in details for the ${agencyName} vendor panel on Plezar. Any password you used before no longer works.`;
@@ -30,6 +30,7 @@ const credentialsEmail = ({ name, agencyName, email, password, loginURL, kind = 
       'Sign in to your vendor panel here:',
       loginURL,
       '',
+      ...(vendorId ? [`Vendor ID: ${vendorId}`] : []),
       `Email: ${email}`,
       `${temporary ? 'Temporary password' : 'Password'}: ${password}`,
       '',
@@ -40,4 +41,7 @@ const credentialsEmail = ({ name, agencyName, email, password, loginURL, kind = 
   };
 };
 
-module.exports = { temporaryPassword, credentialsEmail };
+// A short readable vendor ID for emails and the admin panel, e.g. PLZ-V-8F45A1
+const vendorCode = agency => `PLZ-V-${String(agency._id || agency).slice(-6).toUpperCase()}`;
+
+module.exports = { temporaryPassword, credentialsEmail, vendorCode };

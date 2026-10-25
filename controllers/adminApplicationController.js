@@ -4,7 +4,8 @@ const User = require('../models/userModel');
 const VendorCategory = require('../models/vendorCategoryModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
-const { temporaryPassword, credentialsEmail } = require('../utils/credentials');
+const { temporaryPassword, credentialsEmail, vendorCode } = require('../utils/credentials');
+const Email = require('../utils/email');
 const { logActivity } = require('../utils/activity');
 const { escapeRegex, pageParams, paged, validId } = require('../utils/query');
 const { privateDocumentPath, copyPrivateDocument, removePrivateFolder } = require('../utils/uploads');
@@ -178,13 +179,15 @@ exports.reject = catchAsync(async (req, res, next) => {
 // Sign-in details for the admin to email to the vendor (the password is never stored in readable form)
 const credentialsFor = (req, owner, agency, password) => {
   const loginURL = `${req.protocol}://${req.get('host')}/agent`;
+  const vendorId = vendorCode(agency);
   return {
     name: owner.name,
     email: owner.email,
     password,
     loginURL,
+    vendorId,
     temporary: true,
-    emailDraft: credentialsEmail({ name: owner.name, agencyName: agency.name, email: owner.email, password, loginURL })
+    emailDraft: credentialsEmail({ name: owner.name, agencyName: agency.name, email: owner.email, password, loginURL, vendorId })
   };
 };
 
@@ -273,13 +276,32 @@ exports.approve = catchAsync(async (req, res, next) => {
     agency: agency._id
   });
 
+  // Optionally email the sign-in details straight away; the admin sees them either way
+  const credentials = credentialsFor(req, owner, agency, password);
+  let emailSent = null;
+  if (req.body.send === true || req.body.send === 'true') {
+    try {
+      await new Email(owner, credentials.loginURL, { agencyName: agency.name, vendorCode: credentials.vendorId, email: owner.email, password, temporary: true, kind: 'new' }).sendVendorLogin(credentials.emailDraft.subject);
+      emailSent = true;
+      owner.credentialsSentAt = new Date();
+      await owner.save({ validateBeforeSave: false });
+    } catch (err) {
+      console.warn(`[MAIL WARNING] Sign-in details to ${owner.email} not sent:`, err.message);
+      emailSent = false;
+    }
+  }
+  let message = `${agency.name} is now a member. Email the sign-in details below to ${owner.name}; this is the only time the password is shown.`;
+  if (emailSent === true) message = `${agency.name} is now a member, and the sign-in details were emailed to ${owner.email}.`;
+  if (emailSent === false) message = `${agency.name} is now a member, but the email couldn't be sent (email isn't set up on the server). Send the details below to ${owner.name} yourself.`;
+
   res.status(201).json({
     status: 'success',
-    message: `${agency.name} is now a member. Email the sign-in details below to ${owner.name}; this is the only time the password is shown.`,
+    message,
     data: {
       application: lead,
       agency: { _id: agency._id, name: agency.name, verified: agency.verified },
-      credentials: credentialsFor(req, owner, agency, password)
+      emailSent,
+      credentials
     }
   });
 });

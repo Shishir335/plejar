@@ -15,6 +15,10 @@ router.get('/vendors/:id', vendor.getVendor);
 router.post('/vendors/:id/status', vendor.setStatus);
 // Passwords: administrators and developers only, like the rest of account security
 router.put('/vendors/:id/members/:userId/password', moneyAdmin, vendor.setMemberPassword);
+// Reports to the vendor: previews for anyone in the admin team, sending and schedules for administrators
+router.get('/vendors/:id/report', vendor.previewReport);
+router.post('/vendors/:id/report', moneyAdmin, vendor.sendReportNow);
+router.put('/vendors/:id/report-schedule', moneyAdmin, vendor.setReportSchedule);
 router.put('/vendors/:id/categories', vendor.setCategories);
 router.put('/vendors/:id/commission', moneyAdmin, vendor.setCommission);
 router.put('/vendors/:id/contract', moneyAdmin, documentUpload.single('document'), vendor.updateContract);

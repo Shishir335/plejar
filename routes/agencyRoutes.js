@@ -2,6 +2,7 @@ const express = require('express');
 const authController = require('../controllers/authController');
 const agencyController = require('../controllers/agencyController');
 const content = require('../controllers/vendorContentController');
+const places = require('../controllers/vendorDestinationController');
 const { imageUpload, documentUpload } = require('../utils/uploads');
 
 const router = express.Router();
@@ -21,7 +22,9 @@ router
   .patch(imageUpload.array('photos', 6), agencyController.updateMyPackage)
   .delete(agencyController.deleteMyPackage);
 router.post('/me/packages/:id/cancel', agencyController.cancelMyPackage);
-router.get('/me/destinations', agencyController.listDestinationOptions);
+// The shared destination list: pick a place, or add one that's missing
+router.route('/me/destinations').get(places.listOptions).post(imageUpload.single('photo'), places.addDestination);
+router.get('/me/destination-geography', places.geography);
 router.get('/me/packages/:id/registrations', agencyController.listEventRegistrations);
 
 router.route('/me/announcements').get(content.listAnnouncements).post(content.createAnnouncement);

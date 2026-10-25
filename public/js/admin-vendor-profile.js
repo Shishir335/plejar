@@ -54,7 +54,7 @@ function renderVendorDetail(tab = 'overview') {
         ${agencyLogo(a, 56)}
         <div>
           <h2>${E(a.name)}</h2>
-          <p>${E((a.regions || []).join(', ')) || 'No areas listed'}${owner ? ` · Owner: ${E(owner.name)}` : ''}</p>
+          <p>${E(d.vendorId)} · ${E((a.regions || []).join(', ')) || 'No areas listed'}${owner ? ` · Owner: ${E(owner.name)}` : ''}</p>
           <p class="profile-badges">
             <span class="badge ${VENDOR_STATUS_BADGE[a.status]}">${E(label(a.status))}</span>
             <span class="badge ${badge}">${E(text)}</span>
@@ -63,7 +63,7 @@ function renderVendorDetail(tab = 'overview') {
           </p>
         </div>
       </div>
-      <div class="profile-actions">${a.status === 'active'
+      <div class="profile-actions">${isMoneyAdmin() ? '<button class="btn btn-secondary" onclick="openSendLoginDetails()">Send login details</button> <button class="btn btn-secondary" onclick="openVendorReportModal()">Send report</button> ' : ''}${a.status === 'active'
         ? '<button class="btn btn-danger" onclick="openVendorStatusModal()">Suspend or deactivate</button>'
         : '<button class="btn btn-primary" onclick="reactivateVendor()">Reactivate vendor</button>'}</div>
     </div>
@@ -299,10 +299,55 @@ function vendorPackages() {
       <td style="white-space: nowrap;">${p.startDate ? `${E(fmtDate(p.startDate))}${p.endDate && p.endDate !== p.startDate ? `<span class="lead-sub">to ${E(fmtDate(p.endDate))}</span>` : ''}` : '<span class="lead-sub" style="margin:0">No date</span>'}<span class="lead-sub">${Number(p.durationDays)}D / ${Number(p.durationNights || 0)}N</span></td>
       <td>${p.seats ? Number(p.seats) : '—'}</td>
       <td>${takaFmt(p.priceFrom)}</td>
-      <td><span class="badge ${STATUS_BADGE[p.status] || 'badge-inactive'}">${E(label(p.status))}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plezar</span>' : ''}${p.status === 'cancelled' && p.cancelReason ? `<span class="lead-sub">${E(p.cancelReason)}</span>` : ''}</td>
-      <td style="text-align: right;">${p.status === 'cancelled' ? '' : p.hiddenByAdmin
+      <td><span class="badge ${STATUS_BADGE[p.status] || 'badge-inactive'}">${E(label(p.status))}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plezar</span>' : ''}${p.status === 'cancelled' && p.cancelReason ? `<span class="lead-sub">${E(p.cancelReason)}</span>` : ''}
+        <span class="lead-sub" style="${p.planMissing && p.planMissing.length ? 'color: var(--color-warning, #b7791f)' : ''}">${p.planMissing && p.planMissing.length ? `Plan missing ${p.planMissing.length}` : 'Plan complete'}</span></td>
+      <td style="text-align: right;"><div class="lead-actions" style="justify-content: flex-end;"><button class="btn btn-secondary btn-sm" onclick="showEventPlan('${E(p._id)}')">View plan</button>${p.status === 'cancelled' ? '' : p.hiddenByAdmin
         ? `<button class="btn btn-secondary btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', false)">Allow again</button>`
-        : `<button class="btn btn-danger btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', true)">Hide</button>`}</td></tr>`).join('')}</tbody></table></div>`;
+        : `<button class="btn btn-danger btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', true)">Hide</button>`}</div></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+// The full plan a vendor declared for one tour event, as travelers see it
+const TRANSPORT_TEXT = { bus: 'Non-AC bus', ac_bus: 'AC bus', train: 'Train', launch: 'Launch', plane: 'Plane', jeep: 'Jeep', boat: 'Boat', car: 'Car or microbus', walking: 'On foot', mixed: 'A mix' };
+const STAY_TEXT = { none: 'No overnight stay', hotel: 'Hotel', resort: 'Resort', cottage: 'Cottage', camp: 'Camping', houseboat: 'Houseboat', homestay: 'Homestay', mixed: 'A mix' };
+const STOP_TEXT = { departure: 'Departure', stop: 'Stop', activity: 'Activity', meal: 'Meal', stay: 'Check in', return: 'Return' };
+
+function showEventPlan(packageId) {
+  const p = V.detail.packages.find(x => String(x._id) === String(packageId));
+  if (!p) return;
+  const listOf = items => (items && items.length ? `<ul class="plan-ul">${items.map(i => `<li>${E(i)}</li>`).join('')}</ul>` : '<span class="detail-muted">Not given</span>');
+  const row = (name, value) => appPlanRow(name, value);
+  const day = (d, i) => {
+    const date = p.startDate ? new Date(new Date(p.startDate).getTime() + i * 86400000).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '';
+    const meals = ['breakfast', 'lunch', 'dinner'].filter(m => d.meals && d.meals[m]);
+    return `<div class="plan-day"><h4>Day ${d.day}${date ? `, ${E(date)}` : ''}${d.title ? `: ${E(d.title)}` : ''}</h4>
+      ${d.stops && d.stops.length ? `<ol class="plan-stops">${d.stops.map(st => `<li><span class="plan-time">${E(st.time || '')}</span><span><strong>${E(st.place)}</strong> <span class="tag">${E(STOP_TEXT[st.kind] || st.kind)}</span>${st.destinationRef && st.destinationRef.name ? ' <span class="lead-sub" style="display:inline">on Plezar</span>' : ''}${st.note ? `<span class="lead-sub">${E(st.note)}</span>` : ''}</span></li>`).join('')}</ol>` : '<p class="detail-muted">No stops.</p>'}
+      <p class="lead-sub">${meals.length ? `Meals: ${E(meals.join(', '))}` : 'No meals included'}${d.stay ? `. Night at ${E(d.stay)}` : ''}</p></div>`;
+  };
+  document.getElementById('epTitle').textContent = p.title;
+  document.getElementById('epBody').innerHTML = `
+    ${p.planMissing && p.planMissing.length ? `<div class="callout callout-warn"><div><strong>Plan incomplete</strong>Missing: ${E(p.planMissing.join(', '))}.</div></div>` : ''}
+    <dl class="kv">
+      ${row('Dates', p.startDate ? `${E(fmtDate(p.startDate))}${p.endDate ? ` to ${E(fmtDate(p.endDate))}` : ''} (${Number(p.durationDays)}D / ${Number(p.durationNights || 0)}N)` : '')}
+      ${row('Destination', E(p.destination))}
+      ${row('Price', `${takaFmt(p.priceFrom)} per person${p.childPrice != null ? `, ${takaFmt(p.childPrice)} per child` : ''}${p.advanceAmount != null ? `. Advance ${takaFmt(p.advanceAmount)}` : ''}`)}
+      ${row('Seats', p.seats ? Number(p.seats) : '')}
+      ${row('Meeting point', `${E(p.meetingPoint)}${p.departureTime ? ` at ${E(p.departureTime)}` : ''}`)}
+      ${row('Tour ends', E(p.returnInfo))}
+      ${row('Transport', p.transport && p.transport.mode ? `${E(TRANSPORT_TEXT[p.transport.mode])}${p.transport.details ? `: ${E(p.transport.details)}` : ''}` : '')}
+      ${row('Stay', p.accommodation && p.accommodation.type ? `${E(STAY_TEXT[p.accommodation.type])}${p.accommodation.details ? `: ${E(p.accommodation.details)}` : ''}` : '')}
+      ${row('Difficulty', E(label(p.difficulty || '')))}
+      ${row('Included', listOf(p.included))}
+      ${row('Not included', listOf(p.excluded))}
+      ${row('What to bring', listOf(p.whatToBring))}
+      ${row('Cancellation policy', p.cancellationPolicy ? `<span class="pre">${E(p.cancellationPolicy)}</span>` : '')}
+    </dl>
+    <h3 style="margin: 18px 0 8px; font-size: 1rem;">Day by day</h3>
+    ${(p.itinerary || []).length ? p.itinerary.map(day).join('') : '<p class="detail-muted">No day-by-day plan yet.</p>'}`;
+  openModal('eventPlanModal');
+}
+
+function appPlanRow(name, value) {
+  return `<div class="kv-row"><dt>${E(name)}</dt><dd>${value || '<span class="detail-muted">Not given</span>'}</dd></div>`;
 }
 
 async function moderateVendorPackage(agencyId, packageId, hidden) {
@@ -547,20 +592,29 @@ function vendorTeam() {
 
 function memberSignInBadge(m) {
   if (m.accountStatus === 'invited') return '<span class="badge badge-manager">Invite not accepted</span>';
-  if (m.mustChangePassword) return '<span class="badge badge-manager">Hasn\'t signed in yet</span><span class="lead-sub">Using a password set by Plezar</span>';
+  if (m.mustChangePassword) return `<span class="badge badge-manager">Hasn't signed in yet</span><span class="lead-sub">${m.credentialsSentAt ? `Details emailed ${E(fmtDate(m.credentialsSentAt))}` : 'Using a password set by Plezar'}</span>`;
   return `<span class="badge badge-active">Active</span><span class="lead-sub">${m.lastLoginAt ? `Last sign-in ${E(fmtDate(m.lastLoginAt))}` : 'Hasn\'t signed in yet'}</span>`;
 }
 
 // ---------- Vendor passwords (administrators only) ----------
 
 // agencyId and member come from the open vendor profile, or are passed in from the application page
-function openVendorPasswordModal(userId, from) {
+function openVendorPasswordModal(userId, from, { sending = false } = {}) {
   const source = from || { agencyId: V.detail.agency._id, agencyName: V.detail.agency.name, member: V.detail.members.find(x => String(x.id) === String(userId)) };
   if (!source.member) return;
+  document.getElementById('vpMemberGroup').hidden = !sending;
+  document.getElementById('vpSend').checked = sending;
+  document.getElementById('vpSubmit').textContent = sending ? 'Send login details' : 'Set password';
   V.passwordTarget = { agencyId: source.agencyId, userId: source.member.id || source.member._id, name: source.member.name, onDone: source.onDone };
-  document.getElementById('vpTitle').textContent = `${source.member.accountStatus === 'invited' || source.member.mustChangePassword ? 'Set' : 'Change'} password for ${source.member.name}`;
-  document.getElementById('vpLead').textContent = `${source.member.name} (${source.member.email}) signs in to the ${source.agencyName} vendor panel with this password. Any device they're signed in on will be signed out.`;
+  document.getElementById('vpTitle').textContent = sending
+    ? `Send login details for ${source.agencyName}`
+    : `${source.member.accountStatus === 'invited' || source.member.mustChangePassword ? 'Set' : 'Change'} password for ${source.member.name}`;
+  document.getElementById('vpLead').textContent = sending
+    ? 'Passwords are stored scrambled, so Plezar can\'t look one up. Sending login details sets a new password and emails it with the vendor ID, sign-in email and the vendor panel link.'
+    : `${source.member.name} (${source.member.email}) signs in to the ${source.agencyName} vendor panel with this password. Any device they're signed in on will be signed out.`;
+  const keepSend = document.getElementById('vpSend').checked;
   document.getElementById('vendorPasswordForm').reset();
+  document.getElementById('vpSend').checked = keepSend;
   document.getElementById('vendorPasswordForm').hidden = false;
   document.getElementById('vpResult').hidden = true;
   document.getElementById('vpPassword').type = 'password';
@@ -581,11 +635,26 @@ function toggleVendorPasswordVisibility(btn) {
   btn.textContent = show ? 'Hide' : 'Show';
 }
 
+// "Send login details" from the profile header: choose who gets them (the owner by default)
+function openSendLoginDetails() {
+  const members = V.detail.members;
+  const owner = members.find(m => m.agencyRole === 'owner') || members[0];
+  if (!owner) return showAdminToast('This vendor has no team members yet.', 'error');
+  document.getElementById('vpMember').innerHTML = members.map(m => `<option value="${E(m.id)}">${E(m.name)} (${m.agencyRole === 'owner' ? 'owner' : 'team member'}), ${E(m.email)}</option>`).join('');
+  document.getElementById('vpMember').value = owner.id;
+  openVendorPasswordModal(owner.id, null, { sending: true });
+}
+
+function pickVendorPasswordMember() {
+  const m = V.detail.members.find(x => String(x.id) === val('vpMember'));
+  if (m) V.passwordTarget = { ...V.passwordTarget, userId: m.id, name: m.name };
+}
+
 async function submitVendorPassword(e) {
   e.preventDefault();
   const t = V.passwordTarget;
   const generate = document.querySelector('input[name="vpMode"]:checked').value === 'generate';
-  const body = { generate, requireChange: document.getElementById('vpRequireChange').checked };
+  const body = { generate, requireChange: document.getElementById('vpRequireChange').checked, send: document.getElementById('vpSend').checked };
   if (!generate) {
     body.password = val('vpPassword');
     body.confirmPassword = val('vpConfirm');
@@ -601,7 +670,7 @@ async function submitVendorPassword(e) {
     const result = document.getElementById('vpResult');
     result.hidden = false;
     result.innerHTML = `
-      <p style="margin-bottom: 12px;">${E(data.message)} Send them the details below.</p>
+      <div class="callout ${data.data.emailSent === true ? 'callout-ok' : (data.data.emailSent === false ? 'callout-warn' : '')}"><div>${E(data.message)}${data.data.emailSent === null ? ' Send them the details below.' : ''}</div></div>
       ${credentialsBox(data.data.credentials)}
       <div style="display:flex; gap:8px; margin-top: 16px;"><button class="btn btn-secondary" onclick="closeModal('vendorPasswordModal')">Done</button></div>`;
     if (t.onDone) t.onDone();
@@ -611,6 +680,125 @@ async function submitVendorPassword(e) {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ---------- Reports emailed to the vendor ----------
+
+const dhakaToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date());
+const reportKind = () => document.querySelector('input[name="vrKind"]:checked').value;
+
+function openVendorReportModal() {
+  const today = dhakaToday();
+  const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date(Date.now() - 86400000));
+  const [y, m] = today.split('-').map(Number);
+  const lastMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  document.getElementById('vrTitle').textContent = `Report for ${V.detail.agency.name}`;
+  document.querySelector('input[name="vrKind"][value="daily"]').checked = true;
+  Object.assign(document.getElementById('vrDay'), { value: yesterday, max: today });
+  Object.assign(document.getElementById('vrMonth'), { value: lastMonth, max: today.slice(0, 7) });
+  const agencyEmail = V.detail.agency.email;
+  document.getElementById('vrAgencyEmailRow').hidden = !agencyEmail;
+  document.getElementById('vrAgencyEmailText').textContent = `Also send to the agency's public email (${agencyEmail || ''})`;
+  document.getElementById('vrAgencyEmail').checked = false;
+  document.getElementById('vrResult').innerHTML = '';
+  formError('vrError');
+  syncReportForm();
+  openModal('vendorReportModal');
+}
+
+function syncReportForm() {
+  const daily = reportKind() === 'daily';
+  document.getElementById('vrDayGroup').hidden = !daily;
+  document.getElementById('vrMonthGroup').hidden = daily;
+  previewVendorReport();
+}
+
+const reportQuery = () => (reportKind() === 'daily'
+  ? { period: 'daily', date: val('vrDay') }
+  : { period: 'monthly', month: val('vrMonth') });
+
+function reportTable(r) {
+  const row = (k, v) => `<div class="kv-row"><dt>${E(k)}</dt><dd>${v}</dd></div>`;
+  return `
+    <h4 class="report-title">${E(r.period.label)}</h4>
+    <div class="report-cols">
+      <dl class="kv">
+        ${row('New registrations', `${r.registrations.new} (${r.registrations.travelers} travelers)`)}
+        ${row('Value of new registrations', takaFmt(r.registrations.value))}
+        ${row('Cancelled', r.registrations.cancelled)}
+        ${row('Trips completed', `${r.trips.completed} (${r.trips.travelers} travelers)`)}
+        ${row('New reviews', `${r.reviews.count}${r.reviews.average ? `, average ${r.reviews.average} of 5` : ''}`)}
+      </dl>
+      <dl class="kv">
+        ${row('Payments received', takaFmt(r.money.paid))}
+        ${row('Plezar commission', takaFmt(r.money.commission))}
+        ${row('Vendor earnings', takaFmt(r.money.earned))}
+        ${row('Payouts sent', takaFmt(r.money.payoutsPaid))}
+        ${row('Available now', takaFmt(r.money.available))}
+      </dl>
+    </div>
+    <p class="detail-muted" style="margin:10px 0 4px">Coming up in the next 30 days</p>
+    ${r.upcoming.length ? `<ul class="plan-ul">${r.upcoming.map(e => `<li>${E(e.title)}, ${E(fmtDate(e.startDate))}: ${e.seatsTaken}${e.seats ? ` of ${e.seats}` : ''} seats taken</li>`).join('')}</ul>` : '<p class="detail-muted">No published tour events.</p>'}`;
+}
+
+async function previewVendorReport() {
+  const box = document.getElementById('vrPreview');
+  formError('vrError');
+  if ((reportKind() === 'daily' && !val('vrDay')) || (reportKind() === 'monthly' && !val('vrMonth'))) { box.innerHTML = ''; return; }
+  box.innerHTML = '<p class="detail-muted">Loading preview...</p>';
+  const q = new URLSearchParams({ ...reportQuery(), alsoToAgencyEmail: document.getElementById('vrAgencyEmail').checked });
+  const { ok, data } = await adminFetch(`/api/v1/admin/vendors/${V.detail.agency._id}/report?${q}`);
+  if (!ok) { box.innerHTML = ''; return formError('vrError', data.message || 'Could not build the report.'); }
+  const { report, recipients, schedule } = data.data;
+  box.innerHTML = reportTable(report);
+  document.getElementById('vrRecipients').textContent = recipients.length
+    ? `Goes to ${recipients.map(r => `${r.name} (${r.email})`).join(' and ')}.`
+    : 'This vendor has no owner email, so the report can\'t be sent.';
+  document.getElementById('vrSend').disabled = !recipients.length;
+  document.getElementById('vrSchedule').value = schedule.schedule || 'off';
+  const parts = [];
+  if (schedule.lastSentAt) parts.push(`Last sent automatically ${fmtDateTime(schedule.lastSentAt)}.`);
+  if (schedule.lastError) parts.push(`Last automatic send failed: ${schedule.lastError}`);
+  document.getElementById('vrScheduleStatus').textContent = parts.join(' ') || (schedule.schedule && schedule.schedule !== 'off' ? 'Nothing sent automatically yet.' : '');
+}
+
+async function sendVendorReport() {
+  const btn = document.getElementById('vrSend');
+  btn.disabled = true;
+  formError('vrError');
+  try {
+    const { ok, data } = await adminFetch(`/api/v1/admin/vendors/${V.detail.agency._id}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ ...reportQuery(), alsoToAgencyEmail: document.getElementById('vrAgencyEmail').checked })
+    });
+    const box = document.getElementById('vrResult');
+    if (ok) {
+      box.innerHTML = `<div class="callout callout-ok"><div>${E(data.message)}</div></div>`;
+      showAdminToast('Report sent.', 'success');
+    } else if (data.data && data.data.text) {
+      const owner = V.detail.members.find(m => m.agencyRole === 'owner');
+      const subject = `${V.detail.agency.name}: report for ${data.data.report.period.label}`;
+      const mailto = `mailto:${encodeURIComponent(owner ? owner.email : '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(data.data.text)}`;
+      box.innerHTML = `<div class="callout callout-warn"><div>${E(data.message)}</div></div>
+        <textarea class="form-input" id="vrText" rows="8" readonly>${E(data.data.text)}</textarea>
+        <div class="lead-actions" style="margin-top:8px"><a class="btn btn-primary btn-sm" href="${E(mailto)}">Open in my email app</a>
+        <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('vrText').value).then(() => showAdminToast('Report copied.', 'success'))">Copy report</button></div>`;
+    } else {
+      formError('vrError', data.message || 'Could not send the report.');
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveReportSchedule() {
+  const { ok, data } = await adminFetch(`/api/v1/admin/vendors/${V.detail.agency._id}/report-schedule`, {
+    method: 'PUT',
+    body: JSON.stringify({ schedule: val('vrSchedule'), alsoToAgencyEmail: document.getElementById('vrAgencyEmail').checked })
+  });
+  if (!ok) return showAdminToast(data.message || 'Could not save.', 'error');
+  document.getElementById('vrScheduleStatus').textContent = data.message;
+  showAdminToast('Report schedule saved.', 'success');
 }
 
 // ---------- Activity ----------

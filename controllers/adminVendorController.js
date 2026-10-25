@@ -15,7 +15,11 @@ const { getDefaultRate, isCustom } = require('../utils/commission');
 const { escapeRegex, pageParams, paged, validId, toId } = require('../utils/query');
 const { savePrivateDocument, removePrivateDocument, privateDocumentPath } = require('../utils/uploads');
 const { teamView, verificationView, packageCounts } = require('./agencyController');
-const { temporaryPassword, credentialsEmail } = require('../utils/credentials');
+const { temporaryPassword, credentialsEmail, vendorCode } = require('../utils/credentials');
+const Email = require('../utils/email');
+const { reportPeriod, buildReport, reportText } = require('../utils/vendorReport');
+const { sendReport, reportRecipients } = require('../utils/reportMailer');
+const { planProblems } = require('../utils/tourPlan');
 
 const findVendor = async (id, next, select) => {
   if (!validId(id)) {
@@ -179,7 +183,7 @@ exports.getVendor = catchAsync(async (req, res, next) => {
 
   const [members, packages, counts, earnings, ratings, defaultRate, bookingCount, complaintCount] = await Promise.all([
     User.find({ agency: agency._id }).sort({ agencyRole: 1, name: 1 }),
-    Package.find({ agency: agency._id }).sort({ updatedAt: -1 }),
+    Package.find({ agency: agency._id }).sort({ updatedAt: -1 }).populate('itinerary.stops.destinationRef', 'name slug'),
     packageCounts(agency._id),
     earningsFor(agency._id),
     ratingSummary(agency._id),
@@ -199,7 +203,8 @@ exports.getVendor = catchAsync(async (req, res, next) => {
       contract: contractView(agency),
       commission: { rate: isCustom(agency) ? agency.commissionRate : defaultRate, custom: isCustom(agency), defaultRate },
       members: members.map(teamView),
-      packages,
+      vendorId: vendorCode(agency),
+      packages: packages.map(p => ({ ...p.toObject(), planMissing: planProblems(p) })),
       earnings,
       ratings,
       stats: { packages: counts, teamSize: members.length, bookings: bookingCount, complaints: complaintCount }
@@ -477,19 +482,87 @@ exports.setMemberPassword = catchAsync(async (req, res, next) => {
   });
 
   const loginURL = `${req.protocol}://${req.get('host')}/agent`;
+  const kind = wasNew && member.agencyRole === 'owner' ? 'new' : 'changed';
+  const vendorId = vendorCode(agency);
+  const emailDraft = credentialsEmail({ name: member.name, agencyName: agency.name, email: member.email, password, loginURL, kind, temporary: requireChange, vendorId });
+
+  // "Send login details": email them straight away (the admin still gets them, in case email fails)
+  let emailSent = null;
+  if (req.body.send === true || req.body.send === 'true') {
+    try {
+      await new Email(member, loginURL, { agencyName: agency.name, vendorCode: vendorId, email: member.email, password, temporary: requireChange, kind }).sendVendorLogin(emailDraft.subject);
+      emailSent = true;
+      member.credentialsSentAt = new Date();
+      await member.save({ validateBeforeSave: false });
+      await logActivity(req, { action: 'agency.login_sent', summary: `Emailed sign-in details to ${member.name} (${member.email})`, user: member._id, agency: agency._id });
+    } catch (err) {
+      console.warn(`[MAIL WARNING] Sign-in details to ${member.email} not sent:`, err.message);
+      emailSent = false;
+    }
+  }
+
+  let message = `New password set for ${member.name}. Any device they were signed in on has been signed out.`;
+  if (emailSent === true) message = `Sign-in details emailed to ${member.email}. Any device they were signed in on has been signed out.`;
+  if (emailSent === false) message = `The new password is set, but the email couldn't be sent (email isn't set up on the server). Send the details below yourself.`;
+
   res.status(200).json({
     status: 'success',
-    message: `New password set for ${member.name}. Any device they were signed in on has been signed out.`,
+    message,
     data: {
       member: teamView(member),
-      credentials: {
-        name: member.name,
-        email: member.email,
-        password,
-        loginURL,
-        temporary: requireChange,
-        emailDraft: credentialsEmail({ name: member.name, agencyName: agency.name, email: member.email, password, loginURL, kind: wasNew && member.agencyRole === 'owner' ? 'new' : 'changed', temporary: requireChange })
-      }
+      emailSent,
+      credentials: { name: member.name, email: member.email, password, loginURL, vendorId, temporary: requireChange, emailDraft }
     }
   });
+});
+
+// ---------- Performance reports emailed to the vendor ----------
+
+const periodFromQuery = q => reportPeriod(q.period, { date: q.date, month: q.month });
+const siteURL = req => `${req.protocol}://${req.get('host')}`;
+
+// Preview a report (and who it would go to) without sending it
+exports.previewReport = catchAsync(async (req, res, next) => {
+  const agency = await findVendor(req.params.id, next);
+  if (!agency) return;
+  const period = periodFromQuery(req.query);
+  const [report, recipients] = await Promise.all([buildReport(agency, period), reportRecipients(agency, req.query.alsoToAgencyEmail === 'true')]);
+  res.status(200).json({ status: 'success', data: { report, text: reportText(report), recipients, schedule: agency.reports } });
+});
+
+exports.sendReportNow = catchAsync(async (req, res, next) => {
+  const agency = await findVendor(req.params.id, next);
+  if (!agency) return;
+  const period = periodFromQuery(req.body);
+  const outcome = await sendReport(agency, period, { baseURL: siteURL(req), alsoToAgencyEmail: req.body.alsoToAgencyEmail === true || req.body.alsoToAgencyEmail === 'true' });
+  if (outcome.noRecipients) return next(new AppError('This vendor has no owner email to send the report to.', 400));
+  if (outcome.sentTo.length) {
+    await logActivity(req, { action: 'agency.report_sent', summary: `Emailed the ${period.kind} report for ${period.label} to ${outcome.sentTo.join(', ')}`, agency: agency._id });
+  }
+  const sent = outcome.sentTo.length > 0;
+  res.status(sent ? 200 : 502).json({
+    status: sent ? 'success' : 'fail',
+    message: sent
+      ? `Report for ${period.label} emailed to ${outcome.sentTo.join(' and ')}.${outcome.failed.length ? ` It couldn't be sent to ${outcome.failed.map(f => f.email).join(', ')}.` : ''}`
+      : "The report couldn't be emailed (email isn't set up on the server). Copy it below and send it yourself.",
+    data: { sentTo: outcome.sentTo, failed: outcome.failed.map(f => f.email), report: outcome.report, text: reportText(outcome.report) }
+  });
+});
+
+// Turn automatic daily or monthly reports on or off
+exports.setReportSchedule = catchAsync(async (req, res, next) => {
+  const agency = await findVendor(req.params.id, next);
+  if (!agency) return;
+  const { schedule } = req.body;
+  if (!['off', 'daily', 'monthly'].includes(schedule)) return next(new AppError('Choose off, daily or monthly.', 400));
+  const changed = agency.reports.schedule !== schedule;
+  agency.reports.schedule = schedule;
+  if (req.body.alsoToAgencyEmail !== undefined) agency.reports.alsoToAgencyEmail = req.body.alsoToAgencyEmail === true || req.body.alsoToAgencyEmail === 'true';
+  agency.reports.baseURL = siteURL(req);
+  agency.reports.updatedBy = req.user._id;
+  if (changed) { agency.reports.lastError = ''; agency.reports.lastAttemptAt = undefined; }
+  await agency.save({ validateBeforeSave: false });
+  await logActivity(req, { action: 'agency.report_schedule', summary: schedule === 'off' ? 'Turned off automatic reports' : `Set ${schedule} reports to be emailed automatically`, agency: agency._id });
+  const when = { off: 'Automatic reports are off.', daily: 'A report for the day before will be emailed every morning at 9:00 (Bangladesh time).', monthly: 'A report for the month before will be emailed on the 1st of each month at 9:00 (Bangladesh time).' }[schedule];
+  res.status(200).json({ status: 'success', message: when, data: { schedule: agency.reports } });
 });

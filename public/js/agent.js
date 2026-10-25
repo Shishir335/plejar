@@ -20,7 +20,8 @@ const state = {
   cancelling: null,
   audience: null,
   tempPassword: '',
-  places: null
+  places: null,
+  plan: { itinerary: [], spareDays: [] }
 };
 
 const isOwner = () => state.me && state.me.agencyRole === 'owner';
@@ -231,6 +232,8 @@ document.addEventListener('click', e => {
   if (name === 'registrations') showRegistrationsFor(id);
   if (name === 'notify-event') notifyEvent(id);
   if (name === 'close-drawer') closeDrawers();
+  if (name === 'add-place') openPlaceDialog({ kind: 'event' }, $('evPlace').value ? '' : $('evPlaceSearch').value.trim());
+  if (name === 'close-place') closePlaceDialog();
   if (name === 'new-announcement') openAnnouncementEditor(null);
   if (name === 'edit-announcement') openAnnouncementEditor(state.announcements.find(a => a._id === id));
   if (name === 'delete-announcement') deleteAnnouncement(id);
@@ -481,6 +484,7 @@ function renderEvents() {
         ${closes}
         ${e.status === 'cancelled' ? `<div class="pkg-note">Cancelled: ${escapeHTML(e.cancelReason)}</div>` : ''}
         ${e.hiddenByAdmin ? '<div class="pkg-note">Hidden by Plezar</div>' : ''}
+        ${e.status !== 'cancelled' && !e.planComplete ? `<div class="pkg-plan-missing">Tour plan missing ${plural(e.planMissing.length, 'thing')}. Edit to finish it before publishing.</div>` : ''}
         <div class="pkg-actions">
           <button class="btn btn-quiet btn-sm" data-action="registrations" data-id="${id}">Registrations${regs ? ` (${regs})` : ''}</button>
           ${e.status !== 'cancelled' ? `<button class="btn btn-quiet btn-sm" data-action="edit-event" data-id="${id}">Edit</button>` : ''}
@@ -511,14 +515,181 @@ $('evPhotos').addEventListener('click', e => {
   renderEditorPhotos();
 });
 
-function updateDurationHint() {
+// ---------- Tour plan editor ----------
+
+const STOP_KINDS = { departure: 'Departure', stop: 'Stop', activity: 'Activity', meal: 'Meal', stay: 'Check in', return: 'Return' };
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const linesOf = value => String(value || '').split('\n').map(s => s.trim()).filter(Boolean);
+
+// Days and nights from the date fields (null until a valid range is chosen)
+function tripLength() {
   const form = $('eventForm');
   const start = form.startDate.value;
   const end = form.endDate.value || start;
-  if (!start || end < start) { $('evDuration').textContent = ''; return; }
+  if (!start || end < start) return null;
   const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
-  $('evDuration').textContent = `${plural(days, 'day')}, ${plural(days - 1, 'night')}.`;
+  return { days, nights: days - 1, start };
 }
+
+function updateDurationHint() {
+  const len = tripLength();
+  $('evDuration').textContent = len ? `${plural(len.days, 'day')}, ${plural(len.nights, 'night')}.` : '';
+  $('evStayRequired').hidden = !(len && len.nights > 0);
+}
+
+const blankDay = n => ({ day: n, title: '', stops: [], stay: '', meals: { breakfast: false, lunch: false, dinner: false } });
+const blankStop = kind => ({ time: '', place: '', kind: kind || 'stop', note: '', destinationRef: '' });
+
+// Keep one card per day of the tour; days beyond the new length are set aside, not lost
+function syncItineraryDays() {
+  const len = tripLength();
+  if (!len) return renderItinerary();
+  const all = state.plan.itinerary.concat(state.plan.spareDays || []);
+  state.plan.itinerary = Array.from({ length: Math.min(len.days, 60) }, (_, i) => ({ ...(all[i] || blankDay(i + 1)), day: i + 1 }));
+  state.plan.spareDays = all.slice(len.days);
+  if (len.days >= 1 && !state.plan.itinerary[0].stops.length) {
+    state.plan.itinerary[0].stops.push({ ...blankStop('departure'), time: $('evDeparture').value, place: $('evMeeting').value.trim() });
+  }
+  renderItinerary();
+}
+
+function dayDate(i) {
+  const len = tripLength();
+  if (!len) return '';
+  const d = new Date(Date.parse(len.start) + i * 86400000);
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+function renderItinerary() {
+  const box = $('evItinerary');
+  const len = tripLength();
+  const days = state.plan.itinerary;
+  $('evItineraryHint').textContent = len
+    ? 'Add every stop in order: where you leave from, where you stop to eat or visit, where you sleep and when you head back. Times help travelers plan.'
+    : 'Choose the dates first. One card appears for each day of the tour.';
+  if (!len) { box.innerHTML = ''; return; }
+  box.innerHTML = days.map((d, i) => `
+    <article class="day-card" data-day="${i}">
+      <header class="day-head">
+        <span class="day-no">Day ${i + 1}</span><span class="day-date">${escapeHTML(dayDate(i))}</span>
+        <input class="day-title" data-field="title" maxlength="120" placeholder="Short title, e.g. Dhaka to Sajek" value="${escapeHTML(d.title)}" aria-label="Day ${i + 1} title">
+      </header>
+      <ol class="stop-list">
+        ${d.stops.map((st, j) => `
+          <li class="stop-row" data-stop="${j}">
+            <input type="time" data-field="time" value="${escapeHTML(st.time)}" aria-label="Time">
+            <select data-field="kind" aria-label="Kind of stop">${Object.entries(STOP_KINDS).map(([k, t]) => `<option value="${k}" ${st.kind === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+            <input data-field="place" list="placeOptions" maxlength="120" placeholder="Place *" value="${escapeHTML(st.place)}" aria-label="Place" class="${st.destinationRef ? 'is-linked' : ''}">
+            <input data-field="note" maxlength="300" placeholder="What happens here" value="${escapeHTML(st.note)}" aria-label="Note">
+            <div class="stop-actions">
+              <button type="button" class="icon-btn add" data-stop-addplace title="Add this place to Plezar's destinations" aria-label="Add this place to Plezar" ${st.place.trim() && !st.destinationRef ? '' : 'hidden'}>+</button>
+              <button type="button" class="icon-btn" data-stop-move="-1" ${j === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+              <button type="button" class="icon-btn" data-stop-move="1" ${j === d.stops.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+              <button type="button" class="icon-btn danger" data-stop-remove aria-label="Remove stop">×</button>
+            </div>
+          </li>`).join('')}
+      </ol>
+      <button type="button" class="btn btn-quiet btn-sm" data-stop-add>+ Add stop</button>
+      <div class="day-foot">
+        <span class="label">Meals included</span>
+        ${['breakfast', 'lunch', 'dinner'].map(m => `<label class="meal"><input type="checkbox" data-meal="${m}" ${d.meals[m] ? 'checked' : ''}> ${m[0].toUpperCase() + m.slice(1)}</label>`).join('')}
+        ${i < len.nights ? `<input class="day-stay" data-field="stay" maxlength="120" placeholder="Where travelers sleep tonight *" value="${escapeHTML(d.stay)}" aria-label="Night ${i + 1} stay">` : ''}
+      </div>
+    </article>`).join('');
+  updatePlanCheck();
+}
+
+// One listener handles every input in the day cards
+$('evItinerary').addEventListener('input', e => {
+  const card = e.target.closest('[data-day]');
+  if (!card) return;
+  const day = state.plan.itinerary[Number(card.dataset.day)];
+  const row = e.target.closest('[data-stop]');
+  const field = e.target.dataset.field;
+  if (e.target.dataset.meal) day.meals[e.target.dataset.meal] = e.target.checked;
+  else if (row) {
+    const stop = day.stops[Number(row.dataset.stop)];
+    stop[field] = e.target.value;
+    if (field === 'place') {
+      // Typing a Plezar destination's name links the stop to it
+      const match = (state.places || []).find(p => p.name.toLowerCase() === e.target.value.trim().toLowerCase());
+      stop.destinationRef = match ? match._id : '';
+      e.target.classList.toggle('is-linked', Boolean(match));
+      row.querySelector('[data-stop-addplace]').hidden = Boolean(match) || !e.target.value.trim();
+    }
+  } else if (field) day[field] = e.target.value;
+  updatePlanCheck();
+});
+
+$('evItinerary').addEventListener('click', e => {
+  const card = e.target.closest('[data-day]');
+  if (!card) return;
+  const day = state.plan.itinerary[Number(card.dataset.day)];
+  const row = e.target.closest('[data-stop]');
+  if (e.target.closest('[data-stop-add]')) {
+    const last = day.stops[day.stops.length - 1];
+    day.stops.push(blankStop(last && last.kind === 'departure' ? 'stop' : 'stop'));
+    renderItinerary();
+    const rows = $('evItinerary').querySelectorAll(`[data-day="${card.dataset.day}"] [data-field="place"]`);
+    if (rows.length) rows[rows.length - 1].focus();
+  } else if (row && e.target.closest('[data-stop-addplace]')) {
+    openPlaceDialog({ kind: 'stop', day: Number(card.dataset.day), stop: Number(row.dataset.stop) }, day.stops[Number(row.dataset.stop)].place.trim());
+  } else if (row && e.target.closest('[data-stop-remove]')) {
+    day.stops.splice(Number(row.dataset.stop), 1);
+    renderItinerary();
+  } else if (row && e.target.closest('[data-stop-move]')) {
+    const j = Number(row.dataset.stop);
+    const k = j + Number(e.target.closest('[data-stop-move]').dataset.stopMove);
+    [day.stops[j], day.stops[k]] = [day.stops[k], day.stops[j]];
+    renderItinerary();
+  }
+});
+
+// The same checks the server makes before publishing, so vendors see what's left as they go
+function planMissing() {
+  const form = $('eventForm');
+  const len = tripLength();
+  const missing = [];
+  const val = id => $(id).value.trim();
+  if (!val('evPlace')) missing.push('the destination');
+  if (!len) missing.push('the dates');
+  if (!form.seats.value) missing.push('the number of seats');
+  if (form.priceFrom.value === '') missing.push('the price per person');
+  if (val('evAdvance') === '') missing.push('the booking advance (0 if none)');
+  else if (form.priceFrom.value !== '' && Number(val('evAdvance')) > Number(form.priceFrom.value)) missing.push('a booking advance no higher than the price');
+  if (!val('evMeeting')) missing.push('the meeting point');
+  if (!val('evDeparture')) missing.push('the departure time');
+  if (!val('evReturn')) missing.push('when and where the tour ends');
+  if (!val('evTransport')) missing.push('the transport');
+  if (len && len.nights > 0 && (!val('evStay') || val('evStay') === 'none')) missing.push('where travelers stay');
+  if (len) {
+    state.plan.itinerary.forEach((d, i) => {
+      const named = d.stops.filter(s => s.place.trim());
+      if (!named.length) missing.push(`stops for day ${i + 1}`);
+      if (d.stops.some(s => !s.place.trim() && (s.note.trim() || s.time))) missing.push(`a place for every stop on day ${i + 1}`);
+      if (i < len.nights && !d.stay.trim()) missing.push(`where travelers sleep on night ${i + 1}`);
+    });
+    const total = state.plan.itinerary.reduce((n, d) => n + d.stops.filter(s => s.place.trim()).length, 0);
+    if (total === 1) missing.push('at least 2 stops in the plan');
+  }
+  if (!linesOf($('evIncluded').value).length) missing.push("what's included");
+  if (!linesOf($('evExcluded').value).length) missing.push("what's not included");
+  if (!val('evDifficulty')) missing.push('the difficulty');
+  if (val('evPolicy').length < 20) missing.push('the cancellation and refund policy');
+  return missing;
+}
+
+function updatePlanCheck() {
+  const missing = planMissing();
+  const box = $('evPlanCheck');
+  box.className = `plan-check ${missing.length ? '' : 'is-complete'}`;
+  box.innerHTML = missing.length
+    ? `<strong>Before you can publish, add ${plural(missing.length, 'thing')}:</strong><ul>${missing.map(m => `<li>${escapeHTML(m)}</li>`).join('')}</ul>`
+    : '<strong>The plan is complete.</strong> You can publish this event.';
+}
+
+$('eventForm').addEventListener('input', e => { if (!e.target.closest('#evItinerary')) updatePlanCheck(); });
+$('eventForm').addEventListener('change', e => { if (!e.target.closest('#evItinerary')) updatePlanCheck(); });
 
 ['startDate', 'endDate'].forEach(name => $('eventForm')[name].addEventListener('change', () => {
   const form = $('eventForm');
@@ -526,23 +697,169 @@ function updateDurationHint() {
   form.endDate.min = form.startDate.value;
   form.registrationDeadline.max = form.startDate.value;
   updateDurationHint();
+  syncItineraryDays();
 }));
 
-// Published destinations a vendor can link an event to (loaded once)
+// ---------- Shared destinations: pick one, or add a missing place ----------
+
+// "Sajek Valley (Rangamati, Chattogram)"
+const placeLabel = p => `${p.name}${p.path && p.path.length > 1 ? ` (${p.path.slice(1).reverse().join(', ')})` : ''}`;
+
+async function loadPlaces(force) {
+  if (state.places && !force) return state.places;
+  try {
+    const { data } = await api('/api/v1/agency/me/destinations');
+    state.places = data.destinations.filter(d => d.type !== 'country');
+  } catch (err) {
+    // Don't remember a failed load: the next editor opening tries again
+    return state.places || [];
+  }
+  return state.places;
+}
+
 async function fillPlaceSelect(selected) {
-  const select = $('evPlace');
-  if (!state.places) {
+  const places = await loadPlaces();
+  $('destinationOptions').innerHTML = places.map(p => `<option value="${escapeHTML(placeLabel(p))}">`).join('');
+  $('placeOptions').innerHTML = places.map(p => `<option value="${escapeHTML(p.name)}">`).join('');
+  if (selected !== undefined) setEventPlace(selected);
+}
+
+// Link the event to a destination by ID ('' to clear) and show it in the search box
+function setEventPlace(id) {
+  const place = id ? (state.places || []).find(p => p._id === String(id)) : null;
+  $('evPlace').value = place ? place._id : '';
+  $('evPlaceSearch').value = place ? placeLabel(place) : '';
+  updatePlaceHint();
+}
+
+function updatePlaceHint() {
+  const place = state.places && state.places.find(p => p._id === $('evPlace').value);
+  const typed = $('evPlaceSearch').value.trim();
+  const hint = $('evPlaceHint');
+  hint.classList.remove('hint-warn', 'hint-ok');
+  if (place) {
+    hint.textContent = place.status === 'draft'
+      ? `Linked to ${place.name}. It's waiting for Plezar's review; travelers see the destination once it's approved.`
+      : `Linked to ${place.name} on Plezar.`;
+    hint.classList.add('hint-ok');
+  } else if (typed) {
+    hint.textContent = 'Not in the list yet. Choose one of the suggestions, or add it as a new destination.';
+    hint.classList.add('hint-warn');
+  } else {
+    hint.textContent = "Pick from the list. Can't find it? Add it, and it's saved to Plezar's destinations for everyone.";
+  }
+}
+
+$('evPlaceSearch').addEventListener('input', () => {
+  const typed = $('evPlaceSearch').value.trim().toLowerCase();
+  const list = state.places || [];
+  // An exact label, or a name only one destination has
+  const byLabel = list.find(p => placeLabel(p).toLowerCase() === typed);
+  const byName = list.filter(p => p.name.toLowerCase() === typed);
+  const match = byLabel || (byName.length === 1 ? byName[0] : null);
+  $('evPlace').value = match ? match._id : '';
+  updatePlaceHint();
+  updatePlanCheck();
+});
+
+// The add-destination dialog, for the event itself or for one stop in the plan
+async function openPlaceDialog(target, name) {
+  state.placeTarget = target;
+  const form = $('placeForm');
+  form.reset();
+  showAlert('placeError', '');
+  $('plName').value = name || '';
+  if (!state.geo) {
     try {
-      const { data } = await api('/api/v1/agency/me/destinations');
-      state.places = data.destinations.filter(d => d.type !== 'country');
+      const { data } = await api('/api/v1/agency/me/destination-geography');
+      state.geo = data.divisions;
     } catch (err) {
-      state.places = [];
+      state.geo = [];
     }
   }
-  select.innerHTML = '<option value="">Not linked</option>' + state.places
-    .map(d => `<option value="${escapeHTML(d._id)}">${escapeHTML(d.name)}${d.path.length ? ` (${escapeHTML(d.path.slice(1).join(', ') || d.path.join(', '))})` : ''}</option>`).join('');
-  select.value = selected || '';
+  $('plDivision').innerHTML = '<option value="">Choose a division</option>' + state.geo.map(d => `<option value="${escapeHTML(d.code)}">${escapeHTML(d.name)} (${escapeHTML(d.nameBn)})</option>`).join('');
+  fillPlDistricts();
+  $('placeDialog').hidden = false;
+  $('plDivision').focus();
 }
+
+function plType() { return (document.querySelector('input[name="plType"]:checked') || {}).value || 'attraction'; }
+
+function fillPlDistricts() {
+  const division = state.geo.find(d => d.code === $('plDivision').value);
+  const select = $('plDistrict');
+  const town = plType() === 'city';
+  $('plDistrictLabel').textContent = town ? 'District' : 'District *';
+  if (!division) {
+    select.innerHTML = '<option value="">Choose the division first</option>';
+    select.disabled = true;
+    return;
+  }
+  const keep = select.value;
+  select.disabled = false;
+  select.innerHTML = `<option value="">${town ? 'A town that is not a district' : 'Choose a district'}</option>` + division.districts.map(d => `<option value="${escapeHTML(d.code)}">${escapeHTML(d.name)} (${escapeHTML(d.nameBn)})</option>`).join('');
+  select.value = keep;
+}
+
+$('plDivision').addEventListener('change', fillPlDistricts);
+document.querySelectorAll('input[name="plType"]').forEach(r => r.addEventListener('change', fillPlDistricts));
+// Choosing a district as the "town" fills in its name
+$('plDistrict').addEventListener('change', () => {
+  if (plType() !== 'city') return;
+  const division = state.geo.find(d => d.code === $('plDivision').value);
+  const district = division && division.districts.find(d => d.code === $('plDistrict').value);
+  if (district) { $('plName').value = district.name; $('plNameBn').value = district.nameBn; }
+});
+
+function closePlaceDialog() {
+  $('placeDialog').hidden = true;
+  state.placeTarget = null;
+}
+
+$('placeDialog').addEventListener('click', e => { if (e.target === $('placeDialog')) closePlaceDialog(); });
+
+$('placeForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('placeError', '');
+  const type = plType();
+  const name = $('plName').value.trim();
+  const lat = $('plLat').value.trim();
+  const lng = $('plLng').value.trim();
+  if (!$('plDivision').value) return showAlert('placeError', 'Choose the division.');
+  if (type === 'attraction' && !$('plDistrict').value) return showAlert('placeError', 'Choose the district the place is in.');
+  if (!name && !(type === 'city' && $('plDistrict').value)) return showAlert('placeError', 'Enter the name of the place.');
+  if ((lat === '') !== (lng === '')) return showAlert('placeError', 'Enter both latitude and longitude, or leave both empty.');
+  const photo = $('plPhoto').files[0];
+  if (photo && (!['image/jpeg', 'image/png', 'image/webp'].includes(photo.type) || photo.size > 5 * 1024 * 1024)) return showAlert('placeError', 'Use a JPG, PNG or WebP photo under 5 MB.');
+
+  const fd = new FormData();
+  Object.entries({ type, name, nameBn: $('plNameBn').value.trim(), division: $('plDivision').value, district: $('plDistrict').value, lat, lng, summary: $('plSummary').value.trim() })
+    .forEach(([k, v]) => fd.append(k, v));
+  if (photo) fd.append('photo', photo);
+
+  const btn = $('placeSubmit');
+  setBusy(btn, true);
+  try {
+    const { data, message } = await api('/api/v1/agency/me/destinations', { method: 'POST', form: fd });
+    await loadPlaces(true);
+    await fillPlaceSelect();
+    const target = state.placeTarget;
+    if (target && target.kind === 'stop') {
+      const stop = state.plan.itinerary[target.day] && state.plan.itinerary[target.day].stops[target.stop];
+      if (stop) { stop.place = data.destination.name; stop.destinationRef = data.destination._id; }
+      renderItinerary();
+    } else {
+      setEventPlace(data.destination._id);
+      updatePlanCheck();
+    }
+    closePlaceDialog();
+    toast(message);
+  } catch (err) {
+    showAlert('placeError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
 
 function openEventEditor(ev) {
   state.editing = ev || null;
@@ -557,9 +874,9 @@ function openEventEditor(ev) {
   $('eventRegisteredNote').textContent = ev ? `${plural(regs, 'person has', 'people have')} registered. If you change the start date, their registration moves to the new date and they get a notification.` : '';
   const today = isoDay(new Date());
   form.startDate.min = today;
+  const set = (id, value) => { $(id).value = value == null ? '' : value; };
   if (ev) {
     form.title.value = ev.title;
-    form.destination.value = ev.destination;
     form.startDate.value = isoDay(ev.startDate);
     form.endDate.value = isoDay(ev.endDate || ev.startDate);
     form.registrationDeadline.value = isoDay(ev.registrationDeadline);
@@ -575,13 +892,40 @@ function openEventEditor(ev) {
     form.status.value = 'draft';
     form.seats.min = 1;
   }
+  set('evChildPrice', ev && ev.childPrice);
+  set('evAdvance', ev && ev.advanceAmount);
+  set('evExcluded', ev ? (ev.excluded || []).join('\n') : '');
+  set('evDeparture', ev && ev.departureTime);
+  set('evTransport', ev && ev.transport && ev.transport.mode);
+  set('evTransportDetails', ev && ev.transport && ev.transport.details);
+  set('evStay', ev && ev.accommodation && ev.accommodation.type);
+  set('evStayDetails', ev && ev.accommodation && ev.accommodation.details);
+  set('evReturn', ev && ev.returnInfo);
+  set('evDifficulty', ev && ev.difficulty);
+  set('evBring', ev ? (ev.whatToBring || []).join('\n') : '');
+  set('evPolicy', ev && ev.cancellationPolicy);
+  state.plan = {
+    itinerary: ev && ev.itinerary ? ev.itinerary.map(d => ({
+      day: d.day,
+      title: d.title || '',
+      stay: d.stay || '',
+      meals: { breakfast: Boolean(d.meals && d.meals.breakfast), lunch: Boolean(d.meals && d.meals.lunch), dinner: Boolean(d.meals && d.meals.dinner) },
+      stops: (d.stops || []).map(st => ({ time: st.time || '', place: st.place || '', kind: st.kind || 'stop', note: st.note || '', destinationRef: st.destinationRef ? String(st.destinationRef._id || st.destinationRef) : '' }))
+    })) : [],
+    spareDays: []
+  };
   form.endDate.min = form.startDate.value || today;
   form.registrationDeadline.max = form.startDate.value;
   form.status.querySelector('option[value="published"]').disabled = Boolean(ev && ev.hiddenByAdmin);
   updateDurationHint();
   renderEditorPhotos();
-  fillPlaceSelect(ev && ev.destinationRef ? ev.destinationRef._id || ev.destinationRef : '');
+  $('evPlace').value = '';
+  $('evPlaceSearch').value = ev && !ev.destinationRef ? ev.destination || '' : '';
+  updatePlaceHint();
+  fillPlaceSelect(ev && ev.destinationRef ? String(ev.destinationRef._id || ev.destinationRef) : undefined).then(() => { syncItineraryDays(); updatePlaceHint(); });
+  syncItineraryDays();
   $('eventDrawer').hidden = false;
+  $('eventForm').scrollTop = 0;
   form.title.focus();
 }
 
@@ -597,8 +941,34 @@ function closeDrawers() {
 }));
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeDrawers();
+  if (e.key !== 'Escape') return;
+  // Close the add-destination dialog on its own, without losing the tour being edited
+  if (!$('placeDialog').hidden) closePlaceDialog();
+  else closeDrawers();
 });
+
+// The plan as the server expects it
+function planPayload() {
+  const val = id => $(id).value.trim();
+  return {
+    departureTime: val('evDeparture'),
+    returnInfo: val('evReturn'),
+    childPrice: val('evChildPrice'),
+    advanceAmount: val('evAdvance'),
+    excluded: linesOf($('evExcluded').value),
+    whatToBring: linesOf($('evBring').value),
+    difficulty: val('evDifficulty'),
+    cancellationPolicy: val('evPolicy'),
+    transport: { mode: val('evTransport'), details: val('evTransportDetails') },
+    accommodation: { type: val('evStay'), details: val('evStayDetails') },
+    itinerary: state.plan.itinerary.map(d => ({
+      title: d.title.trim(),
+      stay: d.stay.trim(),
+      meals: d.meals,
+      stops: d.stops.filter(s => s.place.trim() || s.note.trim() || s.time).map(s => ({ time: s.time, place: s.place.trim(), kind: s.kind, note: s.note.trim(), destinationRef: s.destinationRef || undefined }))
+    }))
+  };
+}
 
 $('eventForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -607,7 +977,7 @@ $('eventForm').addEventListener('submit', async e => {
   const v = name => form[name].value.trim();
 
   if (!v('title')) return showAlert('eventError', 'Enter a title.');
-  if (!v('destination')) return showAlert('eventError', 'Enter the destination.');
+  if ($('evPlaceSearch').value.trim() && !$('evPlace').value) return showAlert('eventError', 'Choose the destination from the suggestions, or add it as a new destination.');
   if (!v('startDate')) return showAlert('eventError', 'Choose the start date.');
   if (!state.editing && v('startDate') <= isoDay(new Date())) return showAlert('eventError', 'Choose a start date after today.');
   if (v('endDate') && v('endDate') < v('startDate')) return showAlert('eventError', 'The tour cannot end before it starts.');
@@ -616,14 +986,24 @@ $('eventForm').addEventListener('submit', async e => {
   if (!Number.isInteger(seats) || seats < 1) return showAlert('eventError', 'Enter how many seats the tour has.');
   if (state.editing && seats < state.editing.stats.seatsTaken) return showAlert('eventError', `${state.editing.stats.seatsTaken} seats are already taken, so you need at least that many.`);
   if (v('priceFrom') === '' || Number(v('priceFrom')) < 0) return showAlert('eventError', 'Enter the price per person in taka.');
+  const badTime = state.plan.itinerary.flatMap(d => d.stops).find(s => s.time && !TIME_RE.test(s.time));
+  if (badTime) return showAlert('eventError', `Enter times like 06:30 (at ${badTime.place || 'a stop'}).`);
+  if (v('status') === 'published') {
+    const missing = planMissing();
+    if (missing.length) {
+      $('evPlanCheck').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return showAlert('eventError', `Finish the tour plan before publishing, or save it as a draft. Still missing: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? ` and ${missing.length - 3} more` : ''}.`);
+    }
+  }
 
   const newFiles = Array.from($('evPhotoInput').files);
   const kept = state.editing ? state.editing.photos.filter(p => !state.removedPhotos.has(p)).length : 0;
   if (kept + newFiles.length > 6) return showAlert('eventError', `An event can have 6 photos. Remove ${kept + newFiles.length - 6} and try again.`);
 
   const fd = new FormData();
-  ['title', 'destination', 'startDate', 'endDate', 'registrationDeadline', 'seats', 'priceFrom', 'meetingPoint', 'description', 'status', 'destinationRef'].forEach(f => fd.append(f, v(f)));
-  fd.append('included', form.included.value.split('\n').map(s => s.trim()).filter(Boolean).join('\n'));
+  ['title', 'startDate', 'endDate', 'registrationDeadline', 'seats', 'priceFrom', 'meetingPoint', 'description', 'status', 'destinationRef'].forEach(f => fd.append(f, v(f)));
+  fd.append('included', linesOf(form.included.value).join('\n'));
+  fd.append('plan', JSON.stringify(planPayload()));
   newFiles.forEach(f => fd.append('photos', f));
   if (state.editing && state.removedPhotos.size) fd.append('removePhotos', Array.from(state.removedPhotos).join(','));
 
