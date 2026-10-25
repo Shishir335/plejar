@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/css/admin.css">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
 <body>
 
@@ -103,6 +104,12 @@
           <span>🏝️</span>
           <span class="sidebar-text">Vendors</span>
           <span id="vendorsAttentionCount" class="nav-count" hidden>0</span>
+        </button>
+
+        <button class="nav-link-btn" data-tab="destinations" onclick="switchTab('destinations'); refreshDestinationViews();">
+          <span>🗺️</span>
+          <span class="sidebar-text">Destinations</span>
+          <span id="destinationsAttentionCount" class="nav-count" hidden>0</span>
         </button>
 
         <button class="nav-link-btn" data-tab="system" onclick="switchTab('system')">
@@ -386,6 +393,118 @@
               </tbody>
             </table>
           </div>
+        </section>
+
+        <!-- DESTINATION MANAGEMENT -->
+        <section id="tab-destinations" class="tab-pane">
+          <div class="subtabs" role="tablist" aria-label="Destination management">
+            <button type="button" role="tab" class="subtab active" data-dsub="all" aria-selected="true">All destinations</button>
+            <button type="button" role="tab" class="subtab" data-dsub="map" aria-selected="false">Map</button>
+            <button type="button" role="tab" class="subtab" data-dsub="featured" aria-selected="false">Featured &amp; trending</button>
+            <button type="button" role="tab" class="subtab" data-dsub="categories" aria-selected="false">Categories</button>
+            <button type="button" role="tab" class="subtab" data-dsub="statistics" aria-selected="false">Statistics</button>
+          </div>
+
+          <!-- All destinations -->
+          <div class="subpane active" id="dsub-all">
+            <div class="chips" id="destinationChips" aria-label="Destination summary"></div>
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="dSearch" class="search-input" placeholder="Search name, Bangla name or address" aria-label="Search destinations" oninput="debouncedDestinations()"></div>
+                <select id="dTypeF" class="form-select" aria-label="Type" onchange="loadDestinations(1)">
+                  <option value="">Every type</option><option value="country">Countries</option><option value="region">Regions</option><option value="city">Cities and districts</option><option value="attraction">Attractions</option>
+                </select>
+                <select id="dWithinF" class="form-select" aria-label="Inside" onchange="loadDestinations(1)"><option value="">Anywhere</option></select>
+                <select id="dStatusF" class="form-select" aria-label="Status" onchange="loadDestinations(1)">
+                  <option value="">Any status</option><option value="published">Published</option><option value="draft">Draft</option><option value="archived">Archived</option>
+                </select>
+                <select id="dCategoryF" class="form-select" aria-label="Category" onchange="loadDestinations(1)"><option value="">Any category</option></select>
+                <select id="dAvailF" class="form-select" aria-label="Availability" onchange="loadDestinations(1)">
+                  <option value="">Any availability</option><option value="open">Open all year</option><option value="seasonal">Seasonal</option><option value="restricted">Restricted</option><option value="closed">Closed</option>
+                </select>
+                <select id="dMissingF" class="form-select" aria-label="Missing" onchange="loadDestinations(1)">
+                  <option value="">Complete or not</option><option value="location">No map location</option><option value="cover">No cover photo</option><option value="description">No description</option><option value="seo">No search text</option>
+                </select>
+                <select id="dSortF" class="form-select" aria-label="Sort" onchange="loadDestinations(1)">
+                  <option value="">By type, then name</option><option value="name">Name A to Z</option><option value="popular">Most popular</option><option value="trending">Trending now</option><option value="views">Most viewed</option><option value="updated">Recently edited</option>
+                </select>
+              </div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadDestinations()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openNewDestination()">+ Add destination</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Destination</th><th>Type</th><th>Map &amp; media</th><th>Availability</th><th>Events</th><th>Travelers</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="destinationsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="destinationsPager"></div>
+          </div>
+
+          <!-- Map -->
+          <div class="subpane" id="dsub-map">
+            <div class="control-bar">
+              <div><h3 class="pane-title">Destinations on the map</h3><p class="pane-sub" id="mapSummary">Every destination with a map location. Select a pin to open it.</p></div>
+              <div class="filters">
+                <label class="check"><input type="checkbox" id="mapShowDrafts" onchange="loadDestinationMap()"> Show drafts and archived</label>
+              </div>
+            </div>
+            <div class="map-legend">
+              <span><i class="pin pin-country"></i>Country</span><span><i class="pin pin-region"></i>Region</span><span><i class="pin pin-city"></i>City</span><span><i class="pin pin-attraction"></i>Attraction</span>
+            </div>
+            <div id="destinationMap" class="dest-map" role="region" aria-label="Map of destinations"></div>
+            <div id="mapMissing"></div>
+          </div>
+
+          <!-- Featured and trending -->
+          <div class="subpane" id="dsub-featured">
+            <div class="feature-grid">
+              <div class="detail-card">
+                <h3>Featured</h3>
+                <p class="detail-muted">Shown first in the app, in this order. Only published places can be featured.</p>
+                <ol class="feature-list" id="featuredList"></ol>
+                <div class="form-group" style="margin-top: 12px;">
+                  <label class="form-label" for="featureAdd">Add a place</label>
+                  <div style="display:flex; gap:8px;">
+                    <input id="featureAdd" class="form-input" list="featureAddList" placeholder="Start typing a published destination">
+                    <datalist id="featureAddList"></datalist>
+                    <button class="btn btn-secondary btn-sm" onclick="addFeatured()">Add</button>
+                  </div>
+                </div>
+                <button class="btn btn-primary" id="featuredSave" onclick="saveFeatured()" disabled>Save featured list</button>
+              </div>
+              <div class="detail-card">
+                <h3>Trending</h3>
+                <p class="detail-muted">Worked out from registrations in the last 30 days and upcoming tour events. Pin a place to keep it on the list.</p>
+                <ol class="feature-list" id="trendingList"></ol>
+              </div>
+            </div>
+          </div>
+
+          <!-- Categories -->
+          <div class="subpane" id="dsub-categories">
+            <div class="control-bar">
+              <div><h3 class="pane-title">Destination categories</h3><p class="pane-sub">Kinds of places, like beaches, hills or heritage sites. Travelers filter by these in the app.</p></div>
+              <div class="actions"><button class="btn btn-secondary" onclick="loadDestinationCategories()">↻ Refresh</button><button class="btn btn-primary" onclick="openDestinationCategoryModal()">+ New category</button></div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table">
+                <thead><tr><th>Category</th><th>Bangla</th><th>Description</th><th>Places</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="destinationCategoriesBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Statistics -->
+          <div class="subpane" id="dsub-statistics">
+            <div id="destinationStats"></div>
+          </div>
+        </section>
+
+        <section id="tab-destinationDetail" class="tab-pane">
+          <div id="destinationDetail"></div>
         </section>
 
         <!-- VENDOR MANAGEMENT -->
@@ -922,6 +1041,19 @@
     </div>
   </div>
 
+  <div id="destCategoryModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-head"><h3 id="dcTitle">New category</h3><button class="modal-x" onclick="closeModal('destCategoryModal')" aria-label="Close">&times;</button></div>
+      <form onsubmit="submitDestinationCategory(event)" novalidate>
+        <div class="form-group"><label class="form-label" for="dcName">Name *</label><input id="dcName" class="form-input" maxlength="60" placeholder="Hills and valleys"></div>
+        <div class="form-group"><label class="form-label" for="dcNameBn">Name in Bangla</label><input id="dcNameBn" class="form-input" maxlength="60" lang="bn" placeholder="পাহাড় ও উপত্যকা"></div>
+        <div class="form-group"><label class="form-label" for="dcDesc">Description</label><textarea id="dcDesc" class="form-input" rows="2" maxlength="300"></textarea></div>
+        <div class="form-error-box" id="dcError" role="alert" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block" id="dcSubmit">Save category</button>
+      </form>
+    </div>
+  </div>
+
   <div id="reasonModal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-head"><h3 id="reasonTitle">Confirm</h3><button class="modal-x" onclick="closeModal('reasonModal')" aria-label="Close">&times;</button></div>
@@ -1066,5 +1198,7 @@
   <script src="/js/admin-vendors.js"></script>
   <script src="/js/admin-vendor-profile.js"></script>
   <script src="/js/admin-applications.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="/js/admin-destinations.js"></script>
 </body>
 </html>

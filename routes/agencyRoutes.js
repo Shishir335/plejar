@@ -21,6 +21,7 @@ router
   .patch(imageUpload.array('photos', 6), agencyController.updateMyPackage)
   .delete(agencyController.deleteMyPackage);
 router.post('/me/packages/:id/cancel', agencyController.cancelMyPackage);
+router.get('/me/destinations', agencyController.listDestinationOptions);
 router.get('/me/packages/:id/registrations', agencyController.listEventRegistrations);
 
 router.route('/me/announcements').get(content.listAnnouncements).post(content.createAnnouncement);

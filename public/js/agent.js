@@ -19,7 +19,8 @@ const state = {
   editingAnnouncement: null,
   cancelling: null,
   audience: null,
-  tempPassword: ''
+  tempPassword: '',
+  places: null
 };
 
 const isOwner = () => state.me && state.me.agencyRole === 'owner';
@@ -474,7 +475,7 @@ function renderEvents() {
       <div class="pkg-body">
         <div class="pkg-top"><h3>${escapeHTML(e.title)}</h3><span class="badge badge-${escapeHTML(e.status)}">${escapeHTML(isPast(e) && e.status !== 'cancelled' ? 'Finished' : STATUS_TEXT[e.status])}</span></div>
         <div class="pkg-date">${escapeHTML(dateRange(e.startDate, e.endDate))}</div>
-        <div class="pkg-meta">${escapeHTML(e.destination)}, ${plural(e.durationDays, 'day')}${e.durationNights ? ` ${plural(e.durationNights, 'night')}` : ''}</div>
+        <div class="pkg-meta">${e.destinationRef ? `📍 ${escapeHTML(e.destinationRef.name)}` : escapeHTML(e.destination)}, ${plural(e.durationDays, 'day')}${e.durationNights ? ` ${plural(e.durationNights, 'night')}` : ''}</div>
         <div class="pkg-price">${taka(e.priceFrom)} <span class="muted">per person</span></div>
         ${seatBar(e)}
         ${closes}
@@ -527,6 +528,22 @@ function updateDurationHint() {
   updateDurationHint();
 }));
 
+// Published destinations a vendor can link an event to (loaded once)
+async function fillPlaceSelect(selected) {
+  const select = $('evPlace');
+  if (!state.places) {
+    try {
+      const { data } = await api('/api/v1/agency/me/destinations');
+      state.places = data.destinations.filter(d => d.type !== 'country');
+    } catch (err) {
+      state.places = [];
+    }
+  }
+  select.innerHTML = '<option value="">Not linked</option>' + state.places
+    .map(d => `<option value="${escapeHTML(d._id)}">${escapeHTML(d.name)}${d.path.length ? ` (${escapeHTML(d.path.slice(1).join(', ') || d.path.join(', '))})` : ''}</option>`).join('');
+  select.value = selected || '';
+}
+
 function openEventEditor(ev) {
   state.editing = ev || null;
   state.removedPhotos = new Set();
@@ -563,6 +580,7 @@ function openEventEditor(ev) {
   form.status.querySelector('option[value="published"]').disabled = Boolean(ev && ev.hiddenByAdmin);
   updateDurationHint();
   renderEditorPhotos();
+  fillPlaceSelect(ev && ev.destinationRef ? ev.destinationRef._id || ev.destinationRef : '');
   $('eventDrawer').hidden = false;
   form.title.focus();
 }
@@ -604,7 +622,7 @@ $('eventForm').addEventListener('submit', async e => {
   if (kept + newFiles.length > 6) return showAlert('eventError', `An event can have 6 photos. Remove ${kept + newFiles.length - 6} and try again.`);
 
   const fd = new FormData();
-  ['title', 'destination', 'startDate', 'endDate', 'registrationDeadline', 'seats', 'priceFrom', 'meetingPoint', 'description', 'status'].forEach(f => fd.append(f, v(f)));
+  ['title', 'destination', 'startDate', 'endDate', 'registrationDeadline', 'seats', 'priceFrom', 'meetingPoint', 'description', 'status', 'destinationRef'].forEach(f => fd.append(f, v(f)));
   fd.append('included', form.included.value.split('\n').map(s => s.trim()).filter(Boolean).join('\n'));
   newFiles.forEach(f => fd.append('photos', f));
   if (state.editing && state.removedPhotos.size) fd.append('removePhotos', Array.from(state.removedPhotos).join(','));

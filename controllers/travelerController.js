@@ -2,6 +2,7 @@ const Package = require('../models/packageModel');
 const Agency = require('../models/agencyModel');
 const Announcement = require('../models/announcementModel');
 const Notification = require('../models/notificationModel');
+const Destination = require('../models/destinationModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { escapeRegex, pageParams, paged, validId } = require('../utils/query');
@@ -39,7 +40,8 @@ const publicEvent = (event, stats) => {
     registered: e.stats.registrations,
     registrationOpen: !closed && (e.seatsLeft === null || e.seatsLeft > 0),
     registrationClosedReason: closed || (e.seatsLeft === 0 ? 'This tour event is full.' : null),
-    agency: e.agency
+    agency: e.agency,
+    place: e.destinationRef && e.destinationRef.status !== 'archived' ? { _id: e.destinationRef._id, name: e.destinationRef.name, slug: e.destinationRef.slug, type: e.destinationRef.type } : null
   };
 };
 
@@ -53,12 +55,18 @@ exports.listEvents = catchAsync(async (req, res, next) => {
     agency: { $in: await activeAgencyIds(q.agency ? [q.agency] : null) }
   };
   if (q.destination) filter.destination = { $regex: escapeRegex(String(q.destination).trim()), $options: 'i' };
+  // Events at a destination or anywhere inside it (a region includes its cities and attractions)
+  if (q.destinationId) {
+    if (!validId(q.destinationId)) return next(new AppError('Unknown destination.', 400));
+    const inside = await Destination.find({ ancestors: q.destinationId }).select('_id').lean();
+    filter.destinationRef = { $in: [q.destinationId, ...inside.map(d => d._id)] };
+  }
   if (q.from && !Number.isNaN(Date.parse(q.from))) filter.startDate.$gte = new Date(Math.max(Date.parse(q.from), Date.now()));
   if (q.to && !Number.isNaN(Date.parse(q.to))) filter.startDate.$lte = new Date(q.to);
 
   const page = pageParams(q);
   const [events, total] = await Promise.all([
-    Package.find(filter).sort({ startDate: 1 }).skip(page.skip).limit(page.limit).populate('agency', AGENCY_CARD),
+    Package.find(filter).sort({ startDate: 1 }).skip(page.skip).limit(page.limit).populate('agency', AGENCY_CARD).populate('destinationRef', 'name slug type'),
     Package.countDocuments(filter)
   ]);
   const stats = await registrationStats(events.map(e => e._id));
@@ -67,7 +75,7 @@ exports.listEvents = catchAsync(async (req, res, next) => {
 
 exports.getEvent = catchAsync(async (req, res, next) => {
   const event = validId(req.params.id)
-    ? await Package.findOne({ _id: req.params.id, status: { $in: ['published', 'cancelled'] } }).populate('agency', `${AGENCY_CARD} status`)
+    ? await Package.findOne({ _id: req.params.id, status: { $in: ['published', 'cancelled'] } }).populate('agency', `${AGENCY_CARD} status`).populate('destinationRef', 'name slug type status')
     : null;
   if (!event || !event.agency || event.agency.status !== 'active') return next(new AppError('That tour event is not available.', 404));
   const stats = await registrationStats([event._id]);

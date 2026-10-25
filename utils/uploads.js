@@ -8,6 +8,7 @@ const AppError = require('./appError');
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const PUBLIC_AGENCY_DIR = path.join(__dirname, '..', 'public', 'img', 'agencies');
+const PUBLIC_DESTINATION_DIR = path.join(__dirname, '..', 'public', 'img', 'destinations');
 // Verification documents (trade license, NID) must never be reachable as static files
 const PRIVATE_DOCS_DIR = path.join(__dirname, '..', 'uploads', 'private', 'verification');
 
@@ -81,6 +82,32 @@ const removeAgencyImage = async urlPath => {
   await fs.promises.unlink(target).catch(() => {});
 };
 
+// Destination photos live under /public/img/destinations/<destinationId>/
+const saveDestinationImage = async (file, destinationId) => {
+  const dir = path.join(PUBLIC_DESTINATION_DIR, String(destinationId));
+  await ensureDir(dir);
+  const filename = `${randomName()}.jpg`;
+  await sharp(file.buffer)
+    .rotate()
+    .resize({ width: 2000, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 82 })
+    .toFile(path.join(dir, filename));
+  return `/img/destinations/${destinationId}/${filename}`;
+};
+
+const removeDestinationImage = async urlPath => {
+  if (!urlPath || !urlPath.startsWith('/img/destinations/')) return;
+  const target = path.join(__dirname, '..', 'public', urlPath);
+  if (!target.startsWith(PUBLIC_DESTINATION_DIR + path.sep)) return;
+  await fs.promises.unlink(target).catch(() => {});
+};
+
+const removeDestinationFolder = async destinationId => {
+  const target = path.join(PUBLIC_DESTINATION_DIR, String(destinationId));
+  if (!target.startsWith(PUBLIC_DESTINATION_DIR + path.sep)) return;
+  await fs.promises.rm(target, { recursive: true, force: true });
+};
+
 /**
  * Store a verification document privately. Returns the path relative to the private dir.
  */
@@ -130,6 +157,9 @@ module.exports = {
   applicationUpload,
   saveAgencyImage,
   removeAgencyImage,
+  saveDestinationImage,
+  removeDestinationImage,
+  removeDestinationFolder,
   savePrivateDocument,
   privateDocumentPath,
   removePrivateDocument,

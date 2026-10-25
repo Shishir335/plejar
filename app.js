@@ -31,6 +31,7 @@ const agencyRouter = require('./routes/agencyRoutes');
 const adminAgencyRouter = require('./routes/adminAgencyRoutes');
 const adminUserRouter = require('./routes/adminUserRoutes');
 const adminVendorRouter = require('./routes/adminVendorRoutes');
+const adminDestinationRouter = require('./routes/adminDestinationRoutes');
 
 const AppError = require('./utils/appError');
 const authController = require('./controllers/authController');
@@ -191,6 +192,8 @@ app.use('/api/v1/applications', applicationRouter);
 app.use('/api/v1/events', travelerRoutes.events);
 app.use('/api/v1/announcements', travelerRoutes.announcements);
 app.use('/api/v1/notifications', travelerRoutes.notifications);
+app.use('/api/v1/destinations', travelerRoutes.destinations);
+app.use('/api/v1/destination-categories', travelerRoutes.destinationCategories);
 app.use('/api/v1/bookings', bookingRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/complaints', complaintRouter);
@@ -200,6 +203,7 @@ app.use('/api/v1/admin', authController.protect, authController.restrictTo('admi
 app.use('/api/v1/admin', adminUserRouter);
 app.use('/api/v1/admin', adminVendorRouter);
 app.use('/api/v1/admin', adminApplicationRouter);
+app.use('/api/v1/admin', adminDestinationRouter);
 app.use('/api/v1/admin', adminAgencyRouter);
 
 // 404 UNHANDLED ROUTE CATCHER

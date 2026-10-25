@@ -170,7 +170,7 @@ async function handleAdminLogout() {
 // Switch Sidebar Tabs
 const TAB_TITLES = {
   dashboard: 'Dashboard', users: 'Users', userDetail: 'User profile', subscribers: 'Newsletter Leads', agencies: 'Agencies',
-  vendors: 'Vendors', vendorDetail: 'Vendor profile', applicationDetail: 'Membership application', system: 'System Status', profile: 'My profile'
+  vendors: 'Vendors', vendorDetail: 'Vendor profile', applicationDetail: 'Membership application', destinations: 'Destinations', destinationDetail: 'Destination', system: 'System Status', profile: 'My profile'
 };
 
 // Old tab names still work: they open the matching Vendors sub-tab
@@ -180,7 +180,7 @@ const TAB_ALIASES = {
   agentLeads: ['vendors', 'applications'],
   agencyDetail: ['vendorDetail']
 };
-const NAV_FOR = { userDetail: 'users', vendorDetail: 'vendors', applicationDetail: 'vendors' };
+const NAV_FOR = { userDetail: 'users', vendorDetail: 'vendors', applicationDetail: 'vendors', destinationDetail: 'destinations' };
 
 function switchTab(tabId) {
   if (TAB_ALIASES[tabId]) {
