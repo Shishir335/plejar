@@ -2,13 +2,15 @@ const express = require('express');
 
 const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
+const appAuthController = require('../controllers/appAuthController');
 const { userDocumentUpload } = require('../utils/uploads');
 const { signupPhotoUpload } = require('../utils/userImages');
 
 const router = express.Router();
 
-router.post('/signup', signupPhotoUpload, authController.signup);
-router.get('/check-email', authController.checkEmail);
+// Traveler sign-up is the same as /auth/register in the app
+router.post('/signup', signupPhotoUpload, appAuthController.register);
+router.get('/check-email', appAuthController.checkAvailability);
 router.post('/login', authController.login);
 router.post('/google-login', authController.googleLogin);
 router.post('/forgotPassword', authController.forgotPassword);

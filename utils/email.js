@@ -111,6 +111,18 @@ module.exports = class Email {
         await this.send('vendorReport', subject);
     }
 
+    // 4-digit code for "forgot password" in the app (this.data.code)
+    async sendPasswordCode() {
+        await this.send('passwordCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plezar'} security code`);
+    }
+
+    // Whether any mail account is set up in config.env (otherwise sending fails)
+    static isConfigured() {
+        if (process.env.GMAIL_USER && process.env.GMAIL_PASS) return true;
+        if (process.env.NODE_ENV === 'production') return Boolean(process.env.SENDGRID_USERNAME && process.env.SENDGRID_PASSWORD);
+        return Boolean(process.env.EMAIL_USERNAME && process.env.EMAIL_PASSWORD);
+    }
+
     async sendPasswordReset() {
         await this.send('passwordReset', 'Your password reset token (valid for only 10 minutes)');
     }

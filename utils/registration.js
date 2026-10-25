@@ -52,28 +52,54 @@ const readDateOfBirth = value => {
 
 const PHONE_RX = /^(?:\+?880|0)1[3-9]\d{8}$/;
 
-/**
- * Every problem with a sign-up at once, keyed by field, so the app can show each one
- * under its own input. Returns {} when the form is fine.
- */
-const signupProblems = b => {
-  const errors = {};
-  const first = personNameProblem(b.firstName, 'first name');
-  if (first) errors.firstName = first;
-  const last = personNameProblem(b.lastName, 'last name');
-  if (last) errors.lastName = last;
-  const dob = dateOfBirthProblem(b.dateOfBirth);
-  if (dob) errors.dateOfBirth = dob;
-  const email = String(b.email || '').trim();
-  if (!email) errors.email = 'Enter your email address.';
-  else if (!validator.isEmail(email)) errors.email = 'Enter a valid email address, for example rahim@gmail.com.';
+// 01712345678, +8801712345678 and 8801712345678 are all stored as 01712345678
+const normalizePhone = value => {
+  const phone = String(value || '').replace(/[\s()-]/g, '');
+  if (!PHONE_RX.test(phone)) return null;
+  return `0${phone.slice(-10)}`;
+};
+
+const passwordProblems = (b, errors) => {
   const password = String(b.password || '');
   if (password.length < 8) errors.password = 'Use at least 8 characters for your password.';
   else if (password.length > 100) errors.password = 'Your password can be up to 100 characters.';
   if (!errors.password && password !== String(b.confirmPassword || '')) errors.confirmPassword = "The passwords don't match.";
-  const phone = String(b.phone || '').replace(/[\s-]/g, '');
-  if (phone && !PHONE_RX.test(phone)) errors.phone = 'Enter a Bangladeshi mobile number, for example 01712345678.';
+};
+
+// Name and birth date, checked when sent, or always when required
+const profileProblems = (b, { required = false, requireDateOfBirth = required } = {}) => {
+  const errors = {};
+  const filled = v => String(v || '').trim() !== '';
+  if (required || filled(b.firstName)) {
+    const first = personNameProblem(b.firstName, 'first name');
+    if (first) errors.firstName = first;
+  }
+  if (required || filled(b.lastName)) {
+    const last = personNameProblem(b.lastName, 'last name');
+    if (last) errors.lastName = last;
+  }
+  if (requireDateOfBirth || filled(b.dateOfBirth)) {
+    const dob = dateOfBirthProblem(b.dateOfBirth);
+    if (dob) errors.dateOfBirth = dob;
+  }
   return errors;
 };
 
-module.exports = { MIN_AGE, readPersonName, readDateOfBirth, signupProblems, PHONE_RX };
+/**
+ * Every problem with a sign-up at once, keyed by field, so the app can show each one
+ * under its own input. Returns {} when the form is fine.
+ * An email or a mobile number (or both) and a password are required; the name and birth
+ * date are asked for in the profile step right after (they are checked here too when sent).
+ */
+const signupProblems = b => {
+  const errors = profileProblems(b);
+  const email = String(b.email || '').trim();
+  const phone = String(b.phone || '').trim();
+  if (!email && !phone) errors.email = 'Enter your email address or mobile number.';
+  if (email && !validator.isEmail(email)) errors.email = 'Enter a valid email address, for example rahim@gmail.com.';
+  if (phone && !normalizePhone(phone)) errors.phone = 'Enter a Bangladeshi mobile number, for example 01712345678.';
+  passwordProblems(b, errors);
+  return errors;
+};
+
+module.exports = { MIN_AGE, readPersonName, readDateOfBirth, profileProblems, signupProblems, passwordProblems, normalizePhone, PHONE_RX };

@@ -24,6 +24,7 @@ const subscriberRouter = require('./routes/subscriberRoutes');
 const applicationRouter = require('./routes/applicationRoutes');
 const travelerRoutes = require('./routes/travelerRoutes');
 const socialRoutes = require('./routes/socialRoutes');
+const appAuthRouter = require('./routes/appAuthRoutes');
 const adminApplicationRouter = require('./routes/adminApplicationRoutes');
 const bookingRouter = require('./routes/bookingRoutes');
 const reviewRouter = require('./routes/reviewRoutes');
@@ -97,6 +98,16 @@ app.use('/api/v1/users/google-login', authLimiter);
 app.use('/api/v1/users/forgotPassword', authLimiter);
 app.use('/api/v1/users/resetPassword', authLimiter);
 app.use('/api/v1/users/acceptInvite', authLimiter);
+// Traveler app sign-in: 20 failed tries / 15 minutes per IP on each endpoint (successful ones
+// don't count), on top of the per-code limits in appAuthController
+['register', 'login', 'google', 'forgot-password', 'verify-code', 'reset-password', 'check'].forEach(p => app.use(`/api/v1/auth/${p}`, rateLimit({
+    max: 20,
+    windowMs: 15 * 60 * 1000,
+    skipSuccessfulRequests: true,
+    validate: { trustProxy: false },
+    message: { status: 'fail', message: 'Too many tries. Please wait 15 minutes and try again.' }
+})));
+
 // Checking whether an email is free (30 / 15 minutes, so the list of members can't be harvested)
 app.use('/api/v1/users/check-email', rateLimit({
     max: 30,
@@ -205,6 +216,7 @@ app.use('/api/v1/notifications', travelerRoutes.notifications);
 app.use('/api/v1/destinations', travelerRoutes.destinations);
 app.use('/api/v1/destination-categories', travelerRoutes.destinationCategories);
 // Traveler side of the mobile app: feed, posts, comments, people, agencies, settings
+app.use('/api/v1/auth', appAuthRouter);
 app.use('/api/v1/app', socialRoutes.app);
 app.use('/api/v1/feed', socialRoutes.feed);
 app.use('/api/v1/posts', socialRoutes.posts);

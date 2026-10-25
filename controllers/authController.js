@@ -9,8 +9,6 @@ const AppError = require('../utils/appError');
 const Email = require('../utils/email');
 const { recordLogin } = require('../utils/activity');
 const { agencyBlockedReason } = require('../utils/agencyStanding');
-const { signupProblems } = require('../utils/registration');
-const { saveProfileImage } = require('../utils/userImages');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -44,6 +42,7 @@ const blockedReason = async user => {
     return null;
 };
 exports.blockedReason = blockedReason;
+exports.isAdminEmail = isAdminEmail;
 
 // Store the admin role for ADMIN_EMAILS accounts, so the admin console (which reads the role) lets them in
 const promoteAdminEmail = async user => {
@@ -57,6 +56,8 @@ const promoteAdminEmail = async user => {
 const signToken = id => jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN
 });
+
+exports.signToken = signToken;
 
 const createAndSendToken = (user, statusCode, req, res) => {
     let actualReq = req;
@@ -90,86 +91,6 @@ const createAndSendToken = (user, statusCode, req, res) => {
         data: user
     });
 }
-
-// What a newly registered traveler gets back (the app keeps it as the signed-in user)
-const newAccountView = user => ({
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    name: user.name,
-    email: user.email,
-    dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().slice(0, 10) : null,
-    phone: user.phone || '',
-    photo: user.photo,
-    photoUrl: user.photo && user.photo !== 'profile.png' ? `/img/users/${user.photo}` : '/img/users/profile.png',
-    role: user.role,
-    createdAt: user.createdAt || user._id.getTimestamp()
-});
-
-/**
- * POST /users/signup (JSON, or multipart when a photo is included)
- * firstName, lastName, dateOfBirth (YYYY-MM-DD), email, password, confirmPassword,
- * optional phone and photo (JPG, PNG or WebP up to 10 MB).
- * Problems come back together as { errors: { field: message } } with status 400.
- */
-exports.signup = catchAsync(async (req, res, next) => {
-    const b = req.body;
-    const errors = signupProblems(b);
-    const email = String(b.email || '').trim().toLowerCase();
-    if (!errors.email && await User.exists({ email }).setOptions({ includeInactive: true })) {
-        errors.email = 'An account with this email already exists. Sign in instead.';
-    }
-    if (Object.keys(errors).length) {
-        return res.status(400).json({ status: 'fail', message: Object.values(errors)[0], errors });
-    }
-
-    const newUser = await User.create({
-        firstName: String(b.firstName).trim().replace(/\s+/g, ' '),
-        lastName: String(b.lastName).trim().replace(/\s+/g, ' '),
-        dateOfBirth: new Date(`${String(b.dateOfBirth).trim()}T00:00:00.000Z`),
-        email,
-        password: b.password,
-        confirmPassword: b.confirmPassword,
-        phone: String(b.phone || '').replace(/[\s-]/g, ''),
-        role: 'user'
-    });
-
-    // The photo needs the new account's id for its file name; a bad photo doesn't undo the sign-up
-    let photoWarning;
-    if (req.file) {
-        try {
-            newUser.photo = await saveProfileImage(req.file, newUser._id, 'user');
-            await newUser.save({ validateBeforeSave: false });
-        } catch (err) {
-            photoWarning = "Your account is ready, but the photo couldn't be used. Add one from Settings.";
-        }
-    }
-
-    try {
-        const url = `${req.protocol}://${req.get('host')}/`;
-        await new Email(newUser, url).sendWelcome();
-    } catch (mailErr) {
-        console.warn('[MAIL WARNING] Welcome email deferred:', mailErr.message);
-    }
-
-    await recordLogin(req, { user: newUser, email, success: true, reason: 'signup' });
-    const token = signToken(newUser._id);
-    res.status(201).json({
-        status: 'success',
-        message: photoWarning || `Welcome to Plezar, ${newUser.firstName}!`,
-        token,
-        data: { user: newAccountView(newUser) }
-    });
-});
-
-// GET /users/check-email?email= — lets the app check the email on the first sign-up step
-exports.checkEmail = catchAsync(async (req, res) => {
-    const email = String(req.query.email || '').trim().toLowerCase();
-    const problems = signupProblems({ email });
-    if (problems.email) return res.status(400).json({ status: 'fail', message: problems.email, errors: { email: problems.email } });
-    const taken = Boolean(await User.exists({ email }).setOptions({ includeInactive: true }));
-    res.status(200).json({ status: 'success', data: { email, available: !taken }, ...(taken ? { message: 'An account with this email already exists. Sign in instead.' } : {}) });
-});
 
 exports.login = catchAsync(async (req, res, next) => {
     const { email, password } = req.body;

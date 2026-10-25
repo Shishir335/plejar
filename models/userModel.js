@@ -12,12 +12,13 @@ const userSchema = new mongoose.Schema({
     firstName: { type: String, trim: true, maxlength: [30, 'First name is too long'], default: '' },
     lastName: { type: String, trim: true, maxlength: [30, 'Last name is too long'], default: '' },
     dateOfBirth: Date,
+    // Travelers who sign up with a mobile number have no email (unique among those who do, see the index below)
     email: {
         type: String,
-        required: [true, 'Please provide your email'],
-        unique: true,
+        required: [function () { return !this.phone; }, 'Please provide your email'],
         lowercase: true,
-        validate: [validator.isEmail]
+        trim: true,
+        validate: { validator: v => !v || validator.isEmail(v), message: 'Please provide a valid email' }
     },
     photo: {
         type: String,
@@ -181,6 +182,9 @@ const userSchema = new mongoose.Schema({
         select: false
     }
 });
+
+userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
+userSchema.index({ phone: 1 });
 
 // Keep name as "first last" (on validate for new accounts, on save for updates that skip validation)
 function syncName(next) {

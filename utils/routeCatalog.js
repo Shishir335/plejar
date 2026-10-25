@@ -19,6 +19,7 @@ const CATEGORIES = [
   { key: 'users', name: 'Users and sign-in', description: 'Sign up, sign in, passwords, profiles and account management.', test: p => p.startsWith('/api/v1/users') },
   { key: 'destinations', name: 'Destinations (app)', description: 'Published destinations and categories for the app and website.', test: p => /^\/api\/v1\/(destinations|destination-categories)/.test(p) },
   { key: 'events', name: 'Tour events and announcements (app)', description: 'Published tour events with their plans, and vendor announcements.', test: p => /^\/api\/v1\/(events|announcements)/.test(p) },
+  { key: 'app-auth', name: 'Sign-in (app)', description: 'Traveler sign-up with email or phone, log in, Google, forgot password with a code, profile step.', test: p => p.startsWith('/api/v1/auth') },
   { key: 'app-feed', name: 'Home feed and posts (app)', description: 'The Home tab: feed, posts with photos and videos, reactions, shares, comments and replies.', test: p => /^\/api\/v1\/(feed|posts|comments)/.test(p) },
   { key: 'app-people', name: 'People (app)', description: 'Traveler profiles, following, blocking and reporting people.', test: p => p.startsWith('/api/v1/people') },
   { key: 'app-agents', name: 'Agents tab (app)', description: 'Browsing tour agencies, their tours and reviews, and following them.', test: p => p.startsWith('/api/v1/agencies') },
