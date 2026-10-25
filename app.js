@@ -25,6 +25,8 @@ const applicationRouter = require('./routes/applicationRoutes');
 const travelerRoutes = require('./routes/travelerRoutes');
 const socialRoutes = require('./routes/socialRoutes');
 const appAuthRouter = require('./routes/appAuthRoutes');
+const tourRoutes = require('./routes/tourRoutes');
+const adminContentRouter = require('./routes/adminContentRoutes');
 const adminApplicationRouter = require('./routes/adminApplicationRoutes');
 const bookingRouter = require('./routes/bookingRoutes');
 const reviewRouter = require('./routes/reviewRoutes');
@@ -217,6 +219,9 @@ app.use('/api/v1/destinations', travelerRoutes.destinations);
 app.use('/api/v1/destination-categories', travelerRoutes.destinationCategories);
 // Traveler side of the mobile app: feed, posts, comments, people, agencies, settings
 app.use('/api/v1/auth', appAuthRouter);
+app.use('/api/v1/tours', tourRoutes.tours);
+app.use('/api/v1/hotels', tourRoutes.hotels);
+app.use('/api/v1/promotions', tourRoutes.promotions);
 app.use('/api/v1/app', socialRoutes.app);
 app.use('/api/v1/feed', socialRoutes.feed);
 app.use('/api/v1/posts', socialRoutes.posts);
@@ -236,6 +241,7 @@ app.use('/api/v1/admin', adminApplicationRouter);
 app.use('/api/v1/admin', adminDestinationRouter);
 app.use('/api/v1/admin', adminSystemRouter);
 app.use('/api/v1/admin', adminSocialRouter);
+app.use('/api/v1/admin', adminContentRouter);
 app.use('/api/v1/admin', adminAgencyRouter);
 
 // 404 UNHANDLED ROUTE CATCHER

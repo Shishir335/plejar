@@ -657,6 +657,7 @@ function planMissing() {
   if (form.priceFrom.value === '') missing.push('the price per person');
   if (val('evAdvance') === '') missing.push('the booking advance (0 if none)');
   else if (form.priceFrom.value !== '' && Number(val('evAdvance')) > Number(form.priceFrom.value)) missing.push('a booking advance no higher than the price');
+  if (val('evRegularPrice') !== '' && form.priceFrom.value !== '' && Number(val('evRegularPrice')) < Number(form.priceFrom.value)) missing.push('a regular price no lower than the price (or leave it empty when there is no sale)');
   if (!val('evMeeting')) missing.push('the meeting point');
   if (!val('evDeparture')) missing.push('the departure time');
   if (!val('evReturn')) missing.push('when and where the tour ends');
@@ -904,6 +905,12 @@ function openEventEditor(ev) {
   set('evDifficulty', ev && ev.difficulty);
   set('evBring', ev ? (ev.whatToBring || []).join('\n') : '');
   set('evPolicy', ev && ev.cancellationPolicy);
+  set('evTourType', (ev && ev.tourType) || 'group');
+  set('evRegularPrice', ev && ev.regularPrice);
+  set('evGroupMin', ev && ev.groupSize && ev.groupSize.min);
+  set('evGroupMax', ev && ev.groupSize && ev.groupSize.max);
+  set('evHighlights', ev ? (ev.highlights || []).join('\n') : '');
+  $('evFlexible').checked = Boolean(ev && ev.flexibleDates);
   state.plan = {
     itinerary: ev && ev.itinerary ? ev.itinerary.map(d => ({
       day: d.day,
@@ -959,6 +966,11 @@ function planPayload() {
     whatToBring: linesOf($('evBring').value),
     difficulty: val('evDifficulty'),
     cancellationPolicy: val('evPolicy'),
+    tourType: val('evTourType') || 'group',
+    regularPrice: val('evRegularPrice'),
+    groupSize: { min: val('evGroupMin'), max: val('evGroupMax') },
+    highlights: linesOf($('evHighlights').value).slice(0, 6),
+    flexibleDates: $('evFlexible').checked,
     transport: { mode: val('evTransport'), details: val('evTransportDetails') },
     accommodation: { type: val('evStay'), details: val('evStayDetails') },
     itinerary: state.plan.itinerary.map(d => ({

@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const STOP_KINDS = ['departure', 'stop', 'activity', 'meal', 'stay', 'return'];
 const TRANSPORT = ['bus', 'ac_bus', 'train', 'launch', 'plane', 'jeep', 'boat', 'car', 'walking', 'mixed'];
 const STAYS = ['none', 'hotel', 'resort', 'cottage', 'camp', 'houseboat', 'homestay', 'mixed'];
+// The "Group Tour" picker on the Tours screen
+const TOUR_TYPES = ['group', 'private', 'family', 'couple', 'solo', 'corporate'];
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const stopSchema = new mongoose.Schema({
@@ -104,6 +106,21 @@ const packageSchema = new mongoose.Schema(
     difficulty: { type: String, enum: { values: ['easy', 'moderate', 'challenging'], message: 'Choose easy, moderate or challenging' } },
     cancellationPolicy: { type: String, trim: true, maxlength: [1500, 'Keep the cancellation policy under 1500 characters'], default: '' },
 
+    // How the tour is shown on the app's Tours screen
+    tourType: { type: String, enum: { values: TOUR_TYPES, message: 'Choose a tour type' }, default: 'group', index: true },
+    // The usual price, shown struck through when priceFrom is lower (a sale)
+    regularPrice: { type: Number, min: [0, 'The regular price cannot be negative'], default: null },
+    // Short selling points on the card, such as "Free breakfast available"
+    highlights: { type: [String], default: [] },
+    groupSize: {
+      min: { type: Number, min: 1, max: 1000, default: null },
+      max: { type: Number, min: 1, max: 1000, default: null }
+    },
+    // The agency can move the date for the group
+    flexibleDates: { type: Boolean, default: false },
+    // Times the tour page was opened in the app, for "popular"
+    viewCount: { type: Number, default: 0 },
+
     status: {
       type: String,
       enum: ['draft', 'published', 'hidden', 'cancelled'],
@@ -124,8 +141,15 @@ const packageSchema = new mongoose.Schema(
 
 packageSchema.index({ status: 1, startDate: 1 });
 
+// Sale percentage when the price is below the regular price
+packageSchema.virtual('discountPercent').get(function () {
+  if (!this.regularPrice || this.priceFrom == null || this.priceFrom >= this.regularPrice) return 0;
+  return Math.round(((this.regularPrice - this.priceFrom) / this.regularPrice) * 100);
+});
+
 const Package = mongoose.model('Package', packageSchema);
 Package.STOP_KINDS = STOP_KINDS;
 Package.TRANSPORT = TRANSPORT;
 Package.STAYS = STAYS;
+Package.TOUR_TYPES = TOUR_TYPES;
 module.exports = Package;

@@ -170,7 +170,7 @@ async function handleAdminLogout() {
 // Switch Sidebar Tabs
 const TAB_TITLES = {
   dashboard: 'Dashboard', users: 'Users', userDetail: 'User profile', subscribers: 'Newsletter Leads', agencies: 'Agencies',
-  vendors: 'Vendors', vendorDetail: 'Vendor profile', applicationDetail: 'Membership application', destinations: 'Destinations', destinationDetail: 'Destination', system: 'System Status', profile: 'My profile'
+  vendors: 'Vendors', vendorDetail: 'Vendor profile', applicationDetail: 'Membership application', destinations: 'Destinations', destinationDetail: 'Destination', content: 'App content', system: 'System Status', profile: 'My profile'
 };
 
 // Old tab names still work: they open the matching Vendors sub-tab

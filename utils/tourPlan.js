@@ -62,6 +62,24 @@ const applyPlan = async (pkg, raw) => {
   }
   if (plan.cancellationPolicy !== undefined) pkg.cancellationPolicy = text(plan.cancellationPolicy, 1500);
 
+  // How it shows on the app's Tours screen
+  if (plan.tourType !== undefined) {
+    const type = plan.tourType ? String(plan.tourType) : 'group';
+    if (!Package.TOUR_TYPES.includes(type)) throw new AppError('Choose a tour type: group, private, family, couple, solo or corporate.', 400);
+    pkg.tourType = type;
+  }
+  if (plan.regularPrice !== undefined) pkg.regularPrice = money(plan.regularPrice, 'regular price');
+  if (plan.highlights !== undefined) pkg.highlights = list(plan.highlights, 6).map(h => h.slice(0, 60));
+  if (plan.groupSize !== undefined) {
+    const size = v => (v === '' || v === null || v === undefined ? null : Number(v));
+    const min = size(plan.groupSize && plan.groupSize.min);
+    const max = size(plan.groupSize && plan.groupSize.max);
+    if ([min, max].some(n => n !== null && (!Number.isInteger(n) || n < 1 || n > 1000))) throw new AppError('Group size must be whole numbers from 1 to 1000.', 400);
+    if (min !== null && max !== null && min > max) throw new AppError('The smallest group size cannot be bigger than the largest.', 400);
+    pkg.groupSize = { min, max };
+  }
+  if (plan.flexibleDates !== undefined) pkg.flexibleDates = plan.flexibleDates === true || plan.flexibleDates === 'true';
+
   if (plan.itinerary !== undefined) {
     if (!Array.isArray(plan.itinerary)) throw new AppError('The day-by-day plan could not be read.', 400);
     if (plan.itinerary.length > 60) throw new AppError('A plan can have at most 60 days.', 400);
@@ -111,6 +129,7 @@ const planProblems = pkg => {
   if (pkg.priceFrom === undefined || pkg.priceFrom === null) missing.push('the price per person');
   if (pkg.advanceAmount === undefined || pkg.advanceAmount === null) missing.push('the booking advance (0 if none)');
   else if (pkg.priceFrom != null && pkg.advanceAmount > pkg.priceFrom) missing.push('a booking advance no higher than the price');
+  if (pkg.regularPrice != null && pkg.priceFrom != null && pkg.regularPrice < pkg.priceFrom) missing.push('a regular price no lower than the price (or leave it empty when there is no sale)');
   if (!pkg.meetingPoint) missing.push('the meeting point');
   if (!pkg.departureTime) missing.push('the departure time');
   if (!pkg.returnInfo) missing.push('when and where the tour ends');

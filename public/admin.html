@@ -112,6 +112,11 @@
           <span id="destinationsAttentionCount" class="nav-count" hidden>0</span>
         </button>
 
+        <button class="nav-link-btn" data-tab="content" onclick="switchTab('content'); loadContent();">
+          <span>📱</span>
+          <span class="sidebar-text">App content</span>
+        </button>
+
         <button class="nav-link-btn" data-tab="system" onclick="switchTab('system'); loadEndpoints();">
           <span>⚙️</span>
           <span class="sidebar-text">System Status</span>
@@ -395,6 +400,53 @@
         <!-- USER PROFILE -->
         <section id="tab-userDetail" class="tab-pane">
           <div id="userDetail"></div>
+        </section>
+
+        <!-- APP CONTENT: Tours-screen banners and hotels -->
+        <section id="tab-content" class="tab-pane">
+          <div class="subtabs" role="tablist" aria-label="App content">
+            <button type="button" role="tab" class="subtab active" data-csub="banners" aria-selected="true">Tours banners</button>
+            <button type="button" role="tab" class="subtab" data-csub="hotels" aria-selected="false">Hotels</button>
+          </div>
+
+          <div class="subpane active" id="csub-banners">
+            <p class="lead-sub" style="margin: 0 0 12px;">Banners at the top of the app's Tours screen, such as "Summer Adventure Sale". The first live banner shows first.</p>
+            <div class="control-bar">
+              <div class="filters"></div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadBanners()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openBanner()">+ Add banner</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Banner</th><th>Opens</th><th>When</th><th>Taps</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="bannersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="subpane" id="csub-hotels">
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="hSearch" class="search-input" placeholder="Search hotel name" aria-label="Search hotels" oninput="debouncedHotels()"></div>
+                <select id="hStatusF" class="form-select" aria-label="Status" onchange="loadHotels(1)">
+                  <option value="">Any status</option><option value="published">Published</option><option value="draft">Draft</option><option value="hidden">Hidden</option>
+                </select>
+              </div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadHotels()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openHotel()">+ Add hotel</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Hotel</th><th>Where</th><th>Price per night</th><th>Rating</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="hotelsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="hotelsPager"></div>
+          </div>
         </section>
 
         <!-- 2. NEWSLETTER SUBSCRIBERS TAB -->
@@ -1141,6 +1193,99 @@
     </div>
   </div>
 
+  <!-- Banner form -->
+  <div id="bannerModal" class="modal-overlay">
+    <div class="modal-card modal-wide">
+      <div class="modal-head"><h3 id="bannerModalTitle">Add banner</h3><button class="modal-x" onclick="closeModal('bannerModal')" aria-label="Close">&times;</button></div>
+      <form id="bannerForm" onsubmit="saveBanner(event)" novalidate>
+        <div class="form-group"><label class="form-label" for="bnTitle">Title *</label><input id="bnTitle" class="form-input" maxlength="60" placeholder="Summer Adventure Sale" required></div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="bnSubtitle">Subtitle</label><input id="bnSubtitle" class="form-input" maxlength="100" placeholder="Up to 30% Off on selected tours"></div>
+          <div class="form-group"><label class="form-label" for="bnHighlight">Highlighted words</label><input id="bnHighlight" class="form-input" maxlength="30" placeholder="30% Off"><p class="lead-sub">Shown in colour inside the subtitle.</p></div>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="bnCta">Button text</label><input id="bnCta" class="form-input" maxlength="24" placeholder="Explore Now"></div>
+          <div class="form-group"><label class="form-label" for="bnImage">Image</label><input id="bnImage" type="file" accept="image/jpeg,image/png,image/webp" class="form-input"><p class="lead-sub" id="bnImageNow"></p></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="bnTarget">"Explore Now" opens</label>
+          <select id="bnTarget" class="form-select" onchange="showBannerTarget()">
+            <option value="sale_tours">Tours on sale</option>
+            <option value="tours">Tours I choose</option>
+            <option value="destination">Tours at a destination</option>
+            <option value="agency">One vendor's tours</option>
+            <option value="tour_type">One type of tour</option>
+          </select>
+        </div>
+        <div class="form-group" data-bn-target="sale_tours"><label class="form-label" for="bnMinDiscount">At least this much off (%)</label><input id="bnMinDiscount" type="number" min="0" max="100" class="form-input" placeholder="0"></div>
+        <div class="form-group" data-bn-target="tours" hidden><label class="form-label">Tours</label><div id="bnTours" class="check-list" style="max-height: 200px; overflow-y: auto;"></div></div>
+        <div class="form-group" data-bn-target="destination" hidden><label class="form-label" for="bnDestination">Destination</label><select id="bnDestination" class="form-select"></select></div>
+        <div class="form-group" data-bn-target="agency" hidden><label class="form-label" for="bnAgency">Vendor</label><select id="bnAgency" class="form-select"></select></div>
+        <div class="form-group" data-bn-target="tour_type" hidden><label class="form-label" for="bnTourType">Tour type</label>
+          <select id="bnTourType" class="form-select"><option value="group">Group tours</option><option value="private">Private tours</option><option value="family">Family tours</option><option value="couple">Couple tours</option><option value="solo">Solo trips</option><option value="corporate">Corporate tours</option></select>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="bnStarts">Starts</label><input id="bnStarts" type="date" class="form-input"></div>
+          <div class="form-group"><label class="form-label" for="bnEnds">Ends</label><input id="bnEnds" type="date" class="form-input"></div>
+          <div class="form-group"><label class="form-label" for="bnOrder">Order</label><input id="bnOrder" type="number" class="form-input" placeholder="0"></div>
+        </div>
+        <label class="check" style="display:flex; gap:8px; align-items:center; margin-bottom: 14px;"><input type="checkbox" id="bnActive" checked> Switched on</label>
+        <p class="form-error" id="bannerError" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="bannerSubmit">Save banner</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Hotel form -->
+  <div id="hotelModal" class="modal-overlay">
+    <div class="modal-card modal-wide">
+      <div class="modal-head"><h3 id="hotelModalTitle">Add hotel</h3><button class="modal-x" onclick="closeModal('hotelModal')" aria-label="Close">&times;</button></div>
+      <form id="hotelForm" onsubmit="saveHotel(event)" novalidate>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htName">Name *</label><input id="htName" class="form-input" maxlength="120" required></div>
+          <div class="form-group"><label class="form-label" for="htType">Kind of stay</label>
+            <select id="htType" class="form-select"><option value="hotel">Hotel</option><option value="resort">Resort</option><option value="eco_resort">Eco resort</option><option value="cottage">Cottage</option><option value="guest_house">Guest house</option><option value="homestay">Homestay</option><option value="houseboat">Houseboat</option></select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label" for="htDestination">Destination</label><select id="htDestination" class="form-select"></select></div>
+        <div class="form-group"><label class="form-label" for="htAddress">Address</label><input id="htAddress" class="form-input" maxlength="200"></div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htLat">Latitude</label><input id="htLat" class="form-input" inputmode="decimal" placeholder="21.4272"></div>
+          <div class="form-group"><label class="form-label" for="htLng">Longitude</label><input id="htLng" class="form-input" inputmode="decimal" placeholder="92.0058"></div>
+        </div>
+        <p class="lead-sub" style="margin-top:-8px;">The map position puts the hotel in "Hotels Near You".</p>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htPrice">Price per night (৳) *</label><input id="htPrice" type="number" min="0" step="50" class="form-input"></div>
+          <div class="form-group"><label class="form-label" for="htRegular">Regular price (৳)</label><input id="htRegular" type="number" min="0" step="50" class="form-input" placeholder="Only for a sale"></div>
+          <div class="form-group"><label class="form-label" for="htStars">Stars</label><select id="htStars" class="form-select"><option value="">None</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htRating">Guest rating (0 to 5)</label><input id="htRating" type="number" min="0" max="5" step="0.1" class="form-input"></div>
+          <div class="form-group"><label class="form-label" for="htRatingCount">Number of reviews</label><input id="htRatingCount" type="number" min="0" class="form-input"></div>
+          <div class="form-group"><label class="form-label" for="htRatingSource">Rating from</label><input id="htRatingSource" class="form-input" maxlength="40" placeholder="Google"></div>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htHighlights">Highlights (up to 6, one per line)</label><textarea id="htHighlights" class="form-input" rows="3" placeholder="Free breakfast available"></textarea></div>
+          <div class="form-group"><label class="form-label" for="htAmenities">Amenities (one per line)</label><textarea id="htAmenities" class="form-input" rows="3" placeholder="Wi-Fi&#10;Parking"></textarea></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="htDescription">Description</label><textarea id="htDescription" class="form-input" rows="3" maxlength="3000"></textarea></div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htPhone">Phone</label><input id="htPhone" class="form-input" maxlength="30"></div>
+          <div class="form-group"><label class="form-label" for="htWebsite">Website</label><input id="htWebsite" class="form-input" maxlength="200"></div>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htCheckIn">Check-in</label><input id="htCheckIn" class="form-input" maxlength="10" placeholder="14:00"></div>
+          <div class="form-group"><label class="form-label" for="htCheckOut">Check-out</label><input id="htCheckOut" class="form-input" maxlength="10" placeholder="12:00"></div>
+          <div class="form-group"><label class="form-label" for="htStatus">Status</label><select id="htStatus" class="form-select"><option value="draft">Draft</option><option value="published">Published</option><option value="hidden">Hidden</option></select></div>
+        </div>
+        <label class="check" style="display:flex; gap:8px; align-items:center; margin-bottom: 14px;"><input type="checkbox" id="htFeatured"> Featured (shown first when the app has no location)</label>
+        <div class="form-group"><label class="form-label" for="htPhotos">Add photos</label><input id="htPhotos" type="file" multiple accept="image/jpeg,image/png,image/webp" class="form-input"></div>
+        <div id="htPhotosNow" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 12px;"></div>
+        <p class="form-error" id="hotelError" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="hotelSubmit">Save hotel</button>
+      </form>
+    </div>
+  </div>
+
   <div id="reasonModal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-head"><h3 id="reasonTitle">Confirm</h3><button class="modal-x" onclick="closeModal('reasonModal')" aria-label="Close">&times;</button></div>
@@ -1289,5 +1434,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/js/admin-destinations.js"></script>
   <script src="/js/admin-system.js"></script>
+  <script src="/js/admin-content.js"></script>
 </body>
 </html>

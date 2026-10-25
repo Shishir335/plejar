@@ -71,6 +71,8 @@ const publicEvent = (event, stats) => {
   };
 };
 
+exports.publicEvent = publicEvent;
+
 // Upcoming published tour events, soonest first. Filters: agency, destination, from, to.
 exports.listEvents = catchAsync(async (req, res, next) => {
   const q = req.query;

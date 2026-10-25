@@ -947,3 +947,8 @@ tr.is-muted td { opacity: 0.6; }
 [data-theme="dark"] .ep-put { background: rgba(251, 188, 4, 0.18); color: #fdd663; }
 [data-theme="dark"] .ep-patch { background: rgba(161, 66, 244, 0.18); color: #d7aefb; }
 [data-theme="dark"] .ep-delete { background: rgba(234, 67, 53, 0.18); color: #f28b82; }
+
+/* App content forms (banners, hotels): side-by-side fields that wrap on narrow screens */
+#bannerModal .field-row,
+#hotelModal .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 12px; }
+#bannerModal .check-list .check { margin-bottom: 6px; }

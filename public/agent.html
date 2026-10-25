@@ -489,6 +489,46 @@
       </section>
 
       <section class="plan-section">
+        <h3>How it shows in the app</h3>
+        <p class="hint">Travelers see these on the tour card in the Plezar app's Tours screen.</p>
+        <div class="field-row field-row-3">
+          <div class="field">
+            <label for="evTourType">Tour type</label>
+            <select id="evTourType">
+              <option value="group">Group tour</option>
+              <option value="private">Private tour</option>
+              <option value="family">Family tour</option>
+              <option value="couple">Couple tour</option>
+              <option value="solo">Solo trip</option>
+              <option value="corporate">Corporate tour</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="evRegularPrice">Regular price (৳)</label>
+            <input id="evRegularPrice" type="number" min="0" step="50" inputmode="numeric" placeholder="Only for a sale">
+            <p class="hint">Shown struck through when it's higher than the price per person.</p>
+          </div>
+          <div class="field">
+            <label>Group size</label>
+            <div class="field-row field-row-tight">
+              <input id="evGroupMin" type="number" min="1" max="1000" inputmode="numeric" placeholder="Min" aria-label="Smallest group">
+              <input id="evGroupMax" type="number" min="1" max="1000" inputmode="numeric" placeholder="Max" aria-label="Largest group">
+            </div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="evHighlights">Highlights</label>
+            <textarea id="evHighlights" rows="3" placeholder="Up to 6, one per line:&#10;Free breakfast available&#10;Houseboat stay"></textarea>
+          </div>
+          <div class="field">
+            <label class="check"><input type="checkbox" id="evFlexible"> Flexible dates</label>
+            <p class="hint">Tick if the group can agree a different date with you.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="plan-section">
         <h3>Good to know</h3>
         <div class="field-row">
           <div class="field">

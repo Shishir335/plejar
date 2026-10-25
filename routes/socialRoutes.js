@@ -5,6 +5,7 @@ const people = require('../controllers/peopleController');
 const agencies = require('../controllers/agencyDirectoryController');
 const me = require('../controllers/meController');
 const appConfig = require('../controllers/appConfigController');
+const tours = require('../controllers/toursController');
 const { postMediaUpload } = require('../utils/social');
 const { profileUpload } = require('../utils/userImages');
 
@@ -67,5 +68,6 @@ meRoutes.route('/settings').get(me.getSettings).patch(me.updateSettings);
 meRoutes.get('/saved', me.savedPosts);
 meRoutes.get('/blocked', me.blocked);
 meRoutes.get('/following-agencies', me.followingAgencies);
+meRoutes.get('/wishlist', tours.wishlist);
 
 module.exports = { app, feed, posts: postRoutes, comments, people: peopleRoutes, agencies: agencyRoutes, me: meRoutes };

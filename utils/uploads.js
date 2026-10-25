@@ -108,6 +108,38 @@ const removeDestinationFolder = async destinationId => {
   await fs.promises.rm(target, { recursive: true, force: true });
 };
 
+// Hotel photos and promotion banners live under /public/img/<hotels|promotions>/<id>/
+const CONTENT_KINDS = ['hotels', 'promotions'];
+const contentDir = kind => path.join(__dirname, '..', 'public', 'img', kind);
+
+const saveContentImage = async (file, kind, id, { width = 2000 } = {}) => {
+  if (!CONTENT_KINDS.includes(kind)) throw new Error(`Unknown image kind ${kind}`);
+  const dir = path.join(contentDir(kind), String(id));
+  await ensureDir(dir);
+  const filename = `${randomName()}.jpg`;
+  await sharp(file.buffer)
+    .rotate()
+    .resize({ width, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 82 })
+    .toFile(path.join(dir, filename));
+  return `/img/${kind}/${id}/${filename}`;
+};
+
+const removeContentImage = async urlPath => {
+  const kind = CONTENT_KINDS.find(k => urlPath && urlPath.startsWith(`/img/${k}/`));
+  if (!kind) return;
+  const target = path.join(__dirname, '..', 'public', urlPath);
+  if (!target.startsWith(contentDir(kind) + path.sep)) return;
+  await fs.promises.unlink(target).catch(() => {});
+};
+
+const removeContentFolder = async (kind, id) => {
+  if (!CONTENT_KINDS.includes(kind)) return;
+  const target = path.join(contentDir(kind), String(id));
+  if (!target.startsWith(contentDir(kind) + path.sep)) return;
+  await fs.promises.rm(target, { recursive: true, force: true });
+};
+
 /**
  * Store a verification document privately. Returns the path relative to the private dir.
  */
@@ -160,6 +192,9 @@ module.exports = {
   saveDestinationImage,
   removeDestinationImage,
   removeDestinationFolder,
+  saveContentImage,
+  removeContentImage,
+  removeContentFolder,
   savePrivateDocument,
   privateDocumentPath,
   removePrivateDocument,

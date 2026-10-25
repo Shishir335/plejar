@@ -330,6 +330,8 @@ function showEventPlan(packageId) {
       ${row('Dates', p.startDate ? `${E(fmtDate(p.startDate))}${p.endDate ? ` to ${E(fmtDate(p.endDate))}` : ''} (${Number(p.durationDays)}D / ${Number(p.durationNights || 0)}N)` : '')}
       ${row('Destination', E(p.destination))}
       ${row('Price', `${takaFmt(p.priceFrom)} per person${p.childPrice != null ? `, ${takaFmt(p.childPrice)} per child` : ''}${p.advanceAmount != null ? `. Advance ${takaFmt(p.advanceAmount)}` : ''}`)}
+      ${row('In the app', `${E(label(p.tourType || 'group'))} tour${p.regularPrice > p.priceFrom ? `, on sale from ${takaFmt(p.regularPrice)} (${Math.round(((p.regularPrice - p.priceFrom) / p.regularPrice) * 100)}% off)` : ''}${p.groupSize && (p.groupSize.min || p.groupSize.max) ? `, groups of ${E([p.groupSize.min, p.groupSize.max].filter(Boolean).join(' to '))}` : ''}${p.flexibleDates ? ', flexible dates' : ''}`)}
+      ${row('Highlights', listOf(p.highlights))}
       ${row('Seats', p.seats ? Number(p.seats) : '')}
       ${row('Meeting point', `${E(p.meetingPoint)}${p.departureTime ? ` at ${E(p.departureTime)}` : ''}`)}
       ${row('Tour ends', E(p.returnInfo))}
