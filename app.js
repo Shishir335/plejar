@@ -42,6 +42,8 @@ const adminSocialRouter = require('./routes/adminSocialRoutes');
 const AppError = require('./utils/appError');
 const authController = require('./controllers/authController');
 const globalErrorHandler = require('./controllers/errorController');
+const swaggerUi = require('swagger-ui-express');
+const { getSwaggerSpec } = require('./docs/swagger');
 
 const app = express();
 
@@ -196,7 +198,7 @@ app.get('/reset-password', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
 });
 
-app.get(['/agent', '/agent/dashboard'], (req, res) => {
+app.get(['/agent', '/agent/dashboard', '/vendor', '/vendor/dashboard'], (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'agent.html'));
 });
 
@@ -206,6 +208,29 @@ app.get(['/apply', '/apply/status'], (req, res) => {
 
 app.get('/accept-invite', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'accept-invite.html'));
+});
+
+// SWAGGER UI INTERACTIVE API TESTING DASHBOARD
+app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    (req, res, next) => {
+        const spec = getSwaggerSpec(req.app);
+        swaggerUi.setup(spec, {
+            customSiteTitle: 'Plezar API Testing Dashboard',
+            customCss: '.swagger-ui .topbar { display: none } .swagger-ui .info { margin: 25px 0 }',
+            swaggerOptions: {
+                persistAuthorization: true,
+                displayRequestDuration: true,
+                filter: true,
+                tryItOutEnabled: true
+            }
+        })(req, res, next);
+    }
+);
+
+app.get('/api-docs.json', (req, res) => {
+    res.status(200).json(getSwaggerSpec(req.app));
 });
 
 // API ROUTES

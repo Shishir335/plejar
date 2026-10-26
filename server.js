@@ -97,6 +97,7 @@ const server = app.listen(port, () => {
   console.log(`  - Users / Auth: http://localhost:${port}/api/v1/users`);
   console.log(`  - Newsletter:   http://localhost:${port}/api/v1/subscribers`);
   console.log(`  - Admin Panel:  http://localhost:${port}/admin`);
+  console.log(`  - API Testing:  http://localhost:${port}/api-docs`);
 });
 
 process.on('unhandledRejection', err => {
