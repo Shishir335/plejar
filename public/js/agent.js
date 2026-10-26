@@ -165,7 +165,8 @@ $('loginForm').addEventListener('submit', async e => {
   setBusy(btn, true, 'Signing in...');
   try {
     const data = await api('/api/v1/users/login', { method: 'POST', body: { email, password } });
-    if (data.data.role !== 'agent') {
+    const roles = Array.isArray(data.data.roles) && data.data.roles.length ? data.data.roles : [data.data.role];
+    if (!roles.includes('agent') || !data.data.agency) {
       showAlert('loginError', 'This sign in is for tour agencies. Plezar staff use the admin console at /admin.');
       await api('/api/v1/users/logout').catch(() => {});
       return;
@@ -210,6 +211,8 @@ function showView(view) {
   if (view === 'events') loadEvents();
   if (view === 'registrations') loadRegistrationsView();
   if (view === 'announcements') loadAnnouncements();
+  if (view === 'messages') loadConversations();
+  if (view === 'guides') loadGuides();
   if (view === 'notifications') loadNotificationsView();
   if (view === 'team') loadTeam();
   if (view === 'verification') loadVerification();
@@ -235,6 +238,11 @@ document.addEventListener('click', e => {
   if (name === 'add-place') openPlaceDialog({ kind: 'event' }, $('evPlace').value ? '' : $('evPlaceSearch').value.trim());
   if (name === 'close-place') closePlaceDialog();
   if (name === 'new-announcement') openAnnouncementEditor(null);
+  if (name === 'new-guide') openGuideEditor(null);
+  if (name === 'edit-guide') openGuideEditor(state.guides.find(g => g._id === id));
+  if (name === 'delete-guide') deleteGuide(id);
+  if (name === 'open-conversation') openConversation(id);
+  if (name === 'toggle-conversation') toggleConversation(id);
   if (name === 'edit-announcement') openAnnouncementEditor(state.announcements.find(a => a._id === id));
   if (name === 'delete-announcement') deleteAnnouncement(id);
   if (name === 'toggle-pin') togglePin(id);
@@ -273,7 +281,9 @@ async function boot() {
   renderProfileForm();
 
   const start = (window.location.hash || '#overview').slice(1);
-  const views = ['overview', 'events', 'registrations', 'announcements', 'notifications', 'profile', 'team', 'verification'];
+  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'notifications', 'profile', 'team', 'verification'];
+  refreshMessagesBadge();
+  setInterval(refreshMessagesBadge, 60000);
   showView(views.includes(start) ? start : (start === 'packages' ? 'events' : 'overview'));
 }
 
@@ -537,7 +547,7 @@ function updateDurationHint() {
   $('evStayRequired').hidden = !(len && len.nights > 0);
 }
 
-const blankDay = n => ({ day: n, title: '', stops: [], stay: '', meals: { breakfast: false, lunch: false, dinner: false } });
+const blankDay = n => ({ day: n, title: '', description: '', stops: [], stay: '', meals: { breakfast: false, lunch: false, dinner: false } });
 const blankStop = kind => ({ time: '', place: '', kind: kind || 'stop', note: '', destinationRef: '' });
 
 // Keep one card per day of the tour; days beyond the new length are set aside, not lost
@@ -574,6 +584,7 @@ function renderItinerary() {
         <span class="day-no">Day ${i + 1}</span><span class="day-date">${escapeHTML(dayDate(i))}</span>
         <input class="day-title" data-field="title" maxlength="120" placeholder="Short title, e.g. Dhaka to Sajek" value="${escapeHTML(d.title)}" aria-label="Day ${i + 1} title">
       </header>
+      <textarea class="day-description" data-field="description" rows="2" maxlength="1000" placeholder="What the day is like (travelers see this when they open the day in the app)" aria-label="Day ${i + 1} description">${escapeHTML(d.description || '')}</textarea>
       <ol class="stop-list">
         ${d.stops.map((st, j) => `
           <li class="stop-row" data-stop="${j}">
@@ -911,10 +922,14 @@ function openEventEditor(ev) {
   set('evGroupMax', ev && ev.groupSize && ev.groupSize.max);
   set('evHighlights', ev ? (ev.highlights || []).join('\n') : '');
   $('evFlexible').checked = Boolean(ev && ev.flexibleDates);
+  const tags = new Set((ev && ev.tags) || []);
+  document.querySelectorAll('#evTags input').forEach(i => { i.checked = tags.has(i.value); });
+  fillGuideSelect(ev && ev.guide ? String(ev.guide._id || ev.guide) : '');
   state.plan = {
     itinerary: ev && ev.itinerary ? ev.itinerary.map(d => ({
       day: d.day,
       title: d.title || '',
+      description: d.description || '',
       stay: d.stay || '',
       meals: { breakfast: Boolean(d.meals && d.meals.breakfast), lunch: Boolean(d.meals && d.meals.lunch), dinner: Boolean(d.meals && d.meals.dinner) },
       stops: (d.stops || []).map(st => ({ time: st.time || '', place: st.place || '', kind: st.kind || 'stop', note: st.note || '', destinationRef: st.destinationRef ? String(st.destinationRef._id || st.destinationRef) : '' }))
@@ -937,7 +952,8 @@ function openEventEditor(ev) {
 }
 
 function closeDrawers() {
-  ['eventDrawer', 'announcementDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
+  ['eventDrawer', 'announcementDrawer', 'guideDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
+  state.editingGuide = null;
   state.editing = null;
   state.editingAnnouncement = null;
   state.cancelling = null;
@@ -971,10 +987,13 @@ function planPayload() {
     groupSize: { min: val('evGroupMin'), max: val('evGroupMax') },
     highlights: linesOf($('evHighlights').value).slice(0, 6),
     flexibleDates: $('evFlexible').checked,
+    guide: val('evGuide'),
+    tags: [...document.querySelectorAll('#evTags input:checked')].map(i => i.value),
     transport: { mode: val('evTransport'), details: val('evTransportDetails') },
     accommodation: { type: val('evStay'), details: val('evStayDetails') },
     itinerary: state.plan.itinerary.map(d => ({
       title: d.title.trim(),
+      description: (d.description || '').trim(),
       stay: d.stay.trim(),
       meals: d.meals,
       stops: d.stops.filter(s => s.place.trim() || s.note.trim() || s.time).map(s => ({ time: s.time, place: s.place.trim(), kind: s.kind, note: s.note.trim(), destinationRef: s.destinationRef || undefined }))
@@ -1555,5 +1574,320 @@ $('verificationForm').addEventListener('submit', async e => {
     setBusy(btn, false);
   }
 });
+
+// ---------- Guides ----------
+
+async function fetchGuides() {
+  const { data } = await api('/api/v1/agency/me/guides');
+  state.guides = data.guides;
+  return state.guides;
+}
+
+// The guide picker on the tour form
+async function fillGuideSelect(selected) {
+  const select = $('evGuide');
+  try {
+    const guides = await fetchGuides();
+    select.innerHTML = '<option value="">No guide shown</option>' + guides
+      .filter(g => g.active || String(g._id) === selected)
+      .map(g => `<option value="${escapeHTML(g._id)}">${escapeHTML(g.name)}${g.languages.length ? ` (${escapeHTML(g.languages.join(', '))})` : ''}</option>`).join('');
+    select.value = selected || '';
+  } catch (e) { /* the guide is optional */ }
+}
+
+async function loadGuides() {
+  $('guideList').innerHTML = '<p class="muted">Loading guides...</p>';
+  try {
+    await fetchGuides();
+    renderGuides();
+  } catch (err) {
+    $('guideList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+  loadGuideBookings();
+}
+
+// Destinations for "Works in" (published places only)
+async function fillGuideDestinations(selected) {
+  const select = $('gdDestination');
+  try {
+    if (!state.guidePlaces) {
+      const { data } = await api('/api/v1/destinations?limit=200');
+      state.guidePlaces = data.destinations || [];
+    }
+    select.innerHTML = '<option value="">Choose a destination</option>' + state.guidePlaces
+      .map(p => `<option value="${escapeHTML(p._id)}">${escapeHTML(p.name)}</option>`).join('');
+    select.value = selected || '';
+  } catch (e) { /* optional */ }
+}
+
+const GUIDE_NEXT = { pending: ['confirmed', 'cancelled'], confirmed: ['completed', 'cancelled'], completed: [], cancelled: [] };
+
+async function loadGuideBookings() {
+  const box = $('guideBookingList');
+  box.innerHTML = '<p class="muted">Loading...</p>';
+  try {
+    const { data } = await api('/api/v1/agency/me/bookings?kind=guide&limit=50');
+    state.guideBookings = data.bookings;
+    if (!data.bookings.length) {
+      box.innerHTML = '<p class="muted">No guide bookings yet. Tick "Travelers can hire this guide" on a guide and set a price per day.</p>';
+      return;
+    }
+    box.innerHTML = `<div class="ann-list">${data.bookings.map(b => `
+      <article class="ann">
+        <div class="ann-top">
+          <h3>${escapeHTML(b.guide ? b.guide.name : b.packageTitle)} · ${escapeHTML(dateRange(b.travelDate, b.endDate || b.travelDate))}</h3>
+          <span class="badge badge-${escapeHTML(b.status)}">${escapeHTML(b.status)}</span>
+        </div>
+        <p class="ann-meta">${escapeHTML(b.user ? b.user.name : 'Traveler')}${b.user && b.user.phone ? ` · ${escapeHTML(b.user.phone)}` : ''} · ${plural(b.travelers, 'traveler')} · ${plural(b.units || 1, 'day')} · ${taka(b.amount)} · ${escapeHTML(b.reference)}</p>
+        <div class="pkg-actions">${GUIDE_NEXT[b.status].map(st => `<button class="btn ${st === 'cancelled' ? 'btn-danger' : 'btn-quiet'} btn-sm" data-guide-booking="${escapeHTML(b._id)}" data-to="${st}">${st === 'confirmed' ? 'Confirm' : st === 'completed' ? 'Mark completed' : 'Cancel'}</button>`).join('')}</div>
+      </article>`).join('')}</div>`;
+  } catch (err) {
+    box.innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+$('guideBookingList').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-guide-booking]');
+  if (!btn) return;
+  const status = btn.dataset.to;
+  let reason = '';
+  if (status === 'cancelled') {
+    reason = window.prompt('Why are you cancelling? The traveler will see this.') || '';
+    if (reason.trim().length < 3) return;
+  }
+  try {
+    await api(`/api/v1/agency/me/bookings/${btn.dataset.guideBooking}`, { method: 'PATCH', body: { status, reason } });
+    toast(status === 'confirmed' ? 'Confirmed. The traveler gets a notification.' : 'Booking updated.');
+    loadGuideBookings();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+});
+
+function renderGuides() {
+  if (!state.guides.length) {
+    $('guideList').innerHTML = `
+      <div class="empty">
+        <strong>No guides yet</strong>
+        Travelers like to know who leads the trip. Add your guides, then pick one on each tour event.
+        <div style="margin-top: 14px;"><button class="btn btn-primary" data-action="new-guide">Add a guide</button></div>
+      </div>`;
+    return;
+  }
+  $('guideList').innerHTML = `<div class="guide-grid">${state.guides.map(g => {
+    const id = escapeHTML(g._id);
+    return `
+    <article class="guide-card ${g.active ? '' : 'is-off'}">
+      ${g.photo ? `<img src="${escapeHTML(g.photo)}" alt="">` : `<div class="guide-initial">${escapeHTML(g.name.charAt(0).toUpperCase())}</div>`}
+      <div class="guide-info">
+        <h3>${escapeHTML(g.name)}${g.active ? '' : ' <span class="badge badge-draft">Not available</span>'}</h3>
+        <p class="muted">${[g.location, g.experienceYears != null ? `${g.experienceYears} years' experience` : '', g.languages.join(', ')].filter(Boolean).map(escapeHTML).join(' · ')}</p>
+        <p class="muted">${g.upcomingTours ? `Leads ${plural(g.upcomingTours, 'upcoming tour', 'upcoming tours')}` : 'No upcoming tours'}${g.bookable && g.pricePerDay != null ? ` · Hireable in the app, ${taka(g.pricePerDay)} a day` : ''}</p>
+        <div class="pkg-actions">
+          <button class="btn btn-quiet btn-sm" data-action="edit-guide" data-id="${id}">Edit</button>
+          <button class="btn btn-danger btn-sm" data-action="delete-guide" data-id="${id}">Remove</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+function openGuideEditor(guide) {
+  state.editingGuide = guide || null;
+  $('guideForm').reset();
+  showAlert('guideError', '');
+  $('guideFormTitle').textContent = guide ? 'Edit guide' : 'Add a guide';
+  $('gdName').value = guide ? guide.name : '';
+  $('gdLocation').value = guide ? guide.location : '';
+  $('gdLanguages').value = guide ? guide.languages.join(', ') : '';
+  $('gdExperience').value = guide && guide.experienceYears != null ? guide.experienceYears : '';
+  $('gdBio').value = guide ? guide.bio : '';
+  $('gdPhone').value = guide ? guide.phone : '';
+  $('gdActive').checked = guide ? guide.active : true;
+  $('gdBookable').checked = Boolean(guide && guide.bookable);
+  $('gdTitle').value = guide ? guide.title || '' : '';
+  $('gdPrice').value = guide && guide.pricePerDay != null ? guide.pricePerDay : '';
+  $('gdRegular').value = guide && guide.regularPrice != null ? guide.regularPrice : '';
+  $('gdLat').value = guide && guide.mapLocation && guide.mapLocation.coordinates ? guide.mapLocation.coordinates[1] : '';
+  $('gdLng').value = guide && guide.mapLocation && guide.mapLocation.coordinates ? guide.mapLocation.coordinates[0] : '';
+  fillGuideDestinations(guide && guide.destination ? String(guide.destination) : '');
+  $('gdPhotoPreview').hidden = !(guide && guide.photo);
+  if (guide && guide.photo) $('gdPhotoPreview').src = guide.photo;
+  $('guideDrawer').hidden = false;
+  $('gdName').focus();
+}
+
+$('gdPhoto').addEventListener('change', () => {
+  const file = $('gdPhoto').files[0];
+  if (!file) return;
+  $('gdPhotoPreview').src = URL.createObjectURL(file);
+  $('gdPhotoPreview').hidden = false;
+});
+
+$('guideForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('guideError', '');
+  if (!$('gdName').value.trim()) return showAlert('guideError', "Enter the guide's name.");
+  const fd = new FormData();
+  fd.append('name', $('gdName').value.trim());
+  fd.append('location', $('gdLocation').value.trim());
+  fd.append('languages', $('gdLanguages').value);
+  fd.append('experienceYears', $('gdExperience').value);
+  fd.append('bio', $('gdBio').value.trim());
+  fd.append('phone', $('gdPhone').value.trim());
+  fd.append('active', $('gdActive').checked);
+  fd.append('bookable', $('gdBookable').checked);
+  fd.append('title', $('gdTitle').value.trim());
+  fd.append('pricePerDay', $('gdPrice').value);
+  fd.append('regularPrice', $('gdRegular').value);
+  fd.append('destination', $('gdDestination').value);
+  fd.append('lat', $('gdLat').value.trim());
+  fd.append('lng', $('gdLng').value.trim());
+  if ($('gdPhoto').files[0]) fd.append('photo', $('gdPhoto').files[0]);
+  const guide = state.editingGuide;
+  const btn = $('guideSave');
+  setBusy(btn, true);
+  try {
+    await api(guide ? `/api/v1/agency/me/guides/${guide._id}` : '/api/v1/agency/me/guides', { method: guide ? 'PATCH' : 'POST', form: fd });
+    closeDrawers();
+    toast(guide ? 'Guide saved.' : 'Guide added. Pick them on your tour events.');
+    await loadGuides();
+  } catch (err) {
+    showAlert('guideError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
+
+async function deleteGuide(id) {
+  const guide = state.guides.find(g => g._id === id);
+  if (!guide) return;
+  const note = guide.upcomingTours ? ` They will be taken off ${plural(guide.upcomingTours, 'upcoming tour', 'upcoming tours')}.` : '';
+  if (!window.confirm(`Remove ${guide.name}?${note}`)) return;
+  try {
+    await api(`/api/v1/agency/me/guides/${id}`, { method: 'DELETE' });
+    toast('Guide removed.');
+    await loadGuides();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ---------- Messages from travelers ----------
+
+state.guides = [];
+state.messageFilter = '';
+state.conversations = [];
+state.openConversation = null;
+
+async function refreshMessagesBadge() {
+  try {
+    const { data } = await api('/api/v1/agency/me/conversations?limit=1');
+    $('messagesBadge').textContent = data.unreadThreads;
+    $('messagesBadge').hidden = !data.unreadThreads;
+  } catch (e) { /* the badge is optional */ }
+}
+
+document.querySelectorAll('[data-msg-filter]').forEach(btn => btn.addEventListener('click', () => {
+  state.messageFilter = btn.dataset.msgFilter;
+  document.querySelectorAll('[data-msg-filter]').forEach(b => b.classList.toggle('active', b === btn));
+  loadConversations();
+}));
+
+async function loadConversations() {
+  $('conversationList').innerHTML = '<p class="muted" style="padding: 14px;">Loading...</p>';
+  try {
+    const { data } = await api(`/api/v1/agency/me/conversations?limit=50${state.messageFilter ? `&status=${state.messageFilter}` : ''}`);
+    state.conversations = data.conversations;
+    $('messagesBadge').textContent = data.unreadThreads;
+    $('messagesBadge').hidden = !data.unreadThreads;
+    renderConversationList();
+  } catch (err) {
+    $('conversationList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+function renderConversationList() {
+  if (!state.conversations.length) {
+    $('conversationList').innerHTML = `<p class="muted" style="padding: 18px;">${state.messageFilter ? 'Nothing here.' : 'No questions yet. Travelers can message you from any of your tour pages in the app.'}</p>`;
+    return;
+  }
+  $('conversationList').innerHTML = state.conversations.map(c => `
+    <button type="button" class="inbox-item ${state.openConversation === c._id ? 'is-open' : ''} ${c.unread ? 'is-unread' : ''}" data-action="open-conversation" data-id="${escapeHTML(c._id)}">
+      <span class="inbox-top"><strong>${escapeHTML(c.traveler ? c.traveler.name : 'Traveler')}</strong><span class="muted">${escapeHTML(fmtDateTime(c.lastMessageAt))}</span></span>
+      <span class="inbox-tour">${escapeHTML(c.tour ? c.tour.title : '')}${c.status === 'closed' ? ' · Closed' : ''}</span>
+      <span class="inbox-preview">${c.lastFromTraveler ? '' : 'You: '}${escapeHTML(c.lastMessage)}</span>
+      ${c.unread ? `<span class="nav-badge">${Number(c.unread)}</span>` : ''}
+    </button>`).join('');
+}
+
+async function openConversation(id) {
+  state.openConversation = id;
+  renderConversationList();
+  const box = $('conversationThread');
+  box.innerHTML = '<p class="muted" style="padding: 18px;">Loading...</p>';
+  try {
+    const { data } = await api(`/api/v1/agency/me/conversations/${id}`);
+    const c = data.conversation;
+    const t = c.traveler;
+    box.innerHTML = `
+      <header class="thread-head">
+        <div><strong>${escapeHTML(t ? t.name : 'Traveler')}</strong>
+          <div class="muted">${[c.tour && c.tour.title, t && (t.phone || t.email)].filter(Boolean).map(escapeHTML).join(' · ')}</div></div>
+        <button type="button" class="btn btn-quiet btn-sm" data-action="toggle-conversation" data-id="${escapeHTML(c._id)}">${c.status === 'closed' ? 'Reopen' : 'Mark closed'}</button>
+      </header>
+      <div class="thread-messages" id="threadMessages">${data.messages.map(m => `
+        <div class="bubble ${m.side === 'agency' ? 'is-agency' : 'is-traveler'}">
+          <p>${escapeHTML(m.text)}</p>
+          <span class="muted">${m.side === 'agency' && m.sender ? `${escapeHTML(m.sender.name)}, ` : ''}${escapeHTML(fmtDateTime(m.createdAt))}</span>
+        </div>`).join('')}</div>
+      <form class="thread-reply" id="replyForm">
+        <textarea id="replyText" rows="2" maxlength="2000" placeholder="Write your reply" aria-label="Reply"></textarea>
+        <button type="submit" class="btn btn-primary" id="replySend">Send</button>
+      </form>`;
+    const list = $('threadMessages');
+    list.scrollTop = list.scrollHeight;
+    $('replyForm').addEventListener('submit', sendReply);
+    const row = state.conversations.find(x => x._id === id);
+    if (row && row.unread) {
+      row.unread = 0;
+      renderConversationList();
+      refreshMessagesBadge();
+    }
+  } catch (err) {
+    box.innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+async function sendReply(e) {
+  e.preventDefault();
+  const text = $('replyText').value.trim();
+  if (!text) return;
+  const btn = $('replySend');
+  setBusy(btn, true);
+  try {
+    await api(`/api/v1/agency/me/conversations/${state.openConversation}/messages`, { method: 'POST', body: { text } });
+    toast('Reply sent. The traveler gets a notification.');
+    await openConversation(state.openConversation);
+    loadConversations();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+async function toggleConversation(id) {
+  const row = state.conversations.find(c => c._id === id);
+  const status = row && row.status === 'closed' ? 'open' : 'closed';
+  try {
+    await api(`/api/v1/agency/me/conversations/${id}`, { method: 'PATCH', body: { status } });
+    await loadConversations();
+    openConversation(id);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
 
 boot();

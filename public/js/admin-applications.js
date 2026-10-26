@@ -12,7 +12,7 @@ const APPLICATION_BADGES = {
   new: 'badge-manager', reviewing: 'badge-user', needs_info: 'badge-agent', approved: 'badge-active',
   rejected: 'badge-admin', contacted: 'badge-user', archived: 'badge-inactive'
 };
-const APPLICATION_DOCS = { trade_license: 'Trade license', nid: "Owner's national ID", tourism_license: 'Tourism license / TOAB', other: 'Other' };
+const APPLICATION_DOCS = { trade_license: 'Trade license', nid: "Owner's national ID", tourism_license: 'Tourism license / TOAB', insurance: 'Proof of insurance', tax_id: 'Tax ID or business number', other: 'Other' };
 const TEAM_LABELS = { 1: 'Just the owner', '2-5': '2 to 5 people', '6-15': '6 to 15 people', '16+': '16 or more' };
 
 const AP = { status: 'attention', page: 1, detail: null };
@@ -67,11 +67,11 @@ async function loadApplications(page = AP.page) {
   } else {
     document.getElementById('applicationsTableBody').innerHTML = rows.map(r => `
       <tr class="row-link" onclick="openApplication('${E(r._id)}')">
-        <td><span class="lead-main">${E(r.agencyName)}</span><span class="lead-sub">${r.reference ? E(r.reference) : 'From the old contact form'}</span></td>
+        <td><span class="lead-main">${E(r.agencyName)}</span><span class="lead-sub">${r.reference ? E(r.reference) : 'From the old contact form'}${r.source === 'app' ? ' · from the app' : ''}</span></td>
         <td><span class="lead-main">${E(r.contactName)}</span><span class="lead-sub">${E(r.phone)}</span></td>
         <td><span class="lead-sub" style="margin-top:0">${E([r.district, r.regions].filter(Boolean).join(': ')) || '—'}</span></td>
         <td>${r.documentCount
-          ? `${r.documentCount} file${r.documentCount === 1 ? '' : 's'}${r.hasRequiredDocuments ? '' : '<span class="lead-sub" style="color:var(--color-danger)">License or NID missing</span>'}`
+          ? `${r.documentCount} file${r.documentCount === 1 ? '' : 's'}${r.hasRequiredDocuments ? '' : `<span class="lead-sub" style="color:var(--color-danger)">${r.source === 'app' ? 'License, insurance or tax ID missing' : 'License or NID missing'}</span>`}`
           : '<span class="lead-sub" style="margin-top:0">None</span>'}</td>
         <td style="white-space: nowrap; color: var(--text-muted);">${E(fmtDate(r.createdAt))}</td>
         <td><span class="badge ${APPLICATION_BADGES[r.status]}">${E(APPLICATION_LABELS[r.status])}</span>${r.unreadReply ? '<span class="lead-sub" style="color: var(--color-warning, #b7791f); font-weight: 600;">New reply</span>' : ''}</td>
@@ -121,17 +121,43 @@ function applicationChecks(app, checks) {
   const notes = [];
   const has = kind => app.documents.some(d => d.kind === kind);
   if (!has('trade_license')) notes.push(['warn', 'No trade license file. Ask for it before accepting.']);
-  if (!has('nid')) notes.push(['warn', "No owner's national ID. Ask for it before accepting."]);
-  if (checks.account) notes.push(['error', `${app.email} already has a Plezar account (${checks.account.name}, ${label(checks.account.role)}). Accepting needs a different email.`]);
+  if (app.source === 'app') {
+    if (!has('insurance')) notes.push(['warn', 'No proof of insurance. Ask for it before accepting.']);
+    if (!has('tax_id')) notes.push(['warn', 'No tax ID document. Ask for it before accepting.']);
+  } else if (!has('nid')) notes.push(['warn', "No owner's national ID. Ask for it before accepting."]);
+  if (checks.account) {
+    const roles = (checks.account.roles && checks.account.roles.length ? checks.account.roles : [checks.account.role]).map(r => ROLE_NAMES[r] || r).join(', ');
+    if (checks.account.agency) notes.push(['error', `${app.email} already belongs to an agency (${checks.account.name}). Accepting needs a different email.`]);
+    else if (app.applicant && String(app.applicant._id || app.applicant) === String(checks.account._id)) notes.push(['info', `${app.email} is the applicant's own Plezar account (${roles}). Accepting adds the vendor role to it; they sign in with their usual password.`]);
+    else notes.push(['warn', `${app.email} already has a Plezar account (${checks.account.name}, ${roles}). Accepting adds the vendor role to that account; tick the box when you accept.`]);
+  }
   if (checks.agencyWithLicense) notes.push(['error', `The vendor "${checks.agencyWithLicense.name}" already uses trade license ${app.tradeLicenseNumber}.`]);
   (checks.otherApplications || []).forEach(o => notes.push(['info', `Earlier application ${o.reference || ''} for "${o.agencyName}" (${APPLICATION_LABELS[o.status] || o.status}, ${fmtDate(o.createdAt)}) used the same email, phone or license.`]));
-  if (!notes.length) notes.push(['ok', 'No problems found: both required documents are here, and the email, phone and license are not used anywhere else.']);
+  if (!notes.length) notes.push(['ok', 'No problems found: the required documents are here, and the email, phone and license are not used anywhere else.']);
   const cls = { warn: 'callout-warn', error: 'callout-error', ok: 'callout-ok', info: '' };
   return notes.map(([kind, text]) => `<div class="callout ${cls[kind]}"><div>${E(text)}</div></div>`).join('');
 }
 
 function renderApplication() {
-  const { application: a, checks, statusURL } = AP.detail;
+  const { application: a, checks, statusURL, appOptions = {} } = AP.detail;
+  const opt = (group, key) => ((appOptions[group] || {})[key]) || key || '';
+  const biz = a.business || {};
+  // Applications from the app's 3-step form carry business details too
+  const appCard = a.source === 'app' ? `
+      <div class="detail-card">
+        <h3>Business details (from the app)</h3>
+        <dl class="kv">
+          ${appRow('Business type', E(opt('businessTypes', a.businessType)))}
+          ${appRow('Address', E([a.officeAddress, a.city, a.stateProvince, a.postalCode, a.country].filter(Boolean).join(', ')))}
+          ${appRow('Annual sales (USD)', E(opt('annualSales', biz.annualSales)))}
+          ${appRow('Employees', E(opt('employees', biz.employees)))}
+          ${appRow('Clients a year', E(opt('annualClients', biz.annualClients)))}
+          ${appRow('Specializations', E((biz.specializations || []).map(k => opt('specializations', k)).join(', ')))}
+          ${appRow('Partnerships', biz.partnerships ? `<span class="pre">${E(biz.partnerships)}</span>` : '')}
+          ${appRow('Heard about us', E(opt('heardFrom', biz.heardFrom)))}
+          ${appRow('Traveler account', a.applicant ? `${E(a.applicant.name)} (${E(a.applicant.email || a.applicant.phone || '')})` : '')}
+        </dl>
+      </div>` : '';
   const decided = isDecided(a);
   const categories = (a.categories || []).map(c => `<span class="tag">${E(c.name)}</span>`).join('');
 
@@ -212,6 +238,8 @@ function renderApplication() {
         </dl>
         ${statusURL ? `<p class="detail-muted" style="margin-top:12px">The applicant follows this application at <a href="${E(statusURL)}" target="_blank" rel="noopener">their status page</a> (reference and email needed).</p>` : ''}
       </div>
+
+      ${appCard}
 
       <div class="detail-card">
         <h3>Documents</h3>
@@ -304,6 +332,11 @@ async function openApproveModal() {
   document.getElementById('approveLead').textContent =
     `${a.agencyName} becomes a vendor and ${a.contactName} (${a.email}) gets an owner account with a temporary password. You'll see the sign-in details next, ready to email to them.`;
   document.getElementById('apVerify').checked = true;
+  // Someone who already has a Plezar account can be made the owner with the login they have
+  const acct = AP.detail.checks && AP.detail.checks.account;
+  const own = acct && a.applicant && String(a.applicant._id || a.applicant) === String(acct._id);
+  document.getElementById('apUseExistingRow').hidden = !acct || Boolean(acct.agency) || own;
+  document.getElementById('apUseExisting').checked = false;
   document.getElementById('approveForm').hidden = false;
   document.getElementById('approveResult').hidden = true;
   formError('approveError');
@@ -325,7 +358,7 @@ async function submitApprove(e) {
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/applications/${AP.detail.application._id}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ verify: document.getElementById('apVerify').checked, categories, send: document.getElementById('apSend').checked })
+      body: JSON.stringify({ verify: document.getElementById('apVerify').checked, categories, send: document.getElementById('apSend').checked, useExistingAccount: document.getElementById('apUseExisting').checked })
     });
     if (!ok) return formError('approveError', data.message || 'Could not accept this application.');
 
@@ -353,6 +386,8 @@ async function submitApprove(e) {
 
 // The temporary password, an email ready to copy, and a button that opens it in the admin's email app
 function credentialsBox(c) {
+  // An existing account keeps its own password, so there are no sign-in details to send
+  if (!c) return '';
   const draft = c.emailDraft;
   const mailto = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
   return `

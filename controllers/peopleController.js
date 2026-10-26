@@ -6,6 +6,7 @@ const Block = require('../models/blockModel');
 const Booking = require('../models/bookingModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { roleFilter } = require('../utils/roles');
 const { escapeRegex } = require('../utils/query');
 const { viewerContext, visibleFilter, userCard, USER_CARD_FIELDS, POPULATE, hydratePosts, pageSize, cursorFilter, nextCursor, notifySocial, unnotifySocial } = require('../utils/social');
 const { fileReport } = require('./postController');
@@ -16,7 +17,7 @@ const validId = id => mongoose.isValidObjectId(id);
 
 // Only active traveler accounts have public profiles
 const findTraveler = async (id, ctx) => {
-  const user = validId(id) ? await User.findOne({ _id: id, role: 'user', status: 'active' }) : null;
+  const user = validId(id) ? await User.findOne({ $and: [{ _id: id, status: 'active' }, roleFilter('user')] }) : null;
   if (!user || (ctx && ctx.blocked.has(String(user._id)))) throw new AppError('This profile is not available.', 404);
   return user;
 };
@@ -35,7 +36,7 @@ exports.search = catchAsync(async (req, res, next) => {
   const ctx = await viewerContext(req.user);
   const q = String(req.query.q || '').trim();
   if (q.length < 2) return next(new AppError('Type at least 2 letters to search.', 400));
-  const rows = await User.find({ role: 'user', status: 'active', name: { $regex: escapeRegex(q), $options: 'i' }, _id: { $nin: [...ctx.blocked] } })
+  const rows = await User.find({ $and: [{ status: 'active', name: { $regex: escapeRegex(q), $options: 'i' }, _id: { $nin: [...ctx.blocked] } }, roleFilter('user')] })
     .limit(pageSize(req.query)).select(USER_CARD_FIELDS).lean();
   res.status(200).json({ status: 'success', data: { people: rows.map(u => ({ ...userCard(u), following: ctx.following.has(String(u._id)) })) } });
 });
@@ -46,14 +47,22 @@ exports.profile = catchAsync(async (req, res) => {
   const counts = await countsFor(user._id, ctx);
   const showTrips = !(user.settings && user.settings.privacy && user.settings.privacy.showTrips === false) || String(user._id) === ctx.me;
   const followsYou = ctx.me ? Boolean(await Follow.exists({ follower: user._id, targetType: 'user', target: ctx.me })) : false;
+  // What the traveler chose to show in Settings > Profile (they always see their own)
+  const isMe = String(user._id) === ctx.me;
+  const privacy = (user.settings && user.settings.privacy) || {};
+  const showInfo = isMe || privacy.showPersonalInfo !== false;
+  const home = (user.addresses || []).find(a => a.isDefault);
+  const location = (isMe || privacy.showAddress) && home ? `${home.area}, ${home.district}` : null;
   res.status(200).json({
     status: 'success',
     data: {
       profile: {
         ...userCard(user),
-        bio: user.bio,
+        bio: showInfo ? user.bio : '',
         coverPhoto: user.coverPhoto,
-        hometown: user.hometown,
+        hometown: showInfo ? user.hometown : '',
+        occupation: showInfo ? user.occupation || '' : '',
+        location,
         joinedAt: user._id.getTimestamp(),
         counts: { ...counts, trips: showTrips ? counts.trips : null },
         viewer: { isMe: String(user._id) === ctx.me, following: ctx.following.has(String(user._id)), followsYou }

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Agency = require('../models/agencyModel');
 const { reportPeriod, dhakaDay } = require('./vendorReport');
 const { sendReport } = require('./reportMailer');
+const { sendTripReminders } = require('./tripReminders');
 
 /**
  * Sends scheduled vendor reports from inside the web server:
@@ -56,7 +57,11 @@ const startReportScheduler = () => {
   if (process.env.REPORT_SCHEDULER === 'off' || timer) return;
   const tick = () => runOnce().then(r => {
     if (r.results && r.results.length) console.log(`[REPORTS] ${r.results.filter(x => x.sent).length} of ${r.results.length} scheduled reports sent`);
-  }).catch(err => console.warn('[REPORTS WARNING]', err.message));
+  }).catch(err => console.warn('[REPORTS WARNING]', err.message))
+    // Travelers' day-before trip reminders run on the same clock
+    .then(() => sendTripReminders())
+    .then(r => { if (r && r.sent) console.log(`[REMINDERS] ${r.sent} trip reminders sent`); })
+    .catch(err => console.warn('[REMINDERS WARNING]', err.message));
   timer = setInterval(tick, CHECK_EVERY);
   timer.unref();
   setTimeout(tick, 60 * 1000).unref();

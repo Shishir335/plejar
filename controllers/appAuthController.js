@@ -11,6 +11,8 @@ const { photoURL } = require('../utils/social');
 const { saveProfileImage, removeProfileImage } = require('../utils/userImages');
 const { profileProblems, signupProblems, passwordProblems, normalizePhone, readPersonName, readDateOfBirth } = require('../utils/registration');
 const { blockedReason, signToken } = require('./authController');
+const { rolesOf, hasRole, addRole, roleFilter } = require('../utils/roles');
+const { findReferrer, applyReferral } = require('../utils/referrals');
 
 // Sign-up, sign-in and password recovery for the traveler app (/api/v1/auth)
 
@@ -19,7 +21,6 @@ const RESEND_AFTER = 60 * 1000;
 const MAX_CODES_PER_HOUR = 5;
 const MAX_TRIES = 5;
 const RESET_LIFETIME = 15 * 60 * 1000;
-const TRAVELERS_ONLY = 'This app is for travelers. Vendors and Plezar staff sign in on the website.';
 
 const sha256 = text => crypto.createHash('sha256').update(String(text)).digest('hex');
 const sameHash = (a, b) => a && b && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -36,6 +37,7 @@ const appUserView = user => ({
   dateOfBirth: ymd(user.dateOfBirth),
   photoUrl: photoURL(user.photo),
   role: user.role,
+  roles: rolesOf(user),
   authProvider: user.authProvider,
   profileComplete: Boolean(user.firstName && user.lastName && user.dateOfBirth),
   createdAt: user.createdAt || user._id.getTimestamp()
@@ -58,8 +60,10 @@ const readContact = b => {
   return phone ? { channel: 'phone', value: phone } : { error: 'Enter a Bangladeshi mobile number, for example 01712345678.' };
 };
 
+// By email: any account (vendors and staff can use the app as travelers too).
+// By phone: traveler accounts only, as other accounts' phone numbers aren't unique.
 const findTraveler = ({ channel, value }, { withPassword = false, includeInactive = false } = {}) => {
-  const q = User.findOne(channel === 'email' ? { email: value } : { phone: value, role: 'user' });
+  const q = User.findOne(channel === 'email' ? { email: value } : { $and: [{ phone: value }, roleFilter('user')] });
   if (withPassword) q.select('+password');
   if (includeInactive) q.setOptions({ includeInactive: true });
   return q;
@@ -80,9 +84,12 @@ exports.register = catchAsync(async (req, res) => {
   if (!errors.email && email && await User.exists({ email }).setOptions({ includeInactive: true })) {
     errors.email = 'An account with this email already exists. Log in instead.';
   }
-  if (!errors.phone && phone && await User.exists({ phone, role: 'user' }).setOptions({ includeInactive: true })) {
+  if (!errors.phone && phone && await User.exists({ $and: [{ phone }, roleFilter('user')] }).setOptions({ includeInactive: true })) {
     errors.phone = 'An account with this mobile number already exists. Log in instead.';
   }
+  // Optional code from a friend's Refer Friends link
+  const referrer = String(b.referralCode || '').trim() ? await findReferrer(b.referralCode) : null;
+  if (String(b.referralCode || '').trim() && !referrer) errors.referralCode = "This referral code doesn't exist. Check it or leave it empty.";
   if (Object.keys(errors).length) return fieldErrors(res, errors);
 
   const fields = {
@@ -99,6 +106,7 @@ exports.register = catchAsync(async (req, res) => {
   if (String(b.lastName || '').trim()) fields.lastName = readPersonName(b.lastName, 'last name');
   if (!fields.firstName && !fields.lastName) fields.name = 'Plezar traveler';
   const user = await User.create(fields);
+  const welcomePoints = await applyReferral(user, referrer);
 
   // The photo needs the new account's id for its file name; a bad photo doesn't undo the sign-up
   let photoWarning;
@@ -121,7 +129,8 @@ exports.register = catchAsync(async (req, res) => {
   }
 
   await recordLogin(req, { user, email, success: true, reason: 'signup' });
-  sendSession(res, 201, user, photoWarning || (user.firstName ? `Welcome to Plezar, ${user.firstName}!` : 'Your account is ready.'));
+  const welcome = user.firstName ? `Welcome to Plezar, ${user.firstName}!` : 'Your account is ready.';
+  sendSession(res, 201, user, photoWarning || (welcomePoints ? `${welcome} You got ${welcomePoints.toLocaleString('en-US')} welcome points.` : welcome));
 });
 
 // GET /auth/check?email= or ?phone= — is this email or number free for a new account?
@@ -176,18 +185,20 @@ exports.login = catchAsync(async (req, res, next) => {
     if (user && !user.password && user.authProvider === 'google') return next(new AppError('This account uses Google. Tap "Continue with Google", or set a password with "Forgot password".', 401));
     return next(new AppError(wrong, 401));
   }
-  if (user.role !== 'user') return next(new AppError(TRAVELERS_ONLY, 403));
   const blocked = await blockedReason(user);
   if (blocked) {
     await recordLogin(req, { user, email: contact.value, success: false, reason: `blocked_${user.deletedAt ? 'deleted' : user.status}` });
     return next(new AppError(blocked, 403));
   }
 
+  // A vendor or staff account signing in to the app for the first time becomes a traveler too
+  const joined = !hasRole(user, 'user');
+  if (joined) addRole(user, 'user');
   user.lastLoginAt = new Date();
   user.loginCount = (user.loginCount || 0) + 1;
   await user.save({ validateBeforeSave: false });
   await recordLogin(req, { user, email: contact.value, success: true });
-  sendSession(res, 200, user);
+  sendSession(res, 200, user, joined ? 'Welcome to the Plezar app! Your account now works here too.' : undefined);
 });
 
 const googleClient = new OAuth2Client();
@@ -210,9 +221,9 @@ exports.google = catchAsync(async (req, res, next) => {
   let user = await User.findOne({ $or: [{ googleId: payload.sub }, { email }] });
   let created = false;
   if (user) {
-    if (user.role !== 'user') return next(new AppError(TRAVELERS_ONLY, 403));
     const blocked = await blockedReason(user);
     if (blocked) return next(new AppError(blocked, 403));
+    if (!hasRole(user, 'user')) addRole(user, 'user');
     if (!user.googleId) user.googleId = payload.sub;
     if (!user.firstName && payload.given_name) user.firstName = payload.given_name.slice(0, 30);
     if (!user.lastName && payload.family_name) user.lastName = payload.family_name.slice(0, 30);
@@ -276,7 +287,6 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   const user = await findTraveler(contact);
   const label = contact.channel === 'email' ? 'email' : 'mobile number';
   if (!user) return next(new AppError(`We couldn't find an account with this ${label}.`, 404));
-  if (user.role !== 'user') return next(new AppError('Vendors and Plezar staff reset their password on the website.', 403));
   const blocked = await blockedReason(user);
   if (blocked) return next(new AppError(blocked, 403));
 

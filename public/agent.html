@@ -73,6 +73,8 @@
         <button data-view="overview" class="active">Overview</button>
         <button data-view="events">Tour events</button>
         <button data-view="registrations">Registrations</button>
+        <button data-view="messages">Messages <span class="nav-badge" id="messagesBadge" hidden>0</span></button>
+        <button data-view="guides">Guides</button>
         <button data-view="announcements">Announcements</button>
         <button data-view="notifications">Notifications</button>
         <button data-view="profile">Agency profile</button>
@@ -190,6 +192,43 @@
           <button class="chip" data-event-filter="all">All</button>
         </div>
         <div id="eventList"></div>
+      </section>
+
+      <!-- Messages from travelers -->
+      <section id="view-messages" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Messages</h1>
+            <p>Questions travelers send from a tour page in the app ("Message Tour Guide"). They get a notification when you reply.</p>
+          </div>
+        </div>
+        <div class="filter-row" role="group" aria-label="Show conversations">
+          <button class="chip active" data-msg-filter="">All</button>
+          <button class="chip" data-msg-filter="unread">Unread</button>
+          <button class="chip" data-msg-filter="open">Open</button>
+          <button class="chip" data-msg-filter="closed">Closed</button>
+        </div>
+        <div class="inbox">
+          <div class="inbox-list" id="conversationList"></div>
+          <div class="inbox-thread" id="conversationThread">
+            <div class="empty"><strong>Choose a conversation</strong>Pick a traveler's question on the left to read and reply.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tour guides -->
+      <section id="view-guides" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Guides</h1>
+            <p>The people who lead your tours. Pick one on each tour event; travelers see the guide's photo, languages and experience on the tour page.</p>
+          </div>
+          <button class="btn btn-primary" data-action="new-guide">Add a guide</button>
+        </div>
+        <div id="guideList"></div>
+        <h2 class="section-title" style="margin-top: 28px;">Guide bookings</h2>
+        <p class="muted">Travelers who hired one of your guides in the app. Confirm to tell them it's on; they get a notification.</p>
+        <div id="guideBookingList"></div>
       </section>
 
       <!-- Registrations -->
@@ -526,6 +565,34 @@
             <p class="hint">Tick if the group can agree a different date with you.</p>
           </div>
         </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="evGuide">Tour guide</label>
+            <select id="evGuide"><option value="">No guide shown</option></select>
+            <p class="hint">Shown under "Your Tour Guide". Add guides on the Guides page.</p>
+          </div>
+          <div class="field">
+            <label>Tags (up to 5)</label>
+            <div class="tag-picks" id="evTags">
+              <label class="tag-pick"><input type="checkbox" value="adventure"> Adventure</label>
+              <label class="tag-pick"><input type="checkbox" value="beach"> Beach</label>
+              <label class="tag-pick"><input type="checkbox" value="cities"> Cities</label>
+              <label class="tag-pick"><input type="checkbox" value="cultural"> Cultural</label>
+              <label class="tag-pick"><input type="checkbox" value="food"> Food</label>
+              <label class="tag-pick"><input type="checkbox" value="hiking"> Hiking</label>
+              <label class="tag-pick"><input type="checkbox" value="history"> History</label>
+              <label class="tag-pick"><input type="checkbox" value="nature"> Nature</label>
+              <label class="tag-pick"><input type="checkbox" value="photography"> Photography</label>
+              <label class="tag-pick"><input type="checkbox" value="relaxation"> Relaxation</label>
+              <label class="tag-pick"><input type="checkbox" value="religious"> Religious</label>
+              <label class="tag-pick"><input type="checkbox" value="river"> River</label>
+              <label class="tag-pick"><input type="checkbox" value="hills"> Hills</label>
+              <label class="tag-pick"><input type="checkbox" value="wildlife"> Wildlife</label>
+              <label class="tag-pick"><input type="checkbox" value="camping"> Camping</label>
+              <label class="tag-pick"><input type="checkbox" value="island"> Island</label>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="plan-section">
@@ -635,6 +702,51 @@
   </div>
 
   <!-- Announcement editor -->
+  <div class="drawer-bg" id="guideDrawer" hidden>
+    <form class="drawer" id="guideForm" role="dialog" aria-modal="true" aria-labelledby="guideFormTitle" novalidate>
+      <div class="drawer-head">
+        <h2 id="guideFormTitle">Add a guide</h2>
+        <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
+      </div>
+      <div class="guide-photo-row">
+        <img id="gdPhotoPreview" alt="" hidden>
+        <div class="field" style="flex:1;">
+          <label for="gdPhoto">Photo</label>
+          <input id="gdPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+          <p class="hint">A clear, friendly face photo. Square works best.</p>
+        </div>
+      </div>
+      <div class="field"><label for="gdName">Name *</label><input id="gdName" maxlength="80" placeholder="Rakib Hasan"></div>
+      <div class="field"><label for="gdLocation">Based in</label><input id="gdLocation" maxlength="120" placeholder="Cox's Bazar, Bangladesh"></div>
+      <div class="field-row">
+        <div class="field"><label for="gdLanguages">Languages</label><input id="gdLanguages" maxlength="200" placeholder="Bangla, English, Hindi"></div>
+        <div class="field"><label for="gdExperience">Years of experience</label><input id="gdExperience" type="number" min="0" max="70" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label for="gdBio">About the guide</label><textarea id="gdBio" rows="5" maxlength="1500" placeholder="Grew up by the sea, has led 200+ trips to Saint Martin's..."></textarea></div>
+      <div class="field"><label for="gdPhone">Phone (only your team sees this)</label><input id="gdPhone" maxlength="30" inputmode="tel"></div>
+      <label class="check"><input type="checkbox" id="gdActive" checked> <span>Available to pick on tours</span></label>
+      <fieldset class="guide-hire">
+        <legend>Travelers can hire this guide</legend>
+        <label class="check"><input type="checkbox" id="gdBookable"> <span>Show in the app so travelers can book days with this guide</span></label>
+        <div class="field-row">
+          <div class="field"><label for="gdTitle">Title</label><input id="gdTitle" maxlength="60" placeholder="Local Expert"></div>
+          <div class="field"><label for="gdPrice">Price per day (৳)</label><input id="gdPrice" type="number" min="0" step="50" inputmode="numeric"></div>
+          <div class="field"><label for="gdRegular">Regular price (৳)</label><input id="gdRegular" type="number" min="0" step="50" inputmode="numeric" placeholder="Only for a sale"></div>
+        </div>
+        <div class="field"><label for="gdDestination">Works in</label><select id="gdDestination"><option value="">Choose a destination</option></select></div>
+        <div class="field-row">
+          <div class="field"><label for="gdLat">Latitude (for "View map")</label><input id="gdLat" inputmode="decimal" placeholder="21.4272"></div>
+          <div class="field"><label for="gdLng">Longitude</label><input id="gdLng" inputmode="decimal" placeholder="92.0058"></div>
+        </div>
+      </fieldset>
+      <div class="alert alert-error" id="guideError" hidden></div>
+      <div class="drawer-foot">
+        <button type="button" class="btn btn-quiet" data-action="close-drawer">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="guideSave">Save guide</button>
+      </div>
+    </form>
+  </div>
+
   <div class="drawer-bg" id="announcementDrawer" hidden>
     <form class="drawer" id="announcementForm" role="dialog" aria-modal="true" aria-labelledby="announcementFormTitle" novalidate>
       <div class="drawer-head">

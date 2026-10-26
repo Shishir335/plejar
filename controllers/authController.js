@@ -9,6 +9,7 @@ const AppError = require('../utils/appError');
 const Email = require('../utils/email');
 const { recordLogin } = require('../utils/activity');
 const { agencyBlockedReason } = require('../utils/agencyStanding');
+const { hasRole, addRole, rolesOf } = require('../utils/roles');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -44,10 +45,10 @@ const blockedReason = async user => {
 exports.blockedReason = blockedReason;
 exports.isAdminEmail = isAdminEmail;
 
-// Store the admin role for ADMIN_EMAILS accounts, so the admin console (which reads the role) lets them in
+// Give ADMIN_EMAILS accounts the admin role (on top of any others), so the admin console lets them in
 const promoteAdminEmail = async user => {
-    if (user && isAdminEmail(user.email) && user.role !== 'admin' && user.role !== 'agent') {
-        user.role = 'admin';
+    if (user && isAdminEmail(user.email) && !hasRole(user, 'admin')) {
+        addRole(user, 'admin');
         await user.save({ validateBeforeSave: false });
     }
 };
@@ -120,8 +121,8 @@ exports.login = catchAsync(async (req, res, next) => {
         return next(new AppError(blocked, 403));
     }
 
-    // 5) agents of a suspended agency cannot sign in
-    if (user.role === 'agent') {
+    // 5) someone who is only part of a suspended agency cannot sign in (other roles still can)
+    if (hasRole(user, 'agent') && rolesOf(user).length === 1) {
         const agency = await Agency.findById(user.agency);
         const agencyBlocked = await agencyBlockedReason(agency);
         if (agencyBlocked) {
@@ -182,12 +183,10 @@ exports.googleLogin = catchAsync(async (req, res, next) => {
             if (picture && (!user.photo || user.photo === 'profile.png')) {
                 user.photo = picture;
             }
-            if (isAdminEmail(email)) {
-                user.role = 'admin';
-            }
+            if (isAdminEmail(email)) addRole(user, 'admin');
             await user.save({ validateBeforeSave: false });
-        } else if (isAdminEmail(email) && user.role !== 'admin') {
-            user.role = 'admin';
+        } else if (isAdminEmail(email) && !hasRole(user, 'admin')) {
+            addRole(user, 'admin');
             await user.save({ validateBeforeSave: false });
         }
     } else {
@@ -197,7 +196,7 @@ exports.googleLogin = catchAsync(async (req, res, next) => {
             googleId,
             authProvider: 'google',
             photo: picture || 'profile.png',
-            role: isAdminEmail(email) ? 'admin' : 'user'
+            roles: isAdminEmail(email) ? ['user', 'admin'] : ['user']
         });
     }
 
@@ -276,13 +275,14 @@ exports.optionalAuth = async (req, res, next) => {
     next();
 };
 
+// Lets the request through when the signed-in account has any of these roles
 exports.restrictTo = (...roles) => Object.assign((req, res, next) => {
     if (req.user && isAdminEmail(req.user.email)) {
-        req.user.role = 'admin';
+        if (!hasRole(req.user, 'admin')) addRole(req.user, 'admin');
         return next();
     }
 
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !hasRole(req.user, ...roles)) {
         return next(
             new AppError('You do not have administrative permission to perform this action.', 403));
     }

@@ -116,6 +116,11 @@ module.exports = class Email {
         await this.send('passwordCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plezar'} security code`);
     }
 
+    // 4-digit code to confirm the traveler's email address (this.data.code)
+    async sendVerifyCode() {
+        await this.send('verifyCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plezar'} email code`);
+    }
+
     // Whether any mail account is set up in config.env (otherwise sending fails)
     static isConfigured() {
         if (process.env.GMAIL_USER && process.env.GMAIL_PASS) return true;

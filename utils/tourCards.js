@@ -99,6 +99,7 @@ const tourCard = (tour, ctx) => {
     place,
     location: place ? place.label : tour.destination,
     highlights: tour.highlights || [],
+    tags: tour.tags || [],
     rating: ctx.ratings.get(id) || { average: null, count: 0 },
     price: priceView(tour.priceFrom, tour.regularPrice),
     durationDays: tour.durationDays,

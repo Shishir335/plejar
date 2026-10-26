@@ -8,6 +8,7 @@ const AppError = require('../utils/appError');
 const { sendInvite } = require('../utils/invites');
 const { logActivity } = require('../utils/activity');
 const { saveAgencyImage, removeAgencyImage } = require('../utils/uploads');
+const { addRole } = require('../utils/roles');
 const {
   toList,
   pick,
@@ -214,9 +215,13 @@ exports.createAgency = catchAsync(async (req, res, next) => {
     return next(new AppError('Agency name, owner name and owner email are required.', 400));
   }
 
+  // An existing account (a traveler, say) becomes the owner too, unless it already has an agency
   const existing = await User.findOne({ email });
-  if (existing) {
-    return next(new AppError(`An account already exists for ${email}. Use a different email for this agency owner.`, 400));
+  if (existing && existing.agency) {
+    return next(new AppError(`${email} already belongs to an agency. Use a different email for this agency owner.`, 400));
+  }
+  if (existing && (existing.deletedAt || existing.status !== 'active')) {
+    return next(new AppError(`The account for ${email} is suspended or removed. Use a different email.`, 400));
   }
 
   const agency = await Agency.create({
@@ -231,15 +236,23 @@ exports.createAgency = catchAsync(async (req, res, next) => {
 
   let owner;
   try {
-    owner = await User.create({
-      name: contactName,
-      email,
-      phone,
-      role: 'agent',
-      agency: agency._id,
-      agencyRole: 'owner',
-      accountStatus: 'invited'
-    });
+    if (existing) {
+      owner = existing;
+      addRole(owner, 'agent');
+      owner.agency = agency._id;
+      owner.agencyRole = 'owner';
+      await owner.save({ validateBeforeSave: false });
+    } else {
+      owner = await User.create({
+        name: contactName,
+        email,
+        phone,
+        role: 'agent',
+        agency: agency._id,
+        agencyRole: 'owner',
+        accountStatus: 'invited'
+      });
+    }
   } catch (err) {
     await Agency.findByIdAndDelete(agency._id);
     throw err;
@@ -248,6 +261,16 @@ exports.createAgency = catchAsync(async (req, res, next) => {
   if (lead && lead.status === 'new') {
     lead.status = 'contacted';
     await lead.save();
+  }
+
+  // An existing account already has a password, so there's nothing to accept
+  if (existing) {
+    await logActivity(req, { action: 'agency.created', summary: `Agency created with ${owner.name}'s existing account as owner`, agency: agency._id });
+    return res.status(201).json({
+      status: 'success',
+      message: `${agency.name} created. ${owner.name} already has a Plezar account and signs in to the vendor panel with it.`,
+      data: { agency, owner: teamView(owner), inviteURL: null, emailSent: false, existingAccount: true }
+    });
   }
 
   const { inviteURL, emailSent } = await sendInvite(owner, agency, req);

@@ -53,7 +53,20 @@ const applicationUpload = multer({
   { name: 'trade_license', maxCount: 1 },
   { name: 'nid', maxCount: 2 },
   { name: 'tourism_license', maxCount: 1 },
+  { name: 'insurance', maxCount: 1 },
+  { name: 'tax_id', maxCount: 1 },
   { name: 'other', maxCount: 2 }
+]);
+
+// The app's Travel Agency Application (step 3: three documents, PDF or image, 5 MB each)
+const agencyApplicationUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: fileFilter(DOCUMENT_TYPES),
+  limits: { fileSize: MAX_FILE_SIZE, files: 3 }
+}).fields([
+  { name: 'businessLicense', maxCount: 1 },
+  { name: 'insurance', maxCount: 1 },
+  { name: 'taxId', maxCount: 1 }
 ]);
 
 /**
@@ -108,8 +121,8 @@ const removeDestinationFolder = async destinationId => {
   await fs.promises.rm(target, { recursive: true, force: true });
 };
 
-// Hotel photos and promotion banners live under /public/img/<hotels|promotions>/<id>/
-const CONTENT_KINDS = ['hotels', 'promotions'];
+// Hotel photos, promotion banners and voucher pictures live under /public/img/<hotels|promotions|vouchers>/<id>/
+const CONTENT_KINDS = ['hotels', 'promotions', 'vouchers'];
 const contentDir = kind => path.join(__dirname, '..', 'public', 'img', kind);
 
 const saveContentImage = async (file, kind, id, { width = 2000 } = {}) => {
@@ -187,6 +200,7 @@ module.exports = {
   documentUpload,
   userDocumentUpload,
   applicationUpload,
+  agencyApplicationUpload,
   saveAgencyImage,
   removeAgencyImage,
   saveDestinationImage,

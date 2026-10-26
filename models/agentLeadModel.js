@@ -2,10 +2,48 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const validator = require('validator');
 
-// A tour agency's membership application, sent from the website and reviewed by the master admin.
+// A tour agency's membership application, sent from the website or the traveler app ("Travel Agency
+// Application") and reviewed by the master admin.
 // (Older records from the first contact form have no documents or reference; they still list and work.)
 
-const DOCUMENT_KINDS = ['trade_license', 'nid', 'tourism_license', 'other'];
+const DOCUMENT_KINDS = ['trade_license', 'nid', 'tourism_license', 'insurance', 'tax_id', 'other'];
+
+// Choices on the app's 3-step form, as { key: label }
+const APP_OPTIONS = {
+  businessTypes: {
+    tour_operator: 'Tour operator',
+    travel_agency: 'Travel agency',
+    destination_management: 'Destination management company',
+    online_travel_agency: 'Online travel agency',
+    corporate_travel: 'Corporate travel',
+    hotel_resort: 'Hotel or resort',
+    transport: 'Transport provider',
+    other: 'Other'
+  },
+  annualSales: { under_50k: 'Under $50,000', '50k_250k': '$50,000 - $250,000', '250k_1m': '$250,000 - $1 million', '1m_5m': '$1 - 5 million', over_5m: 'Over $5 million' },
+  employees: { '1-5': '1 - 5', '6-20': '6 - 20', '21-50': '21 - 50', '51-200': '51 - 200', '200+': 'More than 200' },
+  annualClients: { under_500: 'Under 500', '500_2000': '500 - 2,000', '2000_10000': '2,000 - 10,000', over_10000: 'Over 10,000' },
+  specializations: {
+    leisure: 'Leisure Travel',
+    business: 'Business Travel',
+    luxury: 'Luxury Travel',
+    adventure: 'Adventure Travel',
+    cruises: 'Cruises',
+    group: 'Group Travel',
+    honeymoon: 'Honeymoon & Romance',
+    destination_weddings: 'Destination Weddings'
+  },
+  heardFrom: {
+    social_media: 'Social media',
+    search_engine: 'Google or another search engine',
+    friend: 'A friend or colleague',
+    plezar_app: 'The Plezar app',
+    event: 'A travel fair or event',
+    news: 'News or a blog',
+    other: 'Other'
+  }
+};
+const keysOf = group => Object.keys(APP_OPTIONS[group]);
 const STATUSES = ['new', 'reviewing', 'needs_info', 'approved', 'rejected', 'contacted', 'archived'];
 const TEAM_SIZES = ['1', '2-5', '6-15', '16+'];
 
@@ -31,6 +69,9 @@ const messageSchema = new mongoose.Schema({
 const agentLeadSchema = new mongoose.Schema(
   {
     reference: { type: String, unique: true, sparse: true },
+    source: { type: String, enum: ['website', 'app'], default: 'website' },
+    // The traveler who applied from the app (they follow it in My Account)
+    applicant: { type: mongoose.Schema.ObjectId, ref: 'User', index: true },
 
     // The agency
     agencyName: {
@@ -48,6 +89,20 @@ const agentLeadSchema = new mongoose.Schema(
     teamSize: { type: String, enum: { values: TEAM_SIZES, message: 'Choose a team size' } },
     officeAddress: { type: String, trim: true, maxlength: [300, 'Address must be 300 characters or fewer'], default: '' },
     district: { type: String, trim: true, maxlength: [60, 'District is too long'], default: '' },
+    // From the app form: the full address and the kind of business
+    businessType: { type: String, enum: { values: [...keysOf('businessTypes'), ''], message: 'Choose a business type' }, default: '' },
+    city: { type: String, trim: true, maxlength: 80, default: '' },
+    stateProvince: { type: String, trim: true, maxlength: 80, default: '' },
+    postalCode: { type: String, trim: true, maxlength: 20, default: '' },
+    country: { type: String, trim: true, maxlength: 60, default: 'Bangladesh' },
+    business: {
+      annualSales: { type: String, enum: [...keysOf('annualSales'), ''], default: '' },
+      employees: { type: String, enum: [...keysOf('employees'), ''], default: '' },
+      annualClients: { type: String, enum: [...keysOf('annualClients'), ''], default: '' },
+      specializations: [{ type: String, enum: keysOf('specializations') }],
+      partnerships: { type: String, trim: true, maxlength: 1000, default: '' },
+      heardFrom: { type: String, enum: [...keysOf('heardFrom'), ''], default: '' }
+    },
     regions: {
       type: String,
       trim: true,
@@ -135,4 +190,5 @@ const AgentLead = mongoose.model('AgentLead', agentLeadSchema);
 AgentLead.DOCUMENT_KINDS = DOCUMENT_KINDS;
 AgentLead.STATUSES = STATUSES;
 AgentLead.TEAM_SIZES = TEAM_SIZES;
+AgentLead.APP_OPTIONS = APP_OPTIONS;
 module.exports = AgentLead;

@@ -7,6 +7,7 @@ const factory = require("./handlerFactory");
 const Email = require("../utils/email");
 const { savePrivateDocument, removePrivateDocument } = require('../utils/uploads');
 const { logActivity } = require('../utils/activity');
+const { STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, setRoles } = require('../utils/roles');
 
 const multerStorage = multer.memoryStorage();
 
@@ -97,7 +98,8 @@ exports.getMyVerification = catchAsync(async (req, res, next) => {
     res.status(200).json({ status: 'success', data: { verification: verificationView(req.user) } });
 });
 
-exports.submitMyVerification = catchAsync(async (req, res, next) => {
+// Saves the uploaded ID documents and selfie (also used by the app's ID Verification steps)
+const saveVerificationDocuments = async req => {
     const user = await User.findById(req.user.id).select('+verification.documents.file');
     const files = req.files || {};
     const uploads = Object.entries(DOC_FIELDS)
@@ -105,11 +107,11 @@ exports.submitMyVerification = catchAsync(async (req, res, next) => {
         .filter(u => u.file);
 
     if (!uploads.length) {
-        return next(new AppError('Upload at least one ID document: NID, passport or driving license.', 400));
+        throw new AppError('Upload at least one ID document: NID, passport or driving license.', 400);
     }
     const kindsAfter = new Set([...user.verification.documents.map(d => d.kind), ...uploads.map(u => u.kind)]);
     if (!['nid', 'passport', 'driving_license'].some(k => kindsAfter.has(k))) {
-        return next(new AppError('Include an ID document: NID, passport or driving license.', 400));
+        throw new AppError('Include an ID document: NID, passport or driving license.', 400);
     }
 
     const stored = await Promise.all(uploads.map(u => savePrivateDocument(u.file, `u-${user.id}`)));
@@ -127,12 +129,22 @@ exports.submitMyVerification = catchAsync(async (req, res, next) => {
     await Promise.all(toRemove.map(removePrivateDocument));
 
     await logActivity(req, { action: 'verification.submitted', summary: 'Submitted identity documents for verification', user: user._id });
+    return user;
+};
 
+exports.submitMyVerification = catchAsync(async (req, res, next) => {
+    const user = await saveVerificationDocuments(req);
     res.status(200).json({
         status: 'success',
         message: 'Documents received. Plezar will review them and update your status.',
         data: { verification: verificationView(user) }
     });
+});
+
+// Saves the files, then hands over to the next handler (the app's own response)
+exports.saveMyVerificationDocuments = catchAsync(async (req, res, next) => {
+    await saveVerificationDocuments(req);
+    next();
 });
 
 exports.verificationView = verificationView;
@@ -162,29 +174,39 @@ exports.getUserDetails = catchAsync(async (req, res, next) => {
     });
 });
 
+// Roles an admin can give or take away here. Vendor (agent) comes with an agency, from the vendor pages.
+const GRANTABLE = ['user', 'manager', 'admin'];
+const isFullAdmin = user => hasRole(user, 'admin', 'dev');
+
+// { roles: [...] }, or the older { role } (one staff role, keeping the traveler and vendor roles they have)
+const wantedRoles = (body, current) => {
+    if (Array.isArray(body.roles)) return body.roles.map(String);
+    if (body.role) return [...current.filter(r => !STAFF.includes(r)), body.role];
+    return null;
+};
+
 // Create User with Role-Based Permission Control
 exports.createUser = catchAsync(async (req, res, next) => {
-    const { name, email, password, confirmPassword, role } = req.body;
+    const { name, email, password, confirmPassword } = req.body;
 
-    const targetRole = role || 'user';
+    const targetRoles = wantedRoles(req.body, []) || ['user'];
+    if (!targetRoles.length || targetRoles.some(r => !GRANTABLE.includes(r))) {
+        return next(new AppError(`Choose roles from: ${GRANTABLE.join(', ')}.`, 400));
+    }
 
-    // Manager can ONLY create 'user' accounts
-    if (req.user.role === 'manager' && targetRole !== 'user') {
+    // Manager can ONLY create traveler accounts
+    if (!isFullAdmin(req.user) && targetRoles.some(r => r !== 'user')) {
         return next(new AppError('Managers are only permitted to create regular User accounts.', 403));
     }
 
-    // Admin can create 'admin', 'manager', or 'user'
-    if (req.user.role === 'admin' && !['user', 'manager', 'admin'].includes(targetRole)) {
-        return next(new AppError('Invalid role specified.', 400));
-    }
-
-    const newUser = await User.create({
+    const newUser = setRoles(new User({
         name,
         email,
         password,
-        confirmPassword: confirmPassword || password,
-        role: targetRole
-    });
+        confirmPassword: confirmPassword || password
+    }), targetRoles);
+    await newUser.save();
+    const targetRole = targetRoles.map(r => LABELS[r]).join(' + ');
 
     newUser.password = undefined;
 
@@ -205,33 +227,41 @@ exports.updateUser = catchAsync(async (req, res, next) => {
         return next(new AppError('No account found with that ID', 404));
     }
 
+    const current = rolesOf(targetUser);
+    const wanted = wantedRoles(req.body, current);
+
     // Manager constraints
-    if (req.user.role === 'manager') {
-        if (targetUser.role !== 'user') {
+    if (!isFullAdmin(req.user)) {
+        if (!isTravelerOnly(targetUser)) {
             return next(new AppError('Managers can only modify standard User accounts.', 403));
         }
-        if (req.body.role && req.body.role !== 'user') {
+        if (wanted && wanted.some(r => r !== 'user')) {
             return next(new AppError('Managers cannot elevate account privileges.', 403));
         }
     }
 
-    // Role validation & self-demotion protection
-    if (req.body.role) {
-        if (!['user', 'manager', 'admin'].includes(req.body.role)) {
-            return next(new AppError('Invalid role specified.', 400));
+    // Role validation & self-demotion protection. The vendor role stays as it is: it follows the agency.
+    let nextRoles = null;
+    if (wanted) {
+        if (wanted.some(r => !GRANTABLE.includes(r) && r !== 'agent')) {
+            return next(new AppError(`Choose roles from: ${GRANTABLE.join(', ')}.`, 400));
         }
-        if (req.user.id === req.params.id && req.body.role !== req.user.role) {
+        nextRoles = [...wanted.filter(r => r !== 'agent'), ...(current.includes('agent') ? ['agent'] : [])];
+        if (current.includes('dev')) nextRoles.push('dev');
+        if (!nextRoles.length) return next(new AppError('An account needs at least one role.', 400));
+        const staffBefore = current.filter(r => STAFF.includes(r)).sort().join();
+        const staffAfter = nextRoles.filter(r => STAFF.includes(r)).sort().join();
+        if (req.user.id === req.params.id && staffBefore !== staffAfter) {
             return next(new AppError('You cannot change your own role to prevent accidental lockout.', 400));
         }
     }
 
-    // Only allow profile fields and role; password changes go through adminResetUserPassword
-    const filteredBody = filterObj(req.body, 'name', 'email', 'phone', 'address', 'photo', 'role');
-
-    const updatedUser = await User.findByIdAndUpdate(req.params.id, filteredBody, {
-        new: true,
-        runValidators: true
-    });
+    // Only allow profile fields and roles; password changes go through adminResetUserPassword
+    const filteredBody = filterObj(req.body, 'name', 'email', 'phone', 'address', 'photo');
+    Object.assign(targetUser, filteredBody);
+    if (nextRoles) setRoles(targetUser, nextRoles);
+    await targetUser.save({ validateBeforeSave: false });
+    const updatedUser = targetUser;
 
     res.status(200).json({
         status: 'success',
@@ -255,8 +285,8 @@ exports.deleteUser = catchAsync(async (req, res, next) => {
         return next(new AppError('No account found with that ID to delete', 404));
     }
 
-    // Manager can ONLY delete 'user' accounts
-    if (req.user.role === 'manager' && targetUser.role !== 'user') {
+    // Manager can ONLY delete traveler accounts
+    if (!isFullAdmin(req.user) && !isTravelerOnly(targetUser)) {
         return next(new AppError('Managers can only delete standard User accounts. Manager and Admin deletion requires Admin clearance.', 403));
     }
 
@@ -288,7 +318,7 @@ exports.adminResetUserPassword = catchAsync(async (req, res, next) => {
     }
 
     // Role permission hierarchy
-    if (req.user.role === 'manager' && targetUser.role !== 'user') {
+    if (!isFullAdmin(req.user) && !isTravelerOnly(targetUser)) {
         return next(new AppError('Managers can only reset passwords for standard Customer accounts.', 403));
     }
 
@@ -311,7 +341,7 @@ exports.adminSendResetEmail = catchAsync(async (req, res, next) => {
         return next(new AppError('No account found with that ID.', 404));
     }
 
-    if (req.user.role === 'manager' && targetUser.role !== 'user') {
+    if (!isFullAdmin(req.user) && !isTravelerOnly(targetUser)) {
         return next(new AppError('Managers can only request resets for standard Customer accounts.', 403));
     }
 

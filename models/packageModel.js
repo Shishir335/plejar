@@ -6,6 +6,8 @@ const TRANSPORT = ['bus', 'ac_bus', 'train', 'launch', 'plane', 'jeep', 'boat', 
 const STAYS = ['none', 'hotel', 'resort', 'cottage', 'camp', 'houseboat', 'homestay', 'mixed'];
 // The "Group Tour" picker on the Tours screen
 const TOUR_TYPES = ['group', 'private', 'family', 'couple', 'solo', 'corporate'];
+// The coloured tags on the tour page (Food, Cultural, Cities...)
+const TOUR_TAGS = ['adventure', 'beach', 'cities', 'cultural', 'food', 'hiking', 'history', 'nature', 'photography', 'relaxation', 'religious', 'river', 'hills', 'wildlife', 'camping', 'island'];
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const stopSchema = new mongoose.Schema({
@@ -19,6 +21,8 @@ const stopSchema = new mongoose.Schema({
 const daySchema = new mongoose.Schema({
   day: { type: Number, min: 1, max: 60, required: true },
   title: { type: String, trim: true, maxlength: [120, 'Keep each day title under 120 characters'], default: '' },
+  // What the day is like, shown when the traveler opens the day in the app
+  description: { type: String, trim: true, maxlength: [1000, 'Keep each day description under 1000 characters'], default: '' },
   stops: { type: [stopSchema], default: [] },
   stay: { type: String, trim: true, maxlength: [120, 'Keep the overnight stay under 120 characters'], default: '' },
   meals: {
@@ -116,6 +120,9 @@ const packageSchema = new mongoose.Schema(
       min: { type: Number, min: 1, max: 1000, default: null },
       max: { type: Number, min: 1, max: 1000, default: null }
     },
+    tags: { type: [String], default: [] },
+    // Who leads the tour (one of the agency's guides)
+    guide: { type: mongoose.Schema.ObjectId, ref: 'Guide' },
     // The agency can move the date for the group
     flexibleDates: { type: Boolean, default: false },
     // Times the tour page was opened in the app, for "popular"
@@ -152,4 +159,5 @@ Package.STOP_KINDS = STOP_KINDS;
 Package.TRANSPORT = TRANSPORT;
 Package.STAYS = STAYS;
 Package.TOUR_TYPES = TOUR_TYPES;
+Package.TOUR_TAGS = TOUR_TAGS;
 module.exports = Package;

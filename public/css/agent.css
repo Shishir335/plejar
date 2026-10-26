@@ -291,3 +291,54 @@ img { display: block; max-width: 100%; }
   .table td { border: none; padding: 0; }
   .table .actions { grid-column: 1 / -1; text-align: left; }
 }
+
+/* Tour form: tags and day descriptions */
+.tag-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-pick { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.85rem; cursor: pointer; background: var(--white); }
+.tag-pick:has(input:checked) { border-color: var(--tea); background: color-mix(in srgb, var(--tea) 10%, var(--white)); }
+.field .tag-pick input, .tag-pick input { width: 16px; height: 16px; margin: 0; padding: 0; display: inline-block; accent-color: var(--tea); flex-shrink: 0; }
+.field .tag-pick { width: auto; margin: 0; font-weight: 500; color: var(--ink); }
+.day-description { width: 100%; margin: 8px 0 4px; resize: vertical; }
+
+/* Guides */
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; }
+.guide-card { display: flex; gap: 14px; background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.guide-card.is-off { opacity: 0.65; }
+.guide-card img, .guide-initial { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.guide-initial { display: grid; place-items: center; background: var(--line); font-size: 1.6rem; font-weight: 700; color: var(--ink-soft); }
+.guide-info { min-width: 0; }
+.guide-info h3 { font-size: 1rem; margin-bottom: 2px; }
+.guide-info p { margin: 2px 0; font-size: 0.85rem; }
+.guide-photo-row { display: flex; gap: 14px; align-items: center; }
+.guide-photo-row img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+
+/* Messages */
+.nav-badge { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--tea); color: #fff; font-size: 0.72rem; font-weight: 700; text-align: center; margin-left: 6px; }
+.inbox { display: grid; grid-template-columns: minmax(240px, 340px) 1fr; gap: 14px; align-items: start; }
+.inbox-list { background: var(--white); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; max-height: 70vh; overflow-y: auto; }
+.inbox-item { position: relative; display: grid; gap: 2px; width: 100%; text-align: left; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--line); background: transparent; cursor: pointer; font: inherit; color: inherit; }
+.inbox-item:hover, .inbox-item.is-open { background: color-mix(in srgb, var(--tea) 7%, var(--white)); }
+.inbox-item.is-unread strong { font-weight: 800; }
+.inbox-item .nav-badge { position: absolute; right: 12px; bottom: 12px; }
+.inbox-top { display: flex; justify-content: space-between; gap: 8px; font-size: 0.9rem; }
+.inbox-tour { font-size: 0.8rem; color: var(--tea); }
+.inbox-preview { font-size: 0.85rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 28px; }
+.inbox-thread { background: var(--white); border: 1px solid var(--line); border-radius: 16px; min-height: 320px; display: flex; flex-direction: column; }
+.inbox-thread .empty { border: 0; }
+.thread-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.thread-messages { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; }
+.bubble { max-width: 80%; padding: 10px 12px; border-radius: 14px; }
+.bubble p { margin: 0 0 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble .muted { font-size: 0.75rem; }
+.bubble.is-traveler { align-self: flex-start; background: var(--paper); border: 1px solid var(--line); }
+.bubble.is-agency { align-self: flex-end; background: color-mix(in srgb, var(--tea) 14%, var(--white)); }
+.thread-reply { display: flex; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); align-items: flex-end; }
+.thread-reply textarea { flex: 1; resize: vertical; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+@media (max-width: 760px) {
+  .inbox { grid-template-columns: 1fr; }
+  .inbox-list { max-height: 40vh; }
+}
+
+.guide-hire { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 16px; }
+.guide-hire legend { font-weight: 700; font-size: 0.9rem; padding: 0 6px; }
+.section-title { font-size: 1.1rem; margin-bottom: 4px; }

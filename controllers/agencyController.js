@@ -14,9 +14,12 @@ const { getDefaultRate, isCustom } = require('../utils/commission');
 const { HOLDS_SEAT, scheduleFrom, registrationStats, withStats } = require('../utils/events');
 const { notifyUsers } = require('../utils/notify');
 const { applyPlan, planProblems, describeMissing } = require('../utils/tourPlan');
+const { bookingStatusChanged } = require('../utils/bookingEvents');
 const Announcement = require('../models/announcementModel');
 const Destination = require('../models/destinationModel');
 const { usableDestination } = require('./vendorDestinationController');
+const { releaseVoucher } = require('../utils/vouchers');
+const { hasRole, addRole, removeRole } = require('../utils/roles');
 const {
   saveAgencyImage,
   removeAgencyImage,
@@ -48,9 +51,9 @@ exports.PROFILE_FIELDS = PROFILE_FIELDS;
 
 // ---------- Access guards ----------
 
-// Only agents of an active agency can use the agent panel API
+// Only people in an active agency can use the agent panel API (they may have other roles too)
 exports.requireAgent = catchAsync(async (req, res, next) => {
-  if (req.user.role !== 'agent' || !req.user.agency) {
+  if (!hasRole(req.user, 'agent') || !req.user.agency) {
     return next(new AppError('This area is for tour agency accounts only.', 403));
   }
 
@@ -320,7 +323,11 @@ exports.cancelMyPackage = catchAsync(async (req, res, next) => {
 
   const filter = { package: pkg._id, status: { $in: HOLDS_SEAT } };
   const users = await Booking.distinct('user', filter);
+  // Vouchers used on these registrations go back to the travelers
+  const vouchers = await Booking.distinct('voucher', { ...filter, voucher: { $ne: null } });
   const result = await Booking.updateMany(filter, { status: 'cancelled', cancelledAt: new Date(), cancelReason: `Cancelled by the agency: ${reason}`.slice(0, 500) });
+
+  await Promise.all(vouchers.map(releaseVoucher));
 
   pkg.status = 'cancelled';
   pkg.cancelledAt = new Date();
@@ -422,9 +429,25 @@ exports.inviteStaff = catchAsync(async (req, res, next) => {
     return next(new AppError('Enter the team member\'s name and email.', 400));
   }
 
+  // Someone who already uses Plezar (as a traveler, say) joins with the account they have
   const existing = await User.findOne({ email });
   if (existing) {
-    return next(new AppError('Someone already has a Plezar account with this email. Use a different email.', 400));
+    if (existing.agency) {
+      return next(new AppError(String(existing.agency) === String(req.agency._id) ? 'This person is already on your team.' : 'This person already belongs to another agency on Plezar.', 400));
+    }
+    if (existing.deletedAt || existing.status !== 'active') {
+      return next(new AppError('This Plezar account can\'t be added right now. Use a different email.', 400));
+    }
+    addRole(existing, 'agent');
+    existing.agency = req.agency._id;
+    existing.agencyRole = 'staff';
+    await existing.save({ validateBeforeSave: false });
+    await logActivity(req, { action: 'team.added', summary: `Added ${existing.name} (existing Plezar account) to the team`, agency: req.agency._id });
+    return res.status(201).json({
+      status: 'success',
+      message: `${existing.name} already has a Plezar account, so they were added straight away. They sign in to the vendor panel with their usual email and password.`,
+      data: { member: teamView(existing), inviteURL: null, emailSent: false, existingAccount: true }
+    });
   }
 
   const user = await User.create({
@@ -477,11 +500,11 @@ exports.removeStaff = catchAsync(async (req, res, next) => {
     return next(new AppError('The agency owner cannot be removed.', 400));
   }
 
-  // Invited people never set a password, so drop the account; others keep a plain user account
+  // Invited people never set a password, so drop the account; others keep their account and other roles
   if (member.accountStatus === 'invited') {
     await User.findByIdAndDelete(member._id);
   } else {
-    member.role = 'user';
+    removeRole(member, 'agent');
     member.agency = null;
     member.agencyRole = null;
     await member.save({ validateBeforeSave: false });
@@ -594,11 +617,12 @@ exports.getMyDocument = catchAsync(async (req, res, next) => {
 exports.listMyBookings = catchAsync(async (req, res, next) => {
   const filter = { agency: req.agency._id };
   if (['pending', 'confirmed', 'completed', 'cancelled'].includes(req.query.status)) filter.status = req.query.status;
+  if (['tour', 'guide'].includes(req.query.kind)) filter.kind = req.query.kind;
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
 
   const [bookings, total] = await Promise.all([
-    Booking.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate('user', 'name phone').lean(),
+    Booking.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate('user', 'name phone email').populate('guide', 'name photo').lean(),
     Booking.countDocuments(filter)
   ]);
   res.status(200).json({ status: 'success', data: { bookings, total, page, limit, pages: Math.max(Math.ceil(total / limit), 1) } });
@@ -608,8 +632,10 @@ exports.updateMyBooking = catchAsync(async (req, res, next) => {
   const booking = await Booking.findOne({ _id: req.params.id, agency: req.agency._id });
   if (!booking) return next(new AppError('No booking found with that ID in your agency.', 404));
 
+  const previous = booking.status;
   moveBooking(booking, req.body.status, { reason: req.body.reason });
   await booking.save();
+  await bookingStatusChanged(booking, previous, { by: 'agency' });
   await logActivity(req, { action: `booking.${booking.status}`, summary: `Booking ${booking.reference} marked ${booking.status}`, user: booking.user, agency: req.agency._id });
 
   res.status(200).json({ status: 'success', data: { booking } });

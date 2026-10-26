@@ -4,12 +4,14 @@ const Payout = require('../models/payoutModel');
 const VendorCategory = require('../models/vendorCategoryModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { hasRole } = require('../utils/roles');
 const { logActivity } = require('../utils/activity');
 const { moveBooking } = require('../utils/bookings');
 const { earningsFor, round } = require('../utils/earnings');
 const { getDefaultRate } = require('../utils/commission');
 const { setSetting } = require('../utils/settings');
 const { escapeRegex, pageParams, paged, validId, toId } = require('../utils/query');
+const { bookingStatusChanged } = require('../utils/bookingEvents');
 
 // ---------- Bookings ----------
 
@@ -18,6 +20,7 @@ const bookingFilter = q => {
   if (q.agency && validId(q.agency)) filter.agency = q.agency;
   if (q.user && validId(q.user)) filter.user = q.user;
   if (['pending', 'confirmed', 'completed', 'cancelled'].includes(q.status)) filter.status = q.status;
+  if (['tour', 'hotel', 'guide'].includes(q.kind)) filter.kind = q.kind;
   if (['unpaid', 'paid', 'partially_refunded', 'refunded'].includes(q.paymentStatus)) filter.paymentStatus = q.paymentStatus;
   if (q.search) {
     const rx = new RegExp(escapeRegex(String(q.search).trim()), 'i');
@@ -57,7 +60,7 @@ exports.updateBooking = catchAsync(async (req, res, next) => {
 
   if (paymentStatus !== undefined && paymentStatus !== booking.paymentStatus) {
     // Only administrators and developers change money state
-    if (!['admin', 'dev'].includes(req.user.role)) {
+    if (!hasRole(req.user, 'admin', 'dev')) {
       return next(new AppError('Only administrators can change payment status.', 403));
     }
     if (!['paid', 'unpaid'].includes(paymentStatus)) {
@@ -74,6 +77,7 @@ exports.updateBooking = catchAsync(async (req, res, next) => {
     changes.push(`payment ${paymentStatus}`);
   }
 
+  const previous = booking.status;
   if (status !== undefined && status !== booking.status) {
     moveBooking(booking, status, { reason });
     changes.push(`status ${status}`);
@@ -81,6 +85,7 @@ exports.updateBooking = catchAsync(async (req, res, next) => {
 
   if (!changes.length) return next(new AppError('Nothing to change.', 400));
   await booking.save();
+  await bookingStatusChanged(booking, previous, { by: 'admin' });
 
   await logActivity(req, { action: 'booking.admin_update', summary: `Booking ${booking.reference}: ${changes.join(', ')}${reason ? `. ${reason}` : ''}`, user: booking.user, agency: booking.agency });
   res.status(200).json({ status: 'success', data: { booking } });

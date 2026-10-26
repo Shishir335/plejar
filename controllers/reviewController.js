@@ -23,6 +23,8 @@ exports.createReview = catchAsync(async (req, res, next) => {
     user: req.user._id,
     agency: booking.agency,
     package: booking.package,
+    hotel: booking.hotel,
+    guide: booking.guide,
     booking: booking._id,
     rating: req.body.rating,
     comment: req.body.comment

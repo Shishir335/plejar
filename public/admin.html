@@ -279,6 +279,7 @@
                   <option value="behavior">Behavior</option>
                   <option value="safety">Safety</option>
                   <option value="service_quality">Service quality</option>
+                  <option value="help_request">Help request (app)</option>
                   <option value="fraud">Fraud</option>
                   <option value="other">Other</option>
                 </select>
@@ -407,6 +408,9 @@
           <div class="subtabs" role="tablist" aria-label="App content">
             <button type="button" role="tab" class="subtab active" data-csub="banners" aria-selected="true">Tours banners</button>
             <button type="button" role="tab" class="subtab" data-csub="hotels" aria-selected="false">Hotels</button>
+            <button type="button" role="tab" class="subtab" data-csub="vouchers" aria-selected="false">Vouchers &amp; rewards</button>
+            <button type="button" role="tab" class="subtab" data-csub="help" aria-selected="false">Help center</button>
+            <button type="button" role="tab" class="subtab" data-csub="pages" aria-selected="false">Pages</button>
           </div>
 
           <div class="subpane active" id="csub-banners">
@@ -446,6 +450,85 @@
               </table>
             </div>
             <div class="pager" id="hotelsPager"></div>
+          </div>
+
+          <div class="subpane" id="csub-vouchers">
+            <p class="lead-sub" style="margin: 0 0 12px;">Vouchers travelers buy with their points in the app. Tour, hotel and guide vouchers take money off a booking; Plezar pays the discount out of its commission.</p>
+            <form id="rewardSettingsForm" onsubmit="saveRewardSettings(event)" novalidate style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:14px; padding:14px; border:1px solid var(--admin-border); border-radius:10px;">
+              <div class="form-group" style="margin:0;"><label class="form-label" for="rsPerTaka">Points per ৳1 spent</label><input id="rsPerTaka" type="number" min="0" step="0.1" class="form-input" style="width:140px;"></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" for="rsReferral">Points per successful referral</label><input id="rsReferral" type="number" min="0" step="50" class="form-input" style="width:180px;"></div>
+              <div class="form-group" style="margin:0;"><label class="form-label" for="rsWelcome">Welcome bonus for the invited friend</label><input id="rsWelcome" type="number" min="0" step="50" class="form-input" style="width:200px;"></div>
+              <button type="submit" class="btn btn-secondary" id="rewardSettingsSubmit">Save point rules</button>
+            </form>
+            <div class="control-bar">
+              <div class="filters">
+                <select id="vCategoryF" class="form-select" aria-label="Category" onchange="loadVouchers()"><option value="">Any category</option></select>
+              </div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadVouchers()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openVoucher()">+ Add voucher</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Voucher</th><th>Gives</th><th>Points</th><th>Usable</th><th>Redeemed / used</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="vouchersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="subpane" id="csub-help">
+            <form id="helpContactForm" onsubmit="saveHelpContact(event)" novalidate style="margin-bottom:14px; padding:14px; border:1px solid var(--admin-border); border-radius:10px;">
+              <p class="lead-sub" style="margin: 0 0 10px;">Contact information shown in the app's Help Center. "Contact Us" messages arrive under Users › Complaints as help requests.</p>
+              <div class="field-row">
+                <div class="form-group"><label class="form-label" for="hcEmail">Support email</label><input id="hcEmail" type="email" class="form-input" maxlength="200"></div>
+                <div class="form-group"><label class="form-label" for="hcEmailHours">Email note</label><input id="hcEmailHours" class="form-input" maxlength="200" placeholder="We reply within 24 hours"></div>
+              </div>
+              <div class="field-row">
+                <div class="form-group"><label class="form-label" for="hcPhone">Emergency phone</label><input id="hcPhone" class="form-input" maxlength="200"></div>
+                <div class="form-group"><label class="form-label" for="hcPhoneHours">Phone note</label><input id="hcPhoneHours" class="form-input" maxlength="200" placeholder="Available 24/7"></div>
+              </div>
+              <div class="field-row">
+                <div class="form-group"><label class="form-label" for="hcHq">Headquarters</label><input id="hcHq" class="form-input" maxlength="200"></div>
+                <div class="form-group"><label class="form-label" for="hcWhatsapp">WhatsApp (optional)</label><input id="hcWhatsapp" class="form-input" maxlength="200"></div>
+              </div>
+              <div class="field-row">
+                <div class="form-group"><label class="form-label" for="hcPartnerEmail">Partnership email</label><input id="hcPartnerEmail" type="email" class="form-input" maxlength="200"><p class="lead-sub">"Need Assistance?" on the Travel Agency Application.</p></div>
+                <div class="form-group"><label class="form-label" for="hcPartnerPhone">Partnership phone</label><input id="hcPartnerPhone" class="form-input" maxlength="200"></div>
+              </div>
+              <button type="submit" class="btn btn-secondary" id="helpContactSubmit">Save contact information</button>
+            </form>
+            <div class="control-bar">
+              <div class="filters">
+                <select id="haCategoryF" class="form-select" aria-label="Category" onchange="renderHelpArticles()"><option value="">Every category</option></select>
+              </div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadHelp()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openHelpArticle()">+ Add question</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Question</th><th>Category</th><th>Order</th><th>Helpful</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="helpTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="subpane" id="csub-pages">
+            <p class="lead-sub" style="margin: 0 0 12px;">The About App, Privacy Policy and Terms &amp; Conditions pages in the app's menu. Each line becomes a paragraph. Travelers see a page once it is published.</p>
+            <form id="pageForm" onsubmit="savePage(event)" novalidate>
+              <div class="field-row">
+                <div class="form-group"><label class="form-label" for="pgKey">Page</label>
+                  <select id="pgKey" class="form-select" onchange="showPage()"><option value="about">About App</option><option value="privacy">Privacy Policy</option><option value="terms">Term &amp; Condition</option></select>
+                </div>
+                <div class="form-group"><label class="form-label" for="pgTitle">Title shown in the app</label><input id="pgTitle" class="form-input" maxlength="80"></div>
+              </div>
+              <div class="form-group"><label class="form-label" for="pgBody">Text</label><textarea id="pgBody" class="form-input" rows="18" maxlength="50000"></textarea><p class="lead-sub" id="pgState"></p></div>
+              <label class="check" style="display:flex; gap:8px; align-items:center; margin-bottom: 14px;"><input type="checkbox" id="pgPublished"> Published in the app</label>
+              <p class="form-error" id="pageError" hidden></p>
+              <button type="submit" class="btn btn-primary" id="pageSubmit">Save page</button>
+            </form>
           </div>
         </section>
 
@@ -708,6 +791,7 @@
                 <select id="bkPayment" class="form-select" aria-label="Payment" onchange="loadBookings(1)">
                   <option value="">Any payment</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partially_refunded">Part refunded</option><option value="refunded">Refunded</option>
                 </select>
+                <select id="bkKind" class="form-select" aria-label="What was booked" onchange="loadBookings(1)"><option value="">Tours, hotels and guides</option><option value="tour">Tours</option><option value="hotel">Hotel stays (Plezar confirms)</option><option value="guide">Guides</option></select>
                 <select id="bkVendor" class="form-select" aria-label="Vendor" onchange="loadBookings(1)"><option value="">All vendors</option></select>
               </div>
               <button class="btn btn-secondary" onclick="loadBookings()">↻ Refresh</button>
@@ -911,12 +995,13 @@
           <input type="email" name="email" class="form-input" placeholder="jordan@example.com" required>
         </div>
         <div class="form-group">
-          <label class="form-label">System Role</label>
-          <select name="role" class="form-select">
-            <option value="user">Standard User</option>
-            <option value="manager">Manager</option>
-            <option value="admin">Administrator</option>
-          </select>
+          <label class="form-label">Roles</label>
+          <div class="check-list">
+            <label class="check"><input type="checkbox" name="roles" value="user" checked><span>Traveler (uses the app)</span></label>
+            <label class="check"><input type="checkbox" name="roles" value="manager"><span>Manager</span></label>
+            <label class="check"><input type="checkbox" name="roles" value="admin"><span>Administrator</span></label>
+          </div>
+          <p class="lead-sub">One person can have several roles with the same login. Vendor access comes from an agency (Vendors).</p>
         </div>
         <div class="form-group">
           <label class="form-label">Password (Min 8 chars)</label>
@@ -935,7 +1020,7 @@
   <div id="editRoleModal" class="modal-overlay">
     <div class="modal-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h3 style="font-size: 1.2rem; font-weight: 700;">Change Account Role</h3>
+        <h3 style="font-size: 1.2rem; font-weight: 700;">Change Account Roles</h3>
         <button onclick="closeModal('editRoleModal')" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
       </div>
 
@@ -945,14 +1030,15 @@
           Update system role and access permissions for <strong id="editRoleUserName" style="color: var(--text-primary);">-</strong>:
         </p>
         <div class="form-group">
-          <label class="form-label">Assign Role</label>
-          <select id="editRoleSelect" class="form-select">
-            <option value="user">Standard User (user)</option>
-            <option value="manager">Manager (manager)</option>
-            <option value="admin">Administrator (admin)</option>
-          </select>
+          <label class="form-label">Roles</label>
+          <div class="check-list" id="editRoleChecks">
+            <label class="check"><input type="checkbox" name="editRoles" value="user"><span>Traveler (uses the app)</span></label>
+            <label class="check"><input type="checkbox" name="editRoles" value="manager"><span>Manager</span></label>
+            <label class="check"><input type="checkbox" name="editRoles" value="admin"><span>Administrator</span></label>
+          </div>
+          <p class="lead-sub" id="editRoleVendorNote" hidden>This person is also a vendor. That role follows their agency and is managed under Vendors.</p>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Update Role</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Update Roles</button>
       </form>
     </div>
   </div>
@@ -1088,6 +1174,7 @@
       <form id="approveForm" onsubmit="submitApprove(event)" novalidate>
         <p class="modal-lead" id="approveLead"></p>
         <label class="check"><input type="checkbox" id="apSend" checked><span>Email the sign-in details (vendor ID, email, temporary password and the vendor panel link) to the applicant now. You'll also see them here.</span></label>
+        <label class="check" id="apUseExistingRow" hidden><input type="checkbox" id="apUseExisting"><span>Add the vendor role to their existing Plezar account. They sign in to the vendor panel with the email and password they already use.</span></label>
         <label class="check"><input type="checkbox" id="apVerify" checked><span>Mark as verified. The trade license and NID they sent become the vendor's verification documents. Untick to send them to the Verification queue instead.</span></label>
         <div class="form-group" id="apCategoriesGroup" hidden>
           <span class="form-label">Categories</span>
@@ -1231,6 +1318,65 @@
         <label class="check" style="display:flex; gap:8px; align-items:center; margin-bottom: 14px;"><input type="checkbox" id="bnActive" checked> Switched on</label>
         <p class="form-error" id="bannerError" hidden></p>
         <button type="submit" class="btn btn-primary btn-block" id="bannerSubmit">Save banner</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Voucher form -->
+  <div id="voucherModal" class="modal-overlay">
+    <div class="modal-card modal-wide">
+      <div class="modal-head"><h3 id="voucherModalTitle">Add voucher</h3><button class="modal-x" onclick="closeModal('voucherModal')" aria-label="Close">&times;</button></div>
+      <form id="voucherForm" onsubmit="saveVoucher(event)" novalidate>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="vcTitle">Title *</label><input id="vcTitle" class="form-input" maxlength="80" placeholder="Weekend Getaway" required></div>
+          <div class="form-group"><label class="form-label" for="vcCategory">Category *</label><select id="vcCategory" class="form-select"></select></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="vcDescription">Description</label><textarea id="vcDescription" class="form-input" rows="3" maxlength="2000" placeholder="25% off at partner resorts in Cox's Bazar"></textarea></div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="vcDiscountType">Gives</label>
+            <select id="vcDiscountType" class="form-select" onchange="showVoucherDiscount()"><option value="percent">Percent off</option><option value="amount">Taka off</option><option value="free">Free</option></select>
+          </div>
+          <div class="form-group" data-vc-discount="value"><label class="form-label" for="vcDiscountValue" id="vcDiscountValueLabel">Percent off</label><input id="vcDiscountValue" type="number" min="0" class="form-input"></div>
+          <div class="form-group" data-vc-discount="max"><label class="form-label" for="vcDiscountMax">Most it takes off (৳)</label><input id="vcDiscountMax" type="number" min="0" class="form-input" placeholder="No cap"></div>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="vcPoints">Points it costs *</label><input id="vcPoints" type="number" min="0" step="50" class="form-input"></div>
+          <div class="form-group"><label class="form-label" for="vcCode">Offer code</label><input id="vcCode" class="form-input" maxlength="30" placeholder="WEEKEND25" style="text-transform:uppercase;"><p class="lead-sub">Travelers can type it in "Redeem". Each redemption also gets its own code.</p></div>
+          <div class="form-group"><label class="form-label" for="vcImage">Image</label><input id="vcImage" type="file" accept="image/jpeg,image/png,image/webp" class="form-input"></div>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="vcLocation">Location shown</label><input id="vcLocation" class="form-input" maxlength="120" placeholder="Cox's Bazar"></div>
+          <div class="form-group"><label class="form-label" for="vcFrom">Usable from</label><input id="vcFrom" type="date" class="form-input"></div>
+          <div class="form-group"><label class="form-label" for="vcUntil">Usable until</label><input id="vcUntil" type="date" class="form-input"></div>
+        </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="vcValidDays">Valid for (days after redeeming)</label><input id="vcValidDays" type="number" min="1" max="730" class="form-input" placeholder="90"></div>
+          <div class="form-group"><label class="form-label" for="vcMinSpend">Minimum booking (৳)</label><input id="vcMinSpend" type="number" min="0" class="form-input" placeholder="0"></div>
+          <div class="form-group"><label class="form-label" for="vcStock">How many in total</label><input id="vcStock" type="number" min="0" class="form-input" placeholder="No limit"></div>
+          <div class="form-group"><label class="form-label" for="vcPerUser">Per traveler</label><input id="vcPerUser" type="number" min="1" max="100" class="form-input" placeholder="1"></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="vcTerms">Terms &amp; conditions (one per line)</label><textarea id="vcTerms" class="form-input" rows="4" maxlength="6000"></textarea></div>
+        <label class="check" style="display:flex; gap:8px; align-items:center; margin-bottom: 14px;"><input type="checkbox" id="vcActive" checked> Offered in the app</label>
+        <p class="form-error" id="voucherError" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="voucherSubmit">Save voucher</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Help article form -->
+  <div id="helpModal" class="modal-overlay">
+    <div class="modal-card modal-wide">
+      <div class="modal-head"><h3 id="helpModalTitle">Add question</h3><button class="modal-x" onclick="closeModal('helpModal')" aria-label="Close">&times;</button></div>
+      <form id="helpForm" onsubmit="saveHelpArticle(event)" novalidate>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="haCategory">Category *</label><select id="haCategory" class="form-select"></select></div>
+          <div class="form-group"><label class="form-label" for="haOrder">Order</label><input id="haOrder" type="number" class="form-input" placeholder="0"></div>
+        </div>
+        <div class="form-group"><label class="form-label" for="haQuestion">Question *</label><input id="haQuestion" class="form-input" maxlength="200" placeholder="How do I cancel a booking?" required></div>
+        <div class="form-group"><label class="form-label" for="haAnswer">Answer *</label><textarea id="haAnswer" class="form-input" rows="7" maxlength="5000"></textarea></div>
+        <label class="check" style="display:flex; gap:8px; align-items:center; margin-bottom: 14px;"><input type="checkbox" id="haPublished" checked> Published in the app</label>
+        <p class="form-error" id="helpError" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="helpSubmit">Save question</button>
       </form>
     </div>
   </div>
@@ -1435,5 +1581,6 @@
   <script src="/js/admin-destinations.js"></script>
   <script src="/js/admin-system.js"></script>
   <script src="/js/admin-content.js"></script>
+  <script src="/js/admin-rewards.js"></script>
 </body>
 </html>

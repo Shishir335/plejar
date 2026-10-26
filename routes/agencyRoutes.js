@@ -3,6 +3,8 @@ const authController = require('../controllers/authController');
 const agencyController = require('../controllers/agencyController');
 const content = require('../controllers/vendorContentController');
 const places = require('../controllers/vendorDestinationController');
+const guides = require('../controllers/guideController');
+const messages = require('../controllers/messageController');
 const { imageUpload, documentUpload } = require('../utils/uploads');
 
 const router = express.Router();
@@ -11,6 +13,15 @@ const router = express.Router();
 router.use(authController.protect, agencyController.requireAgent);
 
 router.get('/me', agencyController.getMyAgency);
+
+// Tour guides shown on the app's tour page
+router.route('/me/guides').get(guides.listGuides).post(imageUpload.single('photo'), guides.createGuide);
+router.route('/me/guides/:id').patch(imageUpload.single('photo'), guides.updateGuide).delete(guides.deleteGuide);
+
+// Travelers' questions ("Message Tour Guide" in the app)
+router.get('/me/conversations', messages.agencyConversations);
+router.route('/me/conversations/:id').get(messages.agencyConversationDetail).patch(messages.setConversationStatus);
+router.post('/me/conversations/:id/messages', messages.replyAsAgency);
 router.patch('/me', agencyController.requireOwner, imageUpload.single('logo'), agencyController.updateMyAgency);
 
 router

@@ -68,13 +68,18 @@ async function adminFetch(endpoint, options = {}) {
   return { status: res.status, ok: res.ok, data };
 }
 
+// Every role an account has (older accounts only have `role`), and whether it may use this console
+const rolesOf = u => (u && Array.isArray(u.roles) && u.roles.length ? u.roles : (u && u.role ? [u.role] : []));
+const isStaff = u => rolesOf(u).some(r => ['admin', 'manager', 'dev'].includes(r));
+const ROLE_NAMES = { user: 'Traveler', agent: 'Vendor', manager: 'Manager', admin: 'Admin', dev: 'Developer' };
+
 // Verify Session
 async function checkAdminAuth() {
   try {
     const { ok, data } = await adminFetch('/api/v1/users/me');
     // /me responds with { data: { user } }
     const me = data.data && (data.data.user || data.data);
-    if (ok && me && ['admin', 'manager', 'dev'].includes(me.role)) {
+    if (ok && me && isStaff(me)) {
       adminState.currentUser = me;
       showDashboard();
       loadUsers();
@@ -123,7 +128,7 @@ async function handleAdminLogin(e) {
     });
 
     if (ok && data.token) {
-      if (!['admin', 'manager', 'dev'].includes(data.data.role)) {
+      if (!isStaff(data.data)) {
         showAdminToast('Access restricted: Administrator role required.', 'error');
         btn.disabled = false;
         btn.textContent = 'Sign In to Console';
@@ -222,13 +227,17 @@ async function handleCreateUser(e) {
   const form = e.target;
   const name = form.name.value;
   const email = form.email.value;
-  const role = form.role.value;
+  const roles = [...form.querySelectorAll('input[name="roles"]:checked')].map(box => box.value);
   const password = form.password.value;
   const confirmPassword = form.confirmPassword.value;
   const btn = form.querySelector('button[type="submit"]');
 
   if (password !== confirmPassword) {
     showAdminToast('Passwords do not match.', 'error');
+    return;
+  }
+  if (!roles.length) {
+    showAdminToast('Choose at least one role.', 'error');
     return;
   }
 
@@ -238,7 +247,7 @@ async function handleCreateUser(e) {
   try {
     const { ok, data } = await adminFetch('/api/v1/users', {
       method: 'POST',
-      body: JSON.stringify({ name, email, role, password, confirmPassword })
+      body: JSON.stringify({ name, email, roles, password, confirmPassword })
     });
 
     if (ok) {
@@ -257,27 +266,33 @@ async function handleCreateUser(e) {
   }
 }
 
-// Edit Role Modal
-function openEditRoleModal(userId, name, currentRole) {
+// Edit Roles Modal (one person can have several roles)
+function openEditRoleModal(userId, name, currentRoles) {
+  const roles = [].concat(currentRoles || []);
   document.getElementById('editRoleId').value = userId;
   document.getElementById('editRoleUserName').textContent = name;
-  document.getElementById('editRoleSelect').value = currentRole;
+  document.querySelectorAll('input[name="editRoles"]').forEach(box => { box.checked = roles.includes(box.value); });
+  document.getElementById('editRoleVendorNote').hidden = !roles.includes('agent');
   openModal('editRoleModal');
 }
 
 async function handleUpdateRole(e) {
   e.preventDefault();
   const userId = document.getElementById('editRoleId').value;
-  const newRole = document.getElementById('editRoleSelect').value;
+  const roles = [...document.querySelectorAll('input[name="editRoles"]:checked')].map(box => box.value);
+  if (!roles.length && document.getElementById('editRoleVendorNote').hidden) {
+    showAdminToast('Choose at least one role.', 'error');
+    return;
+  }
 
   try {
     const { ok, data } = await adminFetch(`/api/v1/users/${userId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ role: newRole })
+      body: JSON.stringify({ roles })
     });
 
     if (ok) {
-      showAdminToast('User role updated successfully!', 'success');
+      showAdminToast('Roles updated.', 'success');
       closeModal('editRoleModal');
       refreshUsersViews();
     } else {
@@ -480,7 +495,7 @@ function renderMyProfile() {
     form.elements.email.value = me.email || '';
     form.elements.phone.value = me.phone || '';
   }
-  set('pfRole', me.role || 'admin');
+  set('pfRole', rolesOf(me).map(r => ROLE_NAMES[r] || r).join(', ') || 'Admin');
   const joined = joinedDate(me);
   set('pfJoined', joined ? joined.toLocaleDateString() : 'date not recorded');
 }
@@ -915,7 +930,7 @@ function renderDashboard(d) {
           <div class="recent-side"><span class="badge ${ag.verified ? 'badge-active' : 'badge-inactive'}">${ag.verified ? 'verified' : escapeHTML(ag.status)}</span>${escapeHTML(when(ag.createdAt))}</div></li>`)}
         ${recentCard('Latest accounts', 'View all', "switchTab('users')", d.recent.users, u => `
           <li><div class="recent-main"><strong>${escapeHTML(u.name)}</strong><span>${escapeHTML(u.email)}</span></div>
-          <div class="recent-side"><span class="badge badge-${escapeHTML(u.role)}">${escapeHTML(u.role)}</span>${escapeHTML(when(u.createdAt))}</div></li>`)}
+          <div class="recent-side">${rolesOf(u).map(r => `<span class="badge badge-${escapeHTML(r)}">${escapeHTML(ROLE_NAMES[r] || r)}</span>`).join(' ')}${escapeHTML(when(u.createdAt))}</div></li>`)}
         ${recentCard('Latest newsletter signups', 'View all', "switchTab('subscribers')", d.recent.subscribers, sub => `
           <li><div class="recent-main"><strong>${escapeHTML(sub.email)}</strong><span>${escapeHTML(sub.source || 'newsletter')}</span></div>
           <div class="recent-side"><span class="badge ${sub.status === 'active' ? 'badge-active' : 'badge-inactive'}">${escapeHTML(sub.status)}</span>${escapeHTML(when(sub.createdAt))}</div></li>`)}

@@ -9,6 +9,7 @@ const Reaction = require('../models/reactionModel');
 const SavedPost = require('../models/savedPostModel');
 const Notification = require('../models/notificationModel');
 const AppError = require('./appError');
+const { hasRole } = require('./roles');
 
 // Shared rules for the traveler side of the app: who sees what, who can comment, notifications, media.
 
@@ -65,7 +66,7 @@ const canComment = (post, ctx, authorSettings) => {
 
 // Signed-in travelers can post and interact, unless Plezar switched it off for them
 const assertCanPost = user => {
-  if (user.role !== 'user') throw new AppError('Posting, reacting and commenting are for traveler accounts in the Plezar app.', 403);
+  if (!hasRole(user, 'user')) throw new AppError('Posting, reacting and commenting are for traveler accounts in the Plezar app.', 403);
   const r = user.restrictions || {};
   if (r.posting && (!r.until || r.until > new Date())) throw new AppError('Posting and commenting are switched off for your account. Contact Plezar support.', 403);
 };
@@ -90,7 +91,7 @@ const userCard = u => (u ? {
   verified: Boolean(u.verification && u.verification.status === 'approved')
 } : null);
 
-const USER_CARD_FIELDS = 'name photo verification.status status role';
+const USER_CARD_FIELDS = 'name photo verification.status status role roles';
 
 const agencyCard = a => (a ? { _id: a._id, name: a.name, logo: a.logo || '', verified: Boolean(a.verified) } : null);
 

@@ -10,6 +10,7 @@ const { logActivity } = require('../utils/activity');
 const { escapeRegex, pageParams, paged, validId } = require('../utils/query');
 const { privateDocumentPath, copyPrivateDocument, removePrivateFolder } = require('../utils/uploads');
 const { OPEN_STATUSES, folderFor, statusURL, mail } = require('./applicationController');
+const { addRole } = require('../utils/roles');
 
 const ATTENTION = { $or: [{ status: 'new' }, { unreadReply: true }] };
 
@@ -60,7 +61,7 @@ exports.listApplications = catchAsync(async (req, res) => {
       .sort({ unreadReply: -1, createdAt: q.sort === 'oldest' ? 1 : -1 })
       .skip(page.skip)
       .limit(page.limit)
-      .select('reference agencyName contactName phone email regions district status unreadReply documents.kind createdAt decidedAt agency')
+      .select('reference source agencyName contactName phone email regions district status unreadReply documents.kind createdAt decidedAt agency')
       .populate('agency', 'name')
       .lean(),
     AgentLead.countDocuments(filter)
@@ -69,7 +70,8 @@ exports.listApplications = catchAsync(async (req, res) => {
   const applications = rows.map(r => ({
     ...r,
     documentCount: (r.documents || []).length,
-    hasRequiredDocuments: ['trade_license', 'nid'].every(k => (r.documents || []).some(d => d.kind === k)),
+    // Website: trade license and owner's NID. App: business license, insurance and tax ID
+    hasRequiredDocuments: (r.source === 'app' ? ['trade_license', 'insurance', 'tax_id'] : ['trade_license', 'nid']).every(k => (r.documents || []).some(d => d.kind === k)),
     documents: undefined
   }));
   res.status(200).json({ status: 'success', data: { applications, ...paged(total, page) } });
@@ -88,13 +90,14 @@ exports.getApplication = catchAsync(async (req, res, next) => {
   await lead.populate([
     { path: 'categories', select: 'name active' },
     { path: 'decidedBy', select: 'name' },
-    { path: 'agency', select: 'name status verified' }
+    { path: 'agency', select: 'name status verified' },
+    { path: 'applicant', select: 'name email phone' }
   ]);
 
   // Things a reviewer should know before deciding
   const licenseRx = lead.tradeLicenseNumber ? { $regex: `^${escapeRegex(lead.tradeLicenseNumber)}$`, $options: 'i' } : null;
   const [account, otherApplications, agencyWithLicense] = await Promise.all([
-    User.findOne({ email: lead.email }).setOptions({ includeInactive: true }).select('name role agency accountStatus').lean(),
+    User.findOne({ email: lead.email }).setOptions({ includeInactive: true }).select('name role roles agency accountStatus').lean(),
     AgentLead.find({
       _id: { $ne: lead._id },
       $or: [{ email: lead.email }, { phone: lead.phone }, ...(licenseRx ? [{ tradeLicenseNumber: licenseRx }] : [])]
@@ -112,7 +115,8 @@ exports.getApplication = catchAsync(async (req, res, next) => {
       application: lead,
       owner,
       checks: { account, otherApplications, agencyWithLicense },
-      statusURL: lead.reference ? statusURL(req, lead) : ''
+      statusURL: lead.reference ? statusURL(req, lead) : '',
+      appOptions: AgentLead.APP_OPTIONS
     }
   });
 });
@@ -196,8 +200,16 @@ exports.approve = catchAsync(async (req, res, next) => {
   const lead = await findLead(req.params.id, next, '+documents.file');
   if (!lead || decidedAlready(lead, next)) return;
 
-  if (await User.exists({ email: lead.email })) {
-    return next(new AppError(`An account already exists for ${lead.email}. Ask the applicant for another email, or invite the agency by hand from All vendors.`, 400));
+  // One person can be a traveler and a vendor: an existing account becomes the owner when it's the
+  // traveler who applied from the app, or when the admin says so (useExistingAccount)
+  const existing = await User.findOne({ email: lead.email });
+  if (existing) {
+    if (existing.agency) return next(new AppError(`${lead.email} already belongs to an agency. Ask the applicant for another email.`, 400));
+    if (existing.deletedAt || existing.status !== 'active') return next(new AppError(`The account for ${lead.email} is suspended or removed. Ask the applicant for another email.`, 400));
+    const ownApplication = lead.applicant && String(lead.applicant) === String(existing._id);
+    if (!ownApplication && !(req.body.useExistingAccount === true || req.body.useExistingAccount === 'true')) {
+      return next(new AppError(`An account already exists for ${lead.email}. Tick "Add the vendor role to their existing account" to make it the owner, or ask the applicant for another email.`, 400));
+    }
   }
 
   const verify = req.body.verify !== false && req.body.verify !== 'false';
@@ -242,11 +254,18 @@ exports.approve = catchAsync(async (req, res, next) => {
     throw err;
   }
 
-  // The owner's account is ready to use straight away, with a temporary password the admin sends by email
-  const password = temporaryPassword();
+  // The owner's account is ready to use straight away, with a temporary password the admin sends by email.
+  // An existing account keeps its own password and just gains the vendor role.
+  const password = existing ? null : temporaryPassword();
   let owner;
   try {
-    owner = await User.create({
+    if (existing) {
+      owner = existing;
+      addRole(owner, 'agent');
+      owner.agency = agency._id;
+      owner.agencyRole = 'owner';
+      await owner.save({ validateBeforeSave: false });
+    } else owner = await User.create({
       name: lead.contactName,
       email: lead.email,
       phone: lead.phone,
@@ -277,9 +296,9 @@ exports.approve = catchAsync(async (req, res, next) => {
   });
 
   // Optionally email the sign-in details straight away; the admin sees them either way
-  const credentials = credentialsFor(req, owner, agency, password);
+  const credentials = existing ? null : credentialsFor(req, owner, agency, password);
   let emailSent = null;
-  if (req.body.send === true || req.body.send === 'true') {
+  if (!existing && (req.body.send === true || req.body.send === 'true')) {
     try {
       await new Email(owner, credentials.loginURL, { agencyName: agency.name, vendorCode: credentials.vendorId, email: owner.email, password, temporary: true, kind: 'new' }).sendVendorLogin(credentials.emailDraft.subject);
       emailSent = true;
@@ -293,6 +312,7 @@ exports.approve = catchAsync(async (req, res, next) => {
   let message = `${agency.name} is now a member. Email the sign-in details below to ${owner.name}; this is the only time the password is shown.`;
   if (emailSent === true) message = `${agency.name} is now a member, and the sign-in details were emailed to ${owner.email}.`;
   if (emailSent === false) message = `${agency.name} is now a member, but the email couldn't be sent (email isn't set up on the server). Send the details below to ${owner.name} yourself.`;
+  if (existing) message = `${agency.name} is now a member. ${owner.name} already has a Plezar account, so they sign in to the vendor panel with their usual email and password.`;
 
   res.status(201).json({
     status: 'success',

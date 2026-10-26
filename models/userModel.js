@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
+const { mainRole } = require('../utils/roles');
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -24,11 +25,14 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: 'profile.png'
     },
+    // The main role (the most powerful one in `roles`), kept for labels and older code
     role: {
         type: String,
         enum: ['user', 'manager', 'admin', 'dev', 'agent'],
         default: 'user'
     },
+    // Everything this person is on Plezar: traveler, vendor (agent), staff. See utils/roles.js
+    roles: [{ type: String, enum: ['user', 'manager', 'admin', 'dev', 'agent'] }],
 
     // Tour agency membership (only for role 'agent')
     agency: {
@@ -119,13 +123,30 @@ const userSchema = new mongoose.Schema({
     bio: { type: String, trim: true, maxlength: [300, 'Keep your bio under 300 characters'], default: '' },
     coverPhoto: { type: String, default: '' },
     hometown: { type: String, trim: true, maxlength: [80, 'Hometown is too long'], default: '' },
+    // Under the name on the Account screen, e.g. "Designer"
+    occupation: { type: String, trim: true, maxlength: [60, 'Keep your occupation under 60 characters'], default: '' },
+    // Address book; the default one is also copied to `address` as one line
+    addresses: [{
+        label: { type: String, trim: true, maxlength: 30, default: '' }, // Home, Office...
+        districtCode: { type: String, required: true },
+        district: { type: String, required: true },
+        division: { type: String, default: '' },
+        area: { type: String, required: true },
+        line: { type: String, trim: true, required: true, maxlength: 200 }, // house, flat no, road
+        isDefault: { type: Boolean, default: false }
+    }],
+    // My Interest: what to recommend
+    interests: [{ type: String, enum: ['travel', 'restaurant', 'tour', 'hotel', 'place', 'food', 'games', 'travel_group'] }],
 
     // App settings (Settings tab)
     settings: {
         privacy: {
             defaultAudience: { type: String, enum: ['public', 'followers', 'private'], default: 'public' },
             whoCanComment: { type: String, enum: ['everyone', 'followers', 'nobody'], default: 'everyone' },
-            showTrips: { type: Boolean, default: true }
+            showTrips: { type: Boolean, default: true },
+            // Settings > Profile: what other travelers see on your profile
+            showPersonalInfo: { type: Boolean, default: true }, // bio, hometown, occupation
+            showAddress: { type: Boolean, default: false } // your default address's area and district (never the street)
         },
         notifications: {
             reactions: { type: Boolean, default: true },
@@ -141,6 +162,16 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    gender: { type: String, enum: ['male', 'female', 'other', 'prefer_not_to_say', ''], default: '' },
+
+    // Contact details confirmed with a code ("ID Verification" in the app)
+    emailVerifiedAt: Date,
+    phoneVerifiedAt: Date,
+
+    // Refer Friends: this traveler's code, who invited them, and when the inviter was rewarded
+    referralCode: { type: String, uppercase: true, trim: true },
+    referredBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
+    referralRewardedAt: Date,
 
     authProvider: {
         type: String,
@@ -185,6 +216,9 @@ const userSchema = new mongoose.Schema({
 
 userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
 userSchema.index({ phone: 1 });
+userSchema.index({ roles: 1 });
+userSchema.index({ referralCode: 1 }, { unique: true, partialFilterExpression: { referralCode: { $type: 'string' } } });
+userSchema.index({ referredBy: 1 });
 
 // Keep name as "first last" (on validate for new accounts, on save for updates that skip validation)
 function syncName(next) {
@@ -195,6 +229,14 @@ function syncName(next) {
 }
 userSchema.pre('validate', syncName);
 userSchema.pre('save', syncName);
+
+// Keep `roles` and the main `role` in step. Setting `role` on its own adds that role.
+userSchema.pre('save', function (next) {
+    if (!this.roles || !this.roles.length) this.roles = [this.role || 'user'];
+    else if (this.isModified('role') && !this.isModified('roles') && !this.roles.includes(this.role)) this.roles.push(this.role);
+    this.role = mainRole(this.roles);
+    next();
+});
 
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password') || !this.password) return next();

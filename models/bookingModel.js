@@ -4,22 +4,40 @@ const crypto = require('crypto');
 // Short readable reference shown to travelers and in admin, for example PLZ-7K3QX9
 const makeReference = () => `PLZ-${crypto.randomBytes(4).toString('hex').slice(0, 6).toUpperCase()}`;
 
+const KINDS = ['tour', 'hotel', 'guide'];
+
 const bookingSchema = new mongoose.Schema(
   {
     reference: { type: String, unique: true, default: makeReference },
     user: { type: mongoose.Schema.ObjectId, ref: 'User', required: true, index: true },
-    agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', required: true, index: true },
-    package: { type: mongoose.Schema.ObjectId, ref: 'Package', required: true },
+    // What was booked: a tour event, a hotel stay (listed by Plezar) or a day with an agency's guide
+    kind: { type: String, enum: KINDS, default: 'tour', index: true },
+    // Hotels are listed by Plezar, so a hotel booking has no agency
+    agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', index: true, required: [function () { return this.kind !== 'hotel'; }, 'A booking needs an agency'] },
+    package: { type: mongoose.Schema.ObjectId, ref: 'Package', required: [function () { return this.kind === 'tour'; }, 'A tour booking needs a tour'] },
+    hotel: { type: mongoose.Schema.ObjectId, ref: 'Hotel', required: [function () { return this.kind === 'hotel'; }, 'A hotel booking needs a hotel'] },
+    guide: { type: mongoose.Schema.ObjectId, ref: 'Guide', required: [function () { return this.kind === 'guide'; }, 'A guide booking needs a guide'] },
 
     // Snapshots, so history stays correct if the package is renamed or repriced later
+    // (for hotels and guides: the hotel's or guide's name)
     packageTitle: { type: String, required: true },
     destination: { type: String, default: '' },
     destinationRef: { type: mongoose.Schema.ObjectId, ref: 'Destination' },
 
-    travelDate: { type: Date, required: true },
+    travelDate: { type: Date, required: true }, // tour start, hotel check-in, first guided day
+    endDate: Date, // tour end, hotel check-out, last guided day
     travelers: { type: Number, required: true, min: [1, 'At least one traveler'], max: [50, 'At most 50 travelers'] },
+    // Hotels: rooms and nights; guides: days. Price is per person (tours), per room per night, or per day
+    rooms: { type: Number, min: 1, max: 20, default: null },
+    units: { type: Number, min: 1, max: 60, default: null },
     pricePerPerson: { type: Number, required: true, min: 0 },
+    regularPrice: { type: Number, min: 0, default: null }, // the struck-through price when booked on sale
     amount: { type: Number, required: true, min: 0 }, // total charged to the traveler, in taka
+    // A voucher from Vouchers & Rewards: Plezar pays the discount out of its commission
+    subtotal: { type: Number, min: 0, default: null }, // price before the voucher
+    discountAmount: { type: Number, min: 0, default: 0 },
+    voucher: { type: mongoose.Schema.ObjectId, ref: 'UserVoucher' },
+    voucherCode: { type: String, default: '' },
 
     commissionRate: { type: Number, required: true, min: 0, max: 100 }, // percent, snapshot at booking time
     commissionAmount: { type: Number, required: true, min: 0 }, // Plezar's share of `amount`
@@ -40,11 +58,19 @@ const bookingSchema = new mongoose.Schema(
     completedAt: Date,
     cancelledAt: Date,
     cancelReason: { type: String, trim: true, maxlength: 500, default: '' },
-    note: { type: String, trim: true, maxlength: 500, default: '' }
+    note: { type: String, trim: true, maxlength: 500, default: '' },
+    // Loyalty points given when the trip was completed (taken back if it is cancelled after that)
+    pointsAwarded: { type: Number, default: 0 },
+    // When the day-before reminder went out
+    remindedAt: Date
   },
   { timestamps: true }
 );
 
 bookingSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Booking', bookingSchema);
+bookingSchema.index({ guide: 1, travelDate: 1 });
+
+const Booking = mongoose.model('Booking', bookingSchema);
+Booking.KINDS = KINDS;
+module.exports = Booking;

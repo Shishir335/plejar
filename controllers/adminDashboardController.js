@@ -56,7 +56,13 @@ exports.getDashboard = catchAsync(async (req, res, next) => {
     recentUsers,
     recentSubscribers
   ] = await Promise.all([
-    User.aggregate([{ $match: { active: { $ne: false } } }, { $group: { _id: '$role', count: { $sum: 1 } } }]),
+    // A person with several roles counts once under each
+    User.aggregate([
+      { $match: { active: { $ne: false } } },
+      { $project: { roles: { $cond: [{ $gt: [{ $size: { $ifNull: ['$roles', []] } }, 0] }, '$roles', ['$role']] } } },
+      { $unwind: '$roles' },
+      { $group: { _id: '$roles', count: { $sum: 1 } } }
+    ]),
     User.aggregate([
       { $match: { _id: { $gte: sinceId }, active: { $ne: false } } },
       { $group: { _id: dayFormat({ $toDate: '$_id' }), count: { $sum: 1 } } }
@@ -89,7 +95,7 @@ exports.getDashboard = catchAsync(async (req, res, next) => {
     ]),
     AgentLead.find().sort({ createdAt: -1 }).limit(5).select('agencyName contactName phone regions status createdAt').lean(),
     Agency.find().sort({ createdAt: -1 }).limit(5).select('name logo regions status verified verification.status createdAt').lean(),
-    User.find().sort({ _id: -1 }).limit(5).select('name email role accountStatus').lean(),
+    User.find().sort({ _id: -1 }).limit(5).select('name email role roles accountStatus').lean(),
     Subscriber.find().sort({ createdAt: -1 }).limit(5).select('email source status createdAt').lean()
   ]);
 
@@ -199,6 +205,7 @@ exports.getDashboard = catchAsync(async (req, res, next) => {
           name: u.name,
           email: u.email,
           role: u.role,
+          roles: u.roles && u.roles.length ? u.roles : [u.role],
           accountStatus: u.accountStatus,
           // Accounts don't store a creation date, but their ID does
           createdAt: u._id.getTimestamp()

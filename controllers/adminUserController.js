@@ -8,6 +8,7 @@ const ActivityLog = require('../models/activityLogModel');
 const WalletTransaction = require('../models/walletTransactionModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { ROLES, hasRole, rolesOf, isTravelerOnly, roleFilter } = require('../utils/roles');
 const { logActivity } = require('../utils/activity');
 const { privateDocumentPath, removePrivateDocument } = require('../utils/uploads');
 
@@ -30,7 +31,7 @@ const guard = (req, target, { allowSelf = false } = {}) => {
   if (!allowSelf && String(req.user._id) === String(target._id)) {
     return 'You cannot do this to your own account.';
   }
-  if (req.user.role === 'manager' && target.role !== 'user') {
+  if (!hasRole(req.user, 'admin', 'dev') && !isTravelerOnly(target)) {
     return 'Managers can only manage traveler accounts. Ask an administrator.';
   }
   return null;
@@ -52,6 +53,7 @@ const userView = u => {
     dateOfBirth: u.dateOfBirth ? u.dateOfBirth.toISOString().slice(0, 10) : null,
     photo: u.photo,
     role: u.role,
+    roles: rolesOf(u),
     agency: u.agency || null,
     agencyRole: u.agencyRole || null,
     authProvider: u.authProvider,
@@ -131,7 +133,7 @@ exports.listUsers = catchAsync(async (req, res, next) => {
     const rx = new RegExp(escapeRegex(String(q.search).trim()), 'i');
     and.push({ $or: [{ name: rx }, { email: rx }, { phone: rx }] });
   }
-  if (q.role) and.push({ role: q.role });
+  if (ROLES.includes(q.role)) and.push(roleFilter(q.role));
 
   if (q.status === 'active') and.push({ status: { $nin: ['suspended', 'deactivated'] } });
   else if (['suspended', 'deactivated'].includes(q.status)) and.push({ status: q.status });
@@ -305,7 +307,7 @@ exports.deleteUser = catchAsync(async (req, res, next) => {
   if (!user) return;
   const blocked = guard(req, user);
   if (blocked) return next(new AppError(blocked, 403));
-  if (user.role === 'agent') {
+  if (hasRole(user, 'agent')) {
     return next(new AppError('Agency accounts belong to an agency. Suspend the agency from Vendors instead, or remove the person from the agency team.', 400));
   }
   if (user.deletedAt || user.active === false) return next(new AppError('This account is already deleted.', 400));
@@ -633,7 +635,7 @@ exports.listLogins = catchAsync(async (req, res, next) => {
   const pg = pageParams(q, 30);
 
   const [events, total] = await Promise.all([
-    LoginEvent.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit).populate('user', 'name role').lean(),
+    LoginEvent.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit).populate('user', 'name role roles').lean(),
     LoginEvent.countDocuments(filter)
   ]);
   res.status(200).json({ status: 'success', data: { events, ...paged(total, pg) } });

@@ -6,6 +6,7 @@ const SocialReport = require('../models/socialReportModel');
 const Notification = require('../models/notificationModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { roleFilter } = require('../utils/roles');
 const { logActivity } = require('../utils/activity');
 const { escapeRegex, pageParams, paged } = require('../utils/query');
 const { snippet } = require('../utils/social');
@@ -219,7 +220,7 @@ exports.resolveReport = catchAsync(async (req, res, next) => {
   }
 
   if (status === 'action_taken' && yes(req.body.restrictUser) && report.targetUser) {
-    const user = await User.findOne({ _id: report.targetUser, role: 'user' });
+    const user = await User.findOne({ $and: [{ _id: report.targetUser }, roleFilter('user')] });
     if (user) {
       user.restrictions = { ...(user.restrictions ? user.restrictions.toObject() : {}), posting: true, reason: resolution, setBy: req.user._id, setAt: new Date() };
       await user.save({ validateBeforeSave: false });

@@ -6,8 +6,17 @@ const agencies = require('../controllers/agencyDirectoryController');
 const me = require('../controllers/meController');
 const appConfig = require('../controllers/appConfigController');
 const tours = require('../controllers/toursController');
+const account = require('../controllers/accountController');
 const { postMediaUpload } = require('../utils/social');
 const { profileUpload } = require('../utils/userImages');
+const users = require('../controllers/userController');
+const vouchers = require('../controllers/voucherController');
+const help = require('../controllers/helpController');
+const pages = require('../controllers/pageController');
+const profile = require('../controllers/profileController');
+const agencyApplication = require('../controllers/agencyApplicationController');
+const applications = require('../controllers/applicationController');
+const { userDocumentUpload, applicationUpload, agencyApplicationUpload } = require('../utils/uploads');
 
 // The traveler side of the mobile app
 
@@ -69,5 +78,59 @@ meRoutes.get('/saved', me.savedPosts);
 meRoutes.get('/blocked', me.blocked);
 meRoutes.get('/following-agencies', me.followingAgencies);
 meRoutes.get('/wishlist', tours.wishlist);
+meRoutes.get('/travel-history', account.travelHistory);
+meRoutes.get('/rewards', account.rewards);
+meRoutes.get('/points', account.pointsHistory);
+meRoutes.patch('/password', account.changePassword);
+// The Account screen and its pages
+meRoutes.get('/account', profile.account);
+meRoutes.get('/addresses/districts', profile.districts);
+meRoutes.get('/addresses/areas', profile.areas);
+meRoutes.route('/addresses').get(profile.listAddresses).post(profile.addAddress);
+meRoutes.route('/addresses/:id').patch(profile.updateAddress).delete(profile.deleteAddress);
+meRoutes.route('/interests').get(profile.getInterests).put(profile.saveInterests);
+meRoutes.get('/transactions', profile.transactions);
+meRoutes.get('/referrals', account.referrals);
+// ID Verification: email and phone codes, then the ID document and a selfie (multipart: nid | passport | drivingLicense, selfie)
+meRoutes.get('/verification', account.verification);
+meRoutes.post('/verification/:channel(email|phone)/send', account.sendContactCode);
+meRoutes.post('/verification/:channel(email|phone)/confirm', account.confirmContactCode);
+meRoutes.post(
+  '/verification/documents',
+  userDocumentUpload.fields([{ name: 'nid', maxCount: 1 }, { name: 'passport', maxCount: 1 }, { name: 'drivingLicense', maxCount: 1 }, { name: 'selfie', maxCount: 1 }]),
+  users.saveMyVerificationDocuments,
+  account.documentsSaved
+);
 
-module.exports = { app, feed, posts: postRoutes, comments, people: peopleRoutes, agencies: agencyRoutes, me: meRoutes };
+// Vouchers & Rewards
+const voucherRoutes = express.Router();
+voucherRoutes.use(protect);
+voucherRoutes.get('/', vouchers.listVouchers);
+voucherRoutes.get('/usable', vouchers.usableVouchers);
+voucherRoutes.post('/lookup', vouchers.lookupCode);
+voucherRoutes.post('/apply-code', vouchers.applyCode);
+voucherRoutes.get('/:id', vouchers.getVoucher);
+voucherRoutes.route('/:id/redeem').get(vouchers.redeemPreview).post(vouchers.redeem);
+
+// Help Center (reading is open to everyone; Contact Us needs sign-in)
+const helpRoutes = express.Router();
+helpRoutes.get('/', help.home);
+helpRoutes.get('/articles', help.articles);
+helpRoutes.get('/articles/:id', help.article);
+helpRoutes.post('/articles/:id/feedback', help.feedback);
+helpRoutes.post('/contact', protect, help.contact);
+
+// About App, Privacy Policy, Terms & Conditions
+const pageRoutes = express.Router();
+pageRoutes.get('/', pages.listPages);
+pageRoutes.get('/:key', pages.getPage);
+
+// Travel Agency Application (Become a Partner): the page, the 3-step form and the traveler's applications
+const agencyApplicationRoutes = express.Router();
+agencyApplicationRoutes.get('/', optionalAuth, agencyApplication.overview);
+agencyApplicationRoutes.post('/check', protect, agencyApplication.checkStep);
+agencyApplicationRoutes.post('/', protect, agencyApplicationUpload, agencyApplication.submit);
+agencyApplicationRoutes.get('/mine', protect, agencyApplication.mine);
+agencyApplicationRoutes.post('/:reference/reply', protect, applicationUpload, agencyApplication.findMineForReply, applications.reply);
+
+module.exports = { app, feed, posts: postRoutes, comments, people: peopleRoutes, agencies: agencyRoutes, me: meRoutes, vouchers: voucherRoutes, help: helpRoutes, pages: pageRoutes, agencyApplication: agencyApplicationRoutes };

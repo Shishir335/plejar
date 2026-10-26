@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Package = require('../models/packageModel');
 const Destination = require('../models/destinationModel');
+const Guide = require('../models/guideModel');
 const AppError = require('./appError');
 
 // A vendor must declare the whole plan before a tour event can be published:
@@ -79,6 +80,21 @@ const applyPlan = async (pkg, raw) => {
     pkg.groupSize = { min, max };
   }
   if (plan.flexibleDates !== undefined) pkg.flexibleDates = plan.flexibleDates === true || plan.flexibleDates === 'true';
+  if (plan.tags !== undefined) {
+    const tags = [...new Set((Array.isArray(plan.tags) ? plan.tags : String(plan.tags || '').split(',')).map(t => String(t).trim().toLowerCase()).filter(Boolean))];
+    const unknown = tags.find(t => !Package.TOUR_TAGS.includes(t));
+    if (unknown) throw new AppError(`"${unknown}" isn't a tag travelers can filter by. Choose from: ${Package.TOUR_TAGS.join(', ')}.`, 400);
+    if (tags.length > 5) throw new AppError('Choose up to 5 tags.', 400);
+    pkg.tags = tags;
+  }
+  if (plan.guide !== undefined) {
+    if (!plan.guide) pkg.guide = undefined;
+    else {
+      const guide = mongoose.isValidObjectId(plan.guide) && await Guide.findOne({ _id: plan.guide, agency: pkg.agency, active: true }).select('_id');
+      if (!guide) throw new AppError('Choose a guide from your team.', 400);
+      pkg.guide = guide._id;
+    }
+  }
 
   if (plan.itinerary !== undefined) {
     if (!Array.isArray(plan.itinerary)) throw new AppError('The day-by-day plan could not be read.', 400);
@@ -107,6 +123,7 @@ const applyPlan = async (pkg, raw) => {
       return {
         day: i + 1,
         title: text(d && d.title, 120),
+        description: text(d && d.description, 1000),
         stops,
         stay: text(d && d.stay, 120),
         meals: { breakfast: Boolean(meals.breakfast), lunch: Boolean(meals.lunch), dinner: Boolean(meals.dinner) }

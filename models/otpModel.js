@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
  */
 const otpSchema = new mongoose.Schema(
   {
-    purpose: { type: String, enum: ['password_reset'], required: true },
+    purpose: { type: String, enum: ['password_reset', 'verify_email', 'verify_phone'], required: true },
     channel: { type: String, enum: ['email', 'phone'], required: true },
     destination: { type: String, required: true }, // the email or 01XXXXXXXXX it was sent to
     user: { type: mongoose.Schema.ObjectId, ref: 'User', required: true },

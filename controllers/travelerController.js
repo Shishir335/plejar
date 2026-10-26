@@ -56,6 +56,7 @@ const publicEvent = (event, stats) => {
       day: d.day,
       date: e.startDate ? new Date(new Date(e.startDate).getTime() + (d.day - 1) * 86400000).toISOString().slice(0, 10) : null,
       title: d.title,
+      description: d.description || '',
       stay: d.stay,
       meals: d.meals,
       stops: (d.stops || []).map(st => ({
@@ -135,16 +136,29 @@ exports.listAnnouncements = catchAsync(async (req, res, next) => {
 // Notifications tab: newest first, with who did it and a peek at the post it's about
 const NOTE_GROUPS = {
   social: ['post_reaction', 'post_comment', 'comment_reply', 'comment_reaction', 'post_share', 'new_follower'],
-  tours: ['vendor_message', 'announcement', 'event_cancelled', 'event_changed'],
+  tours: ['vendor_message', 'announcement', 'event_cancelled', 'event_changed', 'tour_message', 'booking_requested', 'booking_confirmed', 'booking_cancelled', 'booking_completed', 'trip_reminder', 'points_earned'],
   plezar: ['post_hidden']
 };
+
+// The chips on "Notification & Trip Updates": what kind of update each notification is
+const NOTE_CATEGORIES = {
+  alerts: ['event_cancelled', 'event_changed', 'booking_cancelled'],
+  info: ['announcement', 'vendor_message', 'tour_message', 'trip_reminder', 'post_hidden'],
+  confirmation: ['booking_requested', 'booking_confirmed', 'booking_completed', 'points_earned', 'referral_reward'],
+  social: NOTE_GROUPS.social
+};
+const CATEGORY_LABELS = { all: 'All', unread: 'Unread', alerts: 'Alerts', info: 'Info', confirmation: 'Confirmation', social: 'Social' };
+const categoryOf = kind => Object.keys(NOTE_CATEGORIES).find(c => NOTE_CATEGORIES[c].includes(kind)) || 'info';
 
 exports.myNotifications = catchAsync(async (req, res) => {
   const filter = { user: req.user._id };
   if (req.query.unread === 'true') filter.readAt = null;
   if (NOTE_GROUPS[req.query.group]) filter.kind = { $in: NOTE_GROUPS[req.query.group] };
+  // ?category=unread|alerts|info|confirmation|social
+  if (req.query.category === 'unread') filter.readAt = null;
+  else if (NOTE_CATEGORIES[req.query.category]) filter.kind = { $in: NOTE_CATEGORIES[req.query.category] };
   const page = pageParams(req.query);
-  const [rows, total, unread] = await Promise.all([
+  const [rows, total, unread, byKind] = await Promise.all([
     Notification.find(filter).sort({ createdAt: -1 }).skip(page.skip).limit(page.limit)
       .select('-user -broadcast')
       .populate('agency', 'name logo verified')
@@ -153,15 +167,26 @@ exports.myNotifications = catchAsync(async (req, res) => {
       .populate('event', 'title startDate')
       .lean(),
     Notification.countDocuments(filter),
-    Notification.countDocuments({ user: req.user._id, readAt: null })
+    Notification.countDocuments({ user: req.user._id, readAt: null }),
+    Notification.aggregate([{ $match: { user: req.user._id } }, { $group: { _id: '$kind', total: { $sum: 1 }, unread: { $sum: { $cond: [{ $eq: [{ $ifNull: ['$readAt', null] }, null] }, 1, 0] } } } }])
   ]);
   const notifications = rows.map(n => ({
     ...n,
     group: Object.keys(NOTE_GROUPS).find(g => NOTE_GROUPS[g].includes(n.kind)) || 'other',
+    category: categoryOf(n.kind),
+    isNew: !n.readAt,
     actor: n.actor ? userCard(n.actor) : null,
     post: n.post && n.post.status === 'active' ? { _id: n.post._id, text: snippet(n.post.text, 100), thumbnail: (n.post.media || []).find(m => m.type === 'image') ? n.post.media.find(m => m.type === 'image').url : '' } : null
   }));
-  res.status(200).json({ status: 'success', data: { notifications, unread, ...paged(total, page) } });
+  // Chips with counts, in the order the app shows them
+  const sum = (kinds, field) => byKind.filter(k => !kinds || kinds.includes(k._id)).reduce((n, k) => n + k[field], 0);
+  const categories = Object.keys(CATEGORY_LABELS).map(key => ({
+    key,
+    label: CATEGORY_LABELS[key],
+    total: key === 'unread' ? unread : sum(NOTE_CATEGORIES[key], 'total'),
+    unread: key === 'unread' ? unread : sum(NOTE_CATEGORIES[key], 'unread')
+  }));
+  res.status(200).json({ status: 'success', data: { notifications, unread, categories, ...paged(total, page) } });
 });
 
 // The number on the Notifications tab

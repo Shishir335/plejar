@@ -21,7 +21,11 @@ const fmtDate = d => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeri
 const fmtDateTime = d => (d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
 const E = escapeHTML;
-const isMoneyAdmin = () => adminState.currentUser && ['admin', 'dev'].includes(adminState.currentUser.role);
+const isMoneyAdmin = () => rolesOf(adminState.currentUser).some(r => ['admin', 'dev'].includes(r));
+// A plain traveler: managers may only look after these
+const isTravelerOnly = u => rolesOf(u).every(r => r === 'user');
+// One badge per role, e.g. ADMIN, TRAVELER, VENDOR · OWNER
+const roleBadges = u => rolesOf(u).map(r => `<span class="badge badge-${E(r)}">${E(ROLE_NAMES[r] || r)}${r === 'agent' && u.agencyRole ? ` · ${E(u.agencyRole)}` : ''}</span>`).join(' ');
 
 const makeDebounce = (fn, ms = 300) => {
   let t;
@@ -188,7 +192,7 @@ async function loadUsers(page = 1) {
         <td><div class="user-cell">${avatarOf(u.name)}<div class="user-cell-info">
           <span class="user-cell-name">${E(u.name) || 'Unnamed'}</span>
           <span class="user-cell-email">${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}</span></div></div></td>
-        <td><span class="badge badge-${E(u.role)}">${E(u.role)}${u.role === 'agent' && u.agencyRole ? ` · ${E(u.agencyRole)}` : ''}</span></td>
+        <td>${roleBadges(u)}</td>
         <td class="standing">${standingBadges(u)}</td>
         <td style="color: var(--text-muted); font-size: 0.85rem;">${u.lastLoginAt ? E(fmtDate(u.lastLoginAt)) : 'Never'}</td>
         <td style="color: var(--text-muted); font-size: 0.85rem;">${E(fmtDate(u.joinedAt))}</td>
@@ -265,6 +269,8 @@ function openComplaint(id) {
     <p class="complaint-text">${E(c.message)}</p>
     <dl class="complaint-facts">
       <div><dt>Reported by</dt><dd>${reporter._id ? `<a href="#" onclick="event.preventDefault(); closeModal('complaintModal'); openUser('${E(reporter._id)}')">${E(reporter.name)}</a> (${E(reporter.email || '')})` : '—'}</dd></div>
+      ${c.contactEmail ? `<div><dt>Reply to</dt><dd>${E(c.contactName || '')} <a href="mailto:${E(c.contactEmail)}">${E(c.contactEmail)}</a></dd></div>` : ''}
+      ${c.topic ? `<div><dt>Topic</dt><dd>${E(c.topic)}</dd></div>` : ''}
       <div><dt>About</dt><dd>${c.againstAgency ? E(c.againstAgency.name) : (c.againstUser ? E(c.againstUser.name) : '—')}</dd></div>
       <div><dt>Booking</dt><dd>${c.booking ? `${E(c.booking.reference)} · ${E(c.booking.packageTitle || '')}` : '—'}</dd></div>
       <div><dt>Received</dt><dd>${E(fmtDateTime(c.createdAt))}</dd></div>
@@ -449,7 +455,7 @@ async function reloadUser() {
 function userActionButtons(u) {
   const me = adminState.currentUser || {};
   const self = String(me._id || me.id) === String(u.id);
-  const managerBlocked = me.role === 'manager' && u.role !== 'user';
+  const managerBlocked = !isMoneyAdmin() && !isTravelerOnly(u);
   if (self || managerBlocked) return '<span class="detail-muted" style="margin:0">You can view this account but not change it.</span>';
 
   const id = E(u.id);
@@ -462,9 +468,9 @@ function userActionButtons(u) {
     : '<button class="btn btn-primary" onclick="reactivateUser()">Reactivate</button>';
   return `${status}
     <button class="btn btn-secondary" onclick="openRestrictModal()">Restrictions</button>
-    ${u.role !== 'agent' ? '<button class="btn btn-secondary" onclick="openRoleForOpenUser()">Change role</button>' : ''}
+    <button class="btn btn-secondary" onclick="openRoleForOpenUser()">Change roles</button>
     <button class="btn btn-secondary" onclick="openResetForOpenUser()">Reset password</button>
-    ${u.role !== 'agent' ? '<button class="btn btn-danger" onclick="openDeleteModal()">Delete account</button>' : ''}`;
+    ${rolesOf(u).includes('agent') ? '' : '<button class="btn btn-danger" onclick="openDeleteModal()">Delete account</button>'}`;
 }
 
 const USER_TABS = [
@@ -482,7 +488,7 @@ function renderUserDetail(tab = 'overview') {
         <div>
           <h2>${E(u.name)}</h2>
           <p>${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}${u.dateOfBirth ? ` · Born ${E(fmtDate(u.dateOfBirth))}` : ''}</p>
-          <p class="profile-badges"><span class="badge badge-${E(u.role)}">${E(u.role)}${u.agencyRole ? ` · ${E(u.agencyRole)}` : ''}</span> ${standingBadges(u)}</p>
+          <p class="profile-badges">${roleBadges(u)} ${standingBadges(u)}</p>
         </div>
       </div>
       <div class="profile-actions">${userActionButtons(u)}</div>
@@ -660,7 +666,7 @@ function documentsPanel() {
     none: ['', 'No verification submitted', 'The user has not uploaded identity documents.']
   };
   const [cls, title, text] = banners[v.status] || banners.none;
-  const canAct = !u.deleted && !(adminState.currentUser.role === 'manager' && u.role !== 'user') && String(adminState.currentUser._id || adminState.currentUser.id) !== String(u.id);
+  const canAct = !u.deleted && !(!isMoneyAdmin() && !isTravelerOnly(u)) && String(adminState.currentUser._id || adminState.currentUser.id) !== String(u.id);
   return `
     <div class="callout ${cls}"><div><strong>${E(title)}</strong>${text}</div></div>
     <ul class="detail-docs">
@@ -704,7 +710,7 @@ function syncStatusForm() {
 // The role and password dialogs live in admin.js; names come from the open profile, never from HTML
 function openRoleForOpenUser() {
   const u = U.detail.user;
-  openEditRoleModal(u.id, u.name, u.role);
+  openEditRoleModal(u.id, u.name, rolesOf(u));
 }
 
 function openResetForOpenUser() {

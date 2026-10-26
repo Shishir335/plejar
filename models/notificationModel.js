@@ -3,7 +3,9 @@ const mongoose = require('mongoose');
 // One in-app notification for one traveler. The mobile app lists these and marks them read.
 const KINDS = [
   // From vendors and tours
-  'vendor_message', 'announcement', 'event_cancelled', 'event_changed',
+  'vendor_message', 'announcement', 'event_cancelled', 'event_changed', 'tour_message',
+  // About the traveler's own bookings
+  'booking_requested', 'booking_confirmed', 'booking_cancelled', 'booking_completed', 'trip_reminder', 'points_earned', 'referral_reward',
   // From other travelers
   'post_reaction', 'post_comment', 'comment_reply', 'comment_reaction', 'post_share', 'new_follower',
   // From Plezar
@@ -27,6 +29,10 @@ const notificationSchema = new mongoose.Schema(
     actor: { type: mongoose.Schema.ObjectId, ref: 'User' },
     post: { type: mongoose.Schema.ObjectId, ref: 'Post' },
     comment: { type: mongoose.Schema.ObjectId, ref: 'Comment' },
+    // A reply from an agency to the traveler's question (tour_message)
+    conversation: { type: mongoose.Schema.ObjectId, ref: 'Conversation' },
+    // The booking an update is about
+    booking: { type: mongoose.Schema.ObjectId, ref: 'Booking' },
     readAt: Date
   },
   { timestamps: true }

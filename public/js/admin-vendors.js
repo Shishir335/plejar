@@ -253,14 +253,16 @@ async function deleteCategory(id) {
 
 const debouncedBookings = makeDebounce(() => loadBookings(1));
 
+const KIND_LABEL = { tour: 'Tour', hotel: 'Hotel stay', guide: 'Guide' };
+
 function bookingRow(b, { withVendor = true } = {}) {
   V.bookings.set(b._id, b);
   return `
     <tr>
-      <td><span class="lead-main">${E(b.packageTitle)}</span><span class="lead-sub">${E(b.reference)} · booked ${E(fmtDate(b.createdAt))}</span></td>
+      <td><span class="lead-main">${E(b.packageTitle)}</span><span class="lead-sub">${E(KIND_LABEL[b.kind || 'tour'])} · ${E(b.reference)} · booked ${E(fmtDate(b.createdAt))}</span></td>
       <td>${b.user ? `<a href="#" onclick="event.preventDefault(); openUser('${E(b.user._id)}')">${E(b.user.name)}</a><span class="lead-sub">${b.travelers} traveler${b.travelers === 1 ? '' : 's'}</span>` : '—'}</td>
-      ${withVendor ? `<td>${b.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(b.agency._id)}')">${E(b.agency.name)}</a>` : '—'}</td>` : ''}
-      <td style="white-space: nowrap;">${E(fmtDate(b.travelDate))}</td>
+      ${withVendor ? `<td>${b.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(b.agency._id)}')">${E(b.agency.name)}</a>` : (b.kind === 'hotel' ? '<span class="lead-sub" style="display:inline;">Plezar confirms</span>' : '—')}</td>` : ''}
+      <td style="white-space: nowrap;">${E(fmtDate(b.travelDate))}${b.endDate && b.endDate !== b.travelDate ? `<span class="lead-sub">to ${E(fmtDate(b.endDate))}${b.units ? ` · ${b.units} ${b.kind === 'hotel' ? 'night' : 'day'}${b.units === 1 ? '' : 's'}` : ''}</span>` : ''}</td>
       <td style="white-space: nowrap;">${takaFmt(b.amount)}<span class="lead-sub">Plezar ${takaFmt(b.commissionAmount)} (${pct(b.commissionRate)})</span></td>
       <td><span class="badge ${BOOKING_BADGE[b.status]}">${E(label(b.status))}</span></td>
       <td>${E(PAY_LABEL[b.paymentStatus] || b.paymentStatus)}</td>
@@ -271,7 +273,7 @@ function bookingRow(b, { withVendor = true } = {}) {
 async function loadBookings(page = 1) {
   tableMessage('bookingsTableBody', 8, 'Loading bookings...');
   ensureVendorOptions();
-  const q = queryString({ search: val('bkSearch').trim(), status: val('bkStatus'), paymentStatus: val('bkPayment'), agency: val('bkVendor'), page, limit: 20 });
+  const q = queryString({ search: val('bkSearch').trim(), status: val('bkStatus'), paymentStatus: val('bkPayment'), kind: val('bkKind'), agency: val('bkVendor'), page, limit: 20 });
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/bookings?${q}`);
     if (!ok) return tableMessage('bookingsTableBody', 8, data.message || 'Could not load bookings.', true);
