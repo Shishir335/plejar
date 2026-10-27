@@ -301,7 +301,28 @@ exports.login = catchAsync(async (req, res, next) => {
 });
 
 const googleClient = new OAuth2Client();
-const googleAudiences = () => [process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_IOS_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID].filter(Boolean);
+const googleAudiences = () => {
+  const sources = [
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_SERVER_CLIENT_ID,
+    process.env.GOOGLE_IOS_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_CLIENT_ID,
+    // Known client IDs for Plezar (Web, Android & iOS from Google/Firebase console)
+    '783619291102-9ujg3f0v6hr5b7l357i6j8n5g8vh78qi.apps.googleusercontent.com',
+    '756555119906-8737egoq23k7pfmcsqa7fuiodd43crcl.apps.googleusercontent.com',
+    '756555119906-q67kbkuacjahi41jl8btrs6en7q7ps4o.apps.googleusercontent.com',
+    '756555119906-7cmmq7mgvjqtj0i7300nmmjvhfo5is0p.apps.googleusercontent.com'
+  ].filter(Boolean);
+
+  const ids = new Set();
+  sources.forEach(src => {
+    String(src).split(',').forEach(item => {
+      const trimmed = item.trim();
+      if (trimmed) ids.add(trimmed);
+    });
+  });
+  return Array.from(ids);
+};
 
 // POST /auth/google { idToken } from google_sign_in in the app
 exports.google = catchAsync(async (req, res, next) => {
