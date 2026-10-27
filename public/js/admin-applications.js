@@ -87,7 +87,12 @@ document.getElementById('apSearch')?.addEventListener('input', debouncedApplicat
 // ---------- Application page ----------
 
 async function openApplication(id) {
-  switchTab('applicationDetail');
+  try {
+    const route = `#applications/${id}`;
+    history.replaceState(null, '', route);
+    sessionStorage.setItem('plezar_admin_tab', route);
+  } catch (_) {}
+  switchTab('applicationDetail', false);
   const box = document.getElementById('applicationDetail');
   box.innerHTML = '<p style="color: var(--text-dim); padding: 24px;">Loading application...</p>';
   try {

@@ -90,6 +90,7 @@ async function checkAdminAuth() {
       loadPendingAgencies();
       loadDashboard();
       updateStats();
+      navigateAdminToRoute();
     } else {
       showLogin();
     }
@@ -146,6 +147,7 @@ async function handleAdminGoogleResponse(response) {
       loadPendingAgencies();
       loadDashboard();
       updateStats();
+      navigateAdminToRoute();
     } else {
       showAdminToast(data.message || 'Google sign-in failed.', 'error');
     }
@@ -205,6 +207,7 @@ async function handleAdminLogin(e) {
       loadPendingAgencies();
       loadDashboard();
       updateStats();
+      navigateAdminToRoute();
     } else {
       showAdminToast(data.message || 'Login failed.', 'error');
     }
@@ -220,10 +223,12 @@ async function handleAdminLogout() {
   // End the server session too, otherwise the login cookie signs you straight back in
   await adminFetch('/api/v1/users/logout').catch(() => {});
   try { localStorage.removeItem('plezar_token'); } catch (e) { /* ignore */ }
+  try { sessionStorage.removeItem('plezar_admin_tab'); } catch (e) { /* ignore */ }
   adminState.token = null;
   adminState.currentUser = null;
   document.getElementById('adminLoginForm')?.reset();
-  switchTab('dashboard');
+  try { history.replaceState(null, '', 'admin.html#dashboard'); } catch (_) {}
+  switchTab('dashboard', false);
   showForgotForm(false);
   showAdminToast('Signed out.', 'info');
   showLogin();
@@ -244,10 +249,10 @@ const TAB_ALIASES = {
 };
 const NAV_FOR = { userDetail: 'users', vendorDetail: 'vendors', applicationDetail: 'vendors', destinationDetail: 'destinations' };
 
-function switchTab(tabId) {
+function switchTab(tabId, updateUrl = true) {
   if (TAB_ALIASES[tabId]) {
     const [real, sub] = TAB_ALIASES[tabId];
-    switchTab(real);
+    switchTab(real, updateUrl);
     if (sub && typeof switchVendorSub === 'function') switchVendorSub(sub);
     return;
   }
@@ -261,7 +266,79 @@ function switchTab(tabId) {
 
   if (targetPane) targetPane.classList.add('active');
   if (targetBtn) targetBtn.classList.add('active');
+
+  // Preserve route across page refreshes
+  if (updateUrl && !['userDetail', 'vendorDetail', 'destinationDetail', 'applicationDetail'].includes(tabId)) {
+    try {
+      history.replaceState(null, '', `#${tabId}`);
+      sessionStorage.setItem('plezar_admin_tab', `#${tabId}`);
+    } catch (_) {}
+  }
 }
+
+// Restore active screen after page refresh or browser back/forward navigation
+function navigateAdminToRoute() {
+  if (!adminState.currentUser) return;
+
+  const rawHash = (window.location.hash || '').replace(/^#\/?/, '').trim();
+  const rawStorage = (sessionStorage.getItem('plezar_admin_tab') || '').replace(/^#\/?/, '').trim();
+  const route = rawHash || rawStorage || 'dashboard';
+
+  const parts = route.split('/').filter(Boolean);
+  const mainTab = parts[0] || 'dashboard';
+
+  // Detail views with IDs:
+  // e.g. #users/:id or #users/:id/:tab
+  if (mainTab === 'users' && parts[1]) {
+    const userId = parts[1];
+    const subTab = parts[2] || 'overview';
+    if (typeof openUser === 'function') {
+      openUser(userId, subTab);
+      return;
+    }
+  }
+
+  // e.g. #vendors/:subOrId
+  if (mainTab === 'vendors' && parts[1]) {
+    const subOrId = parts[1];
+    const validSubs = ['all', 'verification', 'applications', 'messages'];
+    if (validSubs.includes(subOrId)) {
+      switchTab('vendors', false);
+      if (typeof switchVendorSub === 'function') switchVendorSub(subOrId);
+      return;
+    } else if (typeof openVendor === 'function') {
+      const subTab = parts[2] || 'overview';
+      openVendor(subOrId, subTab);
+      return;
+    }
+  }
+
+  // e.g. #applications/:id
+  if ((mainTab === 'applications' || mainTab === 'applicationDetail') && parts[1]) {
+    if (typeof openApplication === 'function') {
+      openApplication(parts[1]);
+      return;
+    }
+  }
+
+  // e.g. #destinations/:id
+  if ((mainTab === 'destinations' || mainTab === 'destinationDetail') && parts[1]) {
+    if (typeof openDestination === 'function') {
+      openDestination(parts[1]);
+      return;
+    }
+  }
+
+  // Main tabs
+  const target = TAB_TITLES[mainTab] ? mainTab : (TAB_ALIASES[mainTab] ? mainTab : 'dashboard');
+  switchTab(target, true);
+}
+
+window.addEventListener('hashchange', () => {
+  if (adminState.currentUser) {
+    navigateAdminToRoute();
+  }
+});
 
 // Refresh the sidebar badge counts (the numbers themselves live on the Dashboard)
 async function updateStats() {

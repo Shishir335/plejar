@@ -193,13 +193,15 @@ async function loadUsers(page = 1) {
           <span class="user-cell-name">${E(u.name) || 'Unnamed'}</span>
           <span class="user-cell-email">${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}</span></div></div></td>
         <td>
-          ${roleBadges(u)}
-          ${isMoneyAdmin() ? `<button type="button" class="btn btn-secondary btn-xs" style="padding: 1px 6px; font-size: 0.7rem; border-radius: 4px; margin-left: 4px; vertical-align: middle;" title="Change roles" onclick="openEditRoleModal('${E(u.id)}', '${E(u.name).replace(/'/g, "\\'")}', ${JSON.stringify(rolesOf(u)).replace(/"/g, '&quot;')})">✎</button>` : ''}
+          <div style="display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+            ${roleBadges(u)}
+            ${isMoneyAdmin() ? `<button type="button" class="btn btn-secondary btn-xs" style="padding: 1px 6px; font-size: 0.7rem; border-radius: 4px; margin-left: 2px; vertical-align: middle;" title="Change roles" onclick="openEditRoleModal('${E(u.id)}', '${E(u.name).replace(/'/g, "\\'")}', ${JSON.stringify(rolesOf(u)).replace(/"/g, '&quot;')})">✎</button>` : ''}
+          </div>
         </td>
-        <td class="standing">${standingBadges(u)}</td>
-        <td style="color: var(--text-muted); font-size: 0.85rem;">${u.lastLoginAt ? E(fmtDate(u.lastLoginAt)) : 'Never'}</td>
-        <td style="color: var(--text-muted); font-size: 0.85rem;">${E(fmtDate(u.joinedAt))}</td>
-        <td style="text-align: right;"><button class="btn btn-secondary btn-sm" onclick="openUser('${E(u.id)}')">Open</button></td>
+        <td class="standing"><div class="standing-wrap">${standingBadges(u)}</div></td>
+        <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">${u.lastLoginAt ? E(fmtDate(u.lastLoginAt)) : 'Never'}</td>
+        <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">${E(fmtDate(u.joinedAt))}</td>
+        <td style="text-align: right; white-space: nowrap;"><button class="btn btn-secondary btn-sm" onclick="openUser('${E(u.id)}')">Open</button></td>
       </tr>`).join('');
   } catch (e) {
     tableMessage('usersTableBody', 6, 'Failed to load users.', true);
@@ -428,7 +430,12 @@ async function loadActivity(page = 1) {
 // ---------- User profile ----------
 
 async function openUser(id, tab = 'overview') {
-  switchTab('userDetail');
+  try {
+    const route = `#users/${id}${tab && tab !== 'overview' ? `/${tab}` : ''}`;
+    history.replaceState(null, '', route);
+    sessionStorage.setItem('plezar_admin_tab', route);
+  } catch (_) {}
+  switchTab('userDetail', false);
   const box = document.getElementById('userDetail');
   box.innerHTML = '<p style="color: var(--text-dim); padding: 24px;">Loading profile...</p>';
   try {
@@ -515,6 +522,13 @@ function renderUserDetail(tab = 'overview') {
 
 async function renderUserTab(tab) {
   U.tab = tab;
+  if (U.detail && U.detail.user) {
+    try {
+      const route = `#users/${U.detail.user.id}${tab && tab !== 'overview' ? `/${tab}` : ''}`;
+      history.replaceState(null, '', route);
+      sessionStorage.setItem('plezar_admin_tab', route);
+    } catch (_) {}
+  }
   document.querySelectorAll('#userDetail [data-utab]').forEach(b => {
     const on = b.dataset.utab === tab;
     b.classList.toggle('active', on);

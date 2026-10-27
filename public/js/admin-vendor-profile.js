@@ -10,7 +10,12 @@ const VENDOR_TABS = [
 ];
 
 async function openVendor(id, tab = 'overview') {
-  switchTab('vendorDetail');
+  try {
+    const route = `#vendors/${id}${tab && tab !== 'overview' ? `/${tab}` : ''}`;
+    history.replaceState(null, '', route);
+    sessionStorage.setItem('plezar_admin_tab', route);
+  } catch (_) {}
+  switchTab('vendorDetail', false);
   const box = document.getElementById('vendorDetail');
   box.innerHTML = '<p style="color: var(--text-dim); padding: 24px;">Loading vendor...</p>';
   try {

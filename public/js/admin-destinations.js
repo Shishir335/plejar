@@ -414,7 +414,12 @@ const DEST_TABS = [['details', 'Details'], ['location', 'Location'], ['photos', 
 
 async function openDestination(id, tab = 'details') {
   D.creating = false;
-  switchTab('destinationDetail');
+  try {
+    const route = `#destinations/${id}`;
+    history.replaceState(null, '', route);
+    sessionStorage.setItem('plezar_admin_tab', route);
+  } catch (_) {}
+  switchTab('destinationDetail', false);
   const box = document.getElementById('destinationDetail');
   box.innerHTML = '<p style="color: var(--text-dim); padding: 24px;">Loading destination...</p>';
   const [{ ok, data }] = await Promise.all([adminFetch(`/api/v1/admin/destinations/${id}`), ensureDestinationOptions(), ensureDestinationCategories()]);

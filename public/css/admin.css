@@ -398,6 +398,7 @@ body {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .badge-admin { background: var(--badge-admin-bg); color: var(--badge-admin-fg); border: 1px solid var(--badge-admin-line); }
@@ -779,7 +780,8 @@ textarea.form-input { resize: vertical; font-family: inherit; }
 .pager > div { display: flex; align-items: center; gap: 10px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .row-muted td { opacity: 0.6; }
-.standing { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--admin-border); }
+.standing { vertical-align: middle; }
+.standing-wrap { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .stars { color: #f59e0b; letter-spacing: 1px; white-space: nowrap; }
 .admin-table td a { color: var(--accent-primary); text-decoration: none; font-weight: 600; }
 .admin-table td a:hover { text-decoration: underline; }
@@ -861,7 +863,13 @@ select.form-select[hidden], [hidden] { display: none !important; }
 #vendorsTableBody td:first-child { min-width: 230px; }
 #vendorsTableBody .user-cell-email { white-space: normal; }
 #vendorsTableBody .lead-sub { white-space: normal; }
-.standing { gap: 4px; }
+
+/* Users table column layout */
+#usersTableBody td { padding-top: 13px; padding-bottom: 13px; }
+#usersTableBody td:first-child { min-width: 220px; }
+#usersTableBody td:nth-child(2) { min-width: 170px; }
+#usersTableBody td:nth-child(3) { min-width: 120px; }
+#usersTableBody td:nth-child(4), #usersTableBody td:nth-child(5) { white-space: nowrap; }
 
 #bookingsTableBody td:first-child, #vendorTabBody .lead-table td:first-child { min-width: 210px; }
 #bookingsTableBody td, #vendorTabBody .lead-table td { padding-top: 12px; padding-bottom: 12px; }

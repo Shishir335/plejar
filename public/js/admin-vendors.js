@@ -68,6 +68,11 @@ function switchVendorSub(name) {
   });
   document.querySelectorAll('#tab-vendors .subpane').forEach(p => p.classList.toggle('active', p.id === `vsub-${name}`));
   if (VENDOR_SUB_LOADERS[name]) VENDOR_SUB_LOADERS[name]();
+  try {
+    const route = `#vendors/${name}`;
+    history.replaceState(null, '', route);
+    sessionStorage.setItem('plezar_admin_tab', route);
+  } catch (_) {}
 }
 
 document.querySelectorAll('#tab-vendors .subtab').forEach(btn => {
@@ -171,7 +176,7 @@ async function loadVendors(page = 1) {
         <td style="white-space: nowrap;">${takaFmt(v.revenue)}</td>
         <td>${v.rating.average ? `<span class="stars">★</span> ${v.rating.average}<span class="lead-sub">${v.rating.count} review${v.rating.count === 1 ? '' : 's'}</span>` : '<span class="lead-sub" style="margin:0">No reviews</span>'}</td>
         <td style="white-space: nowrap;">${pct(v.commission.rate)}${v.commission.custom ? '<span class="lead-sub">custom</span>' : '<span class="lead-sub">default</span>'}</td>
-        <td class="standing">${vendorBadges(v)}</td>
+        <td class="standing"><div class="standing-wrap">${vendorBadges(v)}</div></td>
         <td style="text-align: right;"><button class="btn btn-secondary btn-sm" onclick="openVendor('${E(v.id)}')">Open</button></td>
       </tr>`).join('');
   } catch (e) {
