@@ -1,4 +1,5 @@
 const User = require('../models/userModel');
+const Agency = require('../models/agencyModel');
 const Notification = require('../models/notificationModel');
 const Broadcast = require('../models/broadcastModel');
 const catchAsync = require('../utils/catchAsync');
@@ -140,18 +141,7 @@ exports.sendBroadcast = catchAsync(async (req, res, next) => {
     return next(new AppError(`No active recipients found for audience "${audience}".`, 400));
   }
 
-  // Respect user notification preferences
-  const optedOut = new Set(
-    (await User.find({
-      _id: { $in: recipientIds },
-      'settings.notifications.tours': false
-    }).select('_id').lean()).map(u => String(u._id))
-  );
-  const eligibleRecipients = recipientIds.filter(id => !optedOut.has(String(id)));
-
-  if (!eligibleRecipients.length) {
-    return next(new AppError('All target recipients have opted out of notifications in their settings.', 400));
-  }
+  const eligibleRecipients = recipientIds;
 
   // Create Broadcast log record
   const broadcast = await Broadcast.create({

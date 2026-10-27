@@ -27,7 +27,8 @@ async function fetchAdminNotificationStats() {
     const { ok, data } = await adminFetch('/api/v1/admin/notifications/stats');
     if (!ok || !data) return;
 
-    adminNotifState.stats = data;
+    const stats = (data && data.data) ? data.data : data;
+    adminNotifState.stats = stats;
 
     const nf = new Intl.NumberFormat('en-US');
     const elTravelers = document.getElementById('notifTravelersCount');
@@ -36,19 +37,19 @@ async function fetchAdminNotificationStats() {
     const elVendorsWithFcm = document.getElementById('notifVendorsWithFcm');
     const elTotalTokens = document.getElementById('notifTotalTokens');
 
-    if (elTravelers) elTravelers.textContent = nf.format(data.travelersCount || 0);
-    if (elTravelersWithFcm) elTravelersWithFcm.textContent = `${nf.format(data.travelersWithFcm || 0)} with active device tokens`;
-    if (elVendors) elVendors.textContent = nf.format(data.vendorsCount || 0);
-    if (elVendorsWithFcm) elVendorsWithFcm.textContent = `${nf.format(data.vendorsWithFcm || 0)} with active device tokens`;
-    if (elTotalTokens) elTotalTokens.textContent = nf.format(data.totalTokens || 0);
+    if (elTravelers) elTravelers.textContent = nf.format(stats.travelersCount || 0);
+    if (elTravelersWithFcm) elTravelersWithFcm.textContent = `${nf.format(stats.travelersWithFcm || 0)} with active device tokens`;
+    if (elVendors) elVendors.textContent = nf.format(stats.vendorsCount || 0);
+    if (elVendorsWithFcm) elVendorsWithFcm.textContent = `${nf.format(stats.vendorsWithFcm || 0)} with active device tokens`;
+    if (elTotalTokens) elTotalTokens.textContent = nf.format(stats.totalTokens || 0);
 
     const rUsers = document.getElementById('radioCountUsers');
     const rVendors = document.getElementById('radioCountVendors');
     const rAll = document.getElementById('radioCountAll');
 
-    if (rUsers) rUsers.textContent = `(${nf.format(data.travelersCount || 0)} accounts)`;
-    if (rVendors) rVendors.textContent = `(${nf.format(data.vendorsCount || 0)} accounts)`;
-    if (rAll) rAll.textContent = `(${nf.format(data.totalUsers || 0)} total)`;
+    if (rUsers) rUsers.textContent = `(${nf.format(stats.travelersCount || 0)} accounts)`;
+    if (rVendors) rVendors.textContent = `(${nf.format(stats.vendorsCount || 0)} accounts)`;
+    if (rAll) rAll.textContent = `(${nf.format(stats.totalUsers || 0)} total)`;
   } catch (err) {
     console.warn('[Admin Notifications] Failed to fetch stats:', err);
   }
@@ -191,11 +192,12 @@ async function handleSendAdminBroadcast(event) {
     });
 
     if (!ok) {
-      throw new Error(error || 'Failed to send broadcast notification.');
+      throw new Error(error || (data && data.message) || 'Failed to send broadcast notification.');
     }
 
-    const pushSent = data?.pushStats?.sent ?? 0;
-    const recipients = data?.recipientsCount ?? 0;
+    const resData = (data && data.data) ? data.data : data;
+    const pushSent = resData?.pushStats?.sent ?? 0;
+    const recipients = resData?.recipientsCount ?? resData?.broadcast?.recipientCount ?? 0;
     const successMsg = `Successfully sent "${title}" to ${recipients} recipient${recipients === 1 ? '' : 's'}. (${pushSent} mobile push notifications delivered).`;
 
     setAdminNotifFeedback(successMsg, 'success');
@@ -269,9 +271,11 @@ async function fetchAdminBroadcastHistory(page = 1, scope = 'all') {
       return;
     }
 
-    const broadcasts = data.broadcasts || [];
+    const pagedData = (data && data.data) ? data.data : data;
+    const broadcasts = pagedData.broadcasts || [];
     if (!broadcasts.length) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">No broadcast notifications sent yet.</td></tr>';
+      renderBroadcastPagination(pagedData);
       return;
     }
 
