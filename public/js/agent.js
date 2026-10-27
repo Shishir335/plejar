@@ -1420,6 +1420,8 @@ async function loadNotificationsView() {
     if (state.notifyEvent && events.some(e => e._id === state.notifyEvent)) $('bcEvent').value = state.notifyEvent;
     else if (first) $('bcEvent').value = first._id;
     state.notifyEvent = null;
+    $('audienceFollowers').textContent = `(${plural(audience.followers || 0, 'follower', 'followers')})`;
+    $('audienceAllUsers').textContent = `(${plural(audience.allUsers || 0, 'traveler', 'travelers')})`;
     $('audienceTravelers').textContent = `(${plural(audience.travelers, 'person', 'people')})`;
     $('broadcastLimit').textContent = audience.left
       ? `You can send ${plural(audience.left, 'more notification')} today (up to ${audience.limit} in 24 hours).`
@@ -1427,12 +1429,19 @@ async function loadNotificationsView() {
     $('broadcastSubmit').disabled = !audience.left;
     syncAudience();
 
-    $('broadcastList').innerHTML = sent.broadcasts.length ? sent.broadcasts.map(b => `
+    $('broadcastList').innerHTML = sent.broadcasts.length ? sent.broadcasts.map(b => {
+      let audDesc = 'everyone who booked with you';
+      if (b.audience === 'followers') audDesc = 'your followers';
+      else if (b.audience === 'all_users') audDesc = 'all app travelers';
+      else if (b.audience === 'event') audDesc = `registered for ${escapeHTML(b.eventTitle)}`;
+
+      return `
       <li>
         <div class="sent-top"><strong>${escapeHTML(b.title)}</strong><span class="muted">${escapeHTML(fmtDateTime(b.createdAt))}</span></div>
         ${b.body ? `<p>${escapeHTML(b.body)}</p>` : ''}
-        <span class="cell-sub">To ${escapeHTML(plural(b.recipientCount, 'person', 'people'))}: ${b.audience === 'event' ? `registered for ${escapeHTML(b.eventTitle)}` : 'everyone who registered with you'}${b.announcement ? ', with an announcement' : ''}. Sent by ${escapeHTML(b.sentByName)}.</span>
-      </li>`).join('') : '<li class="muted">Nothing sent yet.</li>';
+        <span class="cell-sub">To ${escapeHTML(plural(b.recipientCount, 'person', 'people'))} (${audDesc})${b.announcement ? ', with an announcement' : ''}. Sent by ${escapeHTML(b.sentByName || 'Agency')}.</span>
+      </li>`;
+    }).join('') : '<li class="muted">Nothing sent yet.</li>';
   } catch (err) {
     $('broadcastList').innerHTML = `<li class="alert alert-error">${escapeHTML(err.message)}</li>`;
   }
@@ -1448,10 +1457,26 @@ $('broadcastForm').addEventListener('submit', async e => {
   if (audience === 'event' && !eventId) return showAlert('broadcastError', 'Choose the tour event.');
   if (!title) return showAlert('broadcastError', 'Write a short title.');
 
-  const a = state.audience;
-  const count = audience === 'event' ? (a.events.find(x => x._id === eventId) || {}).registered : a.travelers;
-  if (!count) return showAlert('broadcastError', audience === 'event' ? 'Nobody is registered for this event yet.' : 'Nobody has registered with you yet.');
-  if (!window.confirm(`Send "${title}" to ${plural(count, 'person', 'people')}? This can't be undone.`)) return;
+  const a = state.audience || {};
+  let count = 0;
+  if (audience === 'event') count = (a.events && a.events.find(x => x._id === eventId) || {}).registered || 0;
+  else if (audience === 'followers') count = a.followers || 0;
+  else if (audience === 'all_users') count = a.allUsers || 0;
+  else count = a.travelers || 0;
+
+  if (!count) {
+    let emptyMsg = 'Nobody is in this audience yet.';
+    if (audience === 'followers') emptyMsg = 'You do not have any followers yet.';
+    else if (audience === 'all_users') emptyMsg = 'No active app users found.';
+    else if (audience === 'event') emptyMsg = 'Nobody is registered for this event yet.';
+    else emptyMsg = 'Nobody has booked with you yet.';
+    return showAlert('broadcastError', emptyMsg);
+  }
+
+  let audName = 'people';
+  if (audience === 'followers') audName = 'followers';
+  else if (audience === 'all_users') audName = 'app travelers';
+  if (!window.confirm(`Send "${title}" to ${plural(count, audName === 'followers' ? 'follower' : 'person', audName)}? This can't be undone.`)) return;
 
   const btn = $('broadcastSubmit');
   setBusy(btn, true, 'Sending...');

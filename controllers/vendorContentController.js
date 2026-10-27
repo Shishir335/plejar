@@ -126,7 +126,9 @@ exports.deleteAnnouncement = catchAsync(async (req, res, next) => {
 
 // Who can be reached, so the vendor sees the numbers before sending
 exports.getAudience = catchAsync(async (req, res) => {
-  const [travelers, events, left] = await Promise.all([
+  const [followers, allUsers, travelers, events, left] = await Promise.all([
+    audienceUsers(req.agency._id, 'followers'),
+    audienceUsers(req.agency._id, 'all_users'),
     audienceUsers(req.agency._id, 'travelers'),
     Package.find({ agency: req.agency._id, startDate: { $exists: true } }).sort({ startDate: -1 }).select('title startDate status').lean(),
     broadcastsLeft(req.agency._id)
@@ -135,6 +137,8 @@ exports.getAudience = catchAsync(async (req, res) => {
   res.status(200).json({
     status: 'success',
     data: {
+      followers: followers.length,
+      allUsers: allUsers.length,
       travelers: travelers.length,
       events: events.map((e, i) => ({ ...e, registered: counts[i].length })),
       limit: BROADCASTS_PER_DAY,
@@ -152,7 +156,9 @@ exports.sendBroadcast = catchAsync(async (req, res, next) => {
   const title = String(req.body.title || '').trim();
   const body = String(req.body.body || '').trim();
   const { audience } = req.body;
-  if (!['travelers', 'event'].includes(audience)) return next(new AppError('Choose who gets the notification.', 400));
+  if (!['followers', 'all_users', 'travelers', 'event'].includes(audience)) {
+    return next(new AppError('Choose who gets the notification (followers, all users, event, or travelers).', 400));
+  }
   if (!title) return next(new AppError('Write a short title.', 400));
   if (title.length > 120) return next(new AppError('Keep the title under 120 characters.', 400));
   if (body.length > 1000) return next(new AppError('Keep the message under 1000 characters.', 400));
@@ -160,15 +166,21 @@ exports.sendBroadcast = catchAsync(async (req, res, next) => {
 
   const event = audience === 'event' ? await findOwnEvent(req, req.body.eventId) : null;
   const broadcast = await sendBroadcast({ agency: req.agency, sender: req.user, audience, event, title, body });
+
+  let audLabel = 'all travelers';
+  if (audience === 'followers') audLabel = 'agency followers';
+  else if (audience === 'all_users') audLabel = 'all app users';
+  else if (event) audLabel = `registered for ${event.title}`;
+
   await logActivity(req, {
     action: 'broadcast.sent',
-    summary: `Sent "${title}" to ${broadcast.recipientCount} traveler${broadcast.recipientCount === 1 ? '' : 's'} (${event ? `registered for ${event.title}` : 'all travelers'})`,
+    summary: `Sent "${title}" to ${broadcast.recipientCount} recipient${broadcast.recipientCount === 1 ? '' : 's'} (${audLabel})`,
     agency: req.agency._id
   });
 
   res.status(201).json({
     status: 'success',
-    message: `Sent to ${broadcast.recipientCount} traveler${broadcast.recipientCount === 1 ? '' : 's'}.`,
+    message: `Sent to ${broadcast.recipientCount} recipient${broadcast.recipientCount === 1 ? '' : 's'}.`,
     data: { broadcast, left: await broadcastsLeft(req.agency._id) }
   });
 });

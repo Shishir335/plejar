@@ -8,29 +8,60 @@ const BROADCASTS_PER_DAY = 10;
 
 /**
  * The travelers a vendor can reach:
+ *  - 'followers': everyone following this tour agency
+ *  - 'all_users': all active travelers registered on the Plejar app
  *  - 'event': everyone registered for that event (cancelled registrations left out)
- *  - 'travelers': everyone who has ever registered with the vendor (including trips that were later cancelled)
+ *  - 'travelers': everyone who has ever booked with the vendor
  */
-const audienceUsers = (agencyId, audience, eventId) => {
-  const match = audience === 'event'
-    ? { agency: agencyId, package: eventId, status: { $in: ['pending', 'confirmed', 'completed'] } }
-    : { agency: agencyId };
-  return Booking.distinct('user', match);
+const audienceUsers = async (agencyId, audience, eventId) => {
+  const User = require('../models/userModel'); // eslint-disable-line global-require
+  const Follow = require('../models/followModel'); // eslint-disable-line global-require
+
+  if (audience === 'followers') {
+    return Follow.distinct('follower', { targetType: 'agency', target: agencyId });
+  }
+
+  if (audience === 'all_users' || audience === 'all') {
+    return User.distinct('_id', {
+      roles: 'user',
+      status: 'active',
+      isDeleted: { $ne: true }
+    });
+  }
+
+  if (audience === 'event') {
+    return Booking.distinct('user', {
+      agency: agencyId,
+      package: eventId,
+      status: { $in: ['pending', 'confirmed', 'completed'] }
+    });
+  }
+
+  return Booking.distinct('user', { agency: agencyId });
 };
 
-// Create one notification per traveler (skipping anyone who switched off tour updates in Settings)
+// Create notifications per traveler (skipping anyone who switched off tour updates in Settings)
 const notifyUsers = async (userIds, fields) => {
-  if (!userIds.length) return 0;
+  if (!userIds || !userIds.length) return { recipientsCount: 0, pushStats: { sent: 0, failed: 0, total: 0 } };
   const User = require('../models/userModel'); // eslint-disable-line global-require
-  const optedOut = new Set((await User.find({ _id: { $in: userIds }, 'settings.notifications.tours': false }).select('_id').lean()).map(u => String(u._id)));
+  const optedOut = new Set(
+    (await User.find({ _id: { $in: userIds }, 'settings.notifications.tours': false }).select('_id').lean()).map(u => String(u._id))
+  );
   const recipients = userIds.filter(id => !optedOut.has(String(id)));
-  if (!recipients.length) return 0;
-  await Notification.insertMany(recipients.map(user => ({ ...fields, user })), { ordered: false });
+  if (!recipients.length) return { recipientsCount: 0, pushStats: { sent: 0, failed: 0, total: 0 } };
+
+  // Batch insert notifications in chunks of 1000
+  const CHUNK_SIZE = 1000;
+  for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
+    const chunk = recipients.slice(i, i + CHUNK_SIZE);
+    await Notification.insertMany(chunk.map(user => ({ ...fields, user })), { ordered: false }).catch(() => {});
+  }
 
   // Send Firebase Push Notifications to the recipients
+  let pushStats = { sent: 0, failed: 0, total: 0 };
   try {
     const { sendPushNotification } = require('./pushNotification'); // eslint-disable-line global-require
-    sendPushNotification({
+    const res = await sendPushNotification({
       userIds: recipients,
       title: fields.title,
       body: fields.body,
@@ -40,10 +71,11 @@ const notifyUsers = async (userIds, fields) => {
         announcementId: fields.announcement ? String(fields.announcement) : '',
         route: fields.event ? '/event-details' : '/notifications'
       }
-    }).catch(() => {});
+    });
+    if (res) pushStats = res;
   } catch (_) {}
 
-  return recipients.length;
+  return { recipientsCount: recipients.length, pushStats };
 };
 
 const broadcastsLeft = async agencyId => {
@@ -62,11 +94,17 @@ const sendBroadcast = async ({ agency, sender, audience, event, title, body, ann
   }
   const users = await audienceUsers(agency._id, audience, event && event._id);
   if (!users.length) {
-    throw new AppError(audience === 'event' ? 'Nobody is registered for this event yet, so there is no one to notify.' : 'No travelers have booked with you yet, so there is no one to notify.', 400);
+    let emptyMsg = 'Nobody is in this audience yet.';
+    if (audience === 'followers') emptyMsg = 'You do not have any followers yet. When travelers follow your agency, you can send them notifications.';
+    else if (audience === 'all_users') emptyMsg = 'No active app travelers found to notify.';
+    else if (audience === 'event') emptyMsg = 'Nobody is registered for this event yet, so there is no one to notify.';
+    else if (audience === 'travelers') emptyMsg = 'No travelers have booked with you yet, so there is no one to notify.';
+    throw new AppError(emptyMsg, 400);
   }
 
   const broadcast = await Broadcast.create({
     agency: agency._id,
+    scope: 'agency',
     audience,
     event: event ? event._id : undefined,
     eventTitle: event ? event.title : '',
@@ -77,7 +115,8 @@ const sendBroadcast = async ({ agency, sender, audience, event, title, body, ann
     sentBy: sender._id,
     sentByName: sender.name
   });
-  await notifyUsers(users, {
+
+  const { pushStats } = await notifyUsers(users, {
     agency: agency._id,
     kind,
     title,
@@ -86,7 +125,14 @@ const sendBroadcast = async ({ agency, sender, audience, event, title, body, ann
     announcement: announcement ? announcement._id : undefined,
     broadcast: broadcast._id
   });
+
+  if (pushStats && (pushStats.sent || pushStats.failed)) {
+    broadcast.pushStats = pushStats;
+    await broadcast.save();
+  }
+
   return broadcast;
 };
 
 module.exports = { BROADCASTS_PER_DAY, audienceUsers, notifyUsers, broadcastsLeft, sendBroadcast };
+

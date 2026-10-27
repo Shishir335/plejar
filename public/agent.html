@@ -295,12 +295,14 @@
           <p class="muted" id="broadcastLimit"></p>
           <fieldset class="audience">
             <legend class="label">Send to</legend>
-            <label class="radio"><input type="radio" name="audience" value="event" checked> <span>People registered for a tour event</span></label>
-            <div class="field audience-event" id="audienceEventField">
+            <label class="radio"><input type="radio" name="audience" value="followers" checked> <span>My followers (users following your agency) <span class="muted" id="audienceFollowers"></span></span></label>
+            <label class="radio"><input type="radio" name="audience" value="all_users"> <span>All users of the app <span class="muted" id="audienceAllUsers"></span></span></label>
+            <label class="radio"><input type="radio" name="audience" value="event"> <span>People registered for a tour event</span></label>
+            <div class="field audience-event" id="audienceEventField" hidden>
               <label class="sr-only" for="bcEvent">Tour event</label>
               <select id="bcEvent"></select>
             </div>
-            <label class="radio"><input type="radio" name="audience" value="travelers"> <span>Everyone who has registered with you <span class="muted" id="audienceTravelers"></span></span></label>
+            <label class="radio"><input type="radio" name="audience" value="travelers"> <span>Everyone who has booked with you <span class="muted" id="audienceTravelers"></span></span></label>
           </fieldset>
           <div class="field">
             <label for="bcTitle">Title *</label>

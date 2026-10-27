@@ -25,7 +25,16 @@ function initFirebaseAdmin() {
     let credential = null;
 
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      const resolvedPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT);
+      let resolvedPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT);
+      if (!fs.existsSync(resolvedPath)) {
+        try {
+          const files = fs.readdirSync(process.cwd());
+          const match = files.find(f => f.includes('firebase-adminsdk') && f.endsWith('.json'));
+          if (match) {
+            resolvedPath = path.resolve(process.cwd(), match);
+          }
+        } catch (_) {}
+      }
       if (fs.existsSync(resolvedPath)) {
         const fileContent = fs.readFileSync(resolvedPath, 'utf8');
         credential = cert(JSON.parse(fileContent));
@@ -41,6 +50,16 @@ function initFirebaseAdmin() {
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
       });
+    } else {
+      // Auto-detect any local service account JSON in cwd
+      try {
+        const files = fs.readdirSync(process.cwd());
+        const match = files.find(f => f.includes('firebase-adminsdk') && f.endsWith('.json'));
+        if (match) {
+          const fileContent = fs.readFileSync(path.resolve(process.cwd(), match), 'utf8');
+          credential = cert(JSON.parse(fileContent));
+        }
+      } catch (_) {}
     }
 
     if (credential) {
@@ -184,20 +203,31 @@ async function sendPushNotification({ userIds, title, body, data = {}, imageUrl 
   };
 
   try {
-    const response = await getMessaging().sendEachForMulticast(message);
+    const BATCH_SIZE = 500;
+    let totalSent = 0;
+    let totalFailed = 0;
     const staleTokens = [];
 
-    response.responses.forEach((resp, index) => {
-      if (!resp.success && resp.error) {
-        const errCode = resp.error.code;
-        if (
-          errCode === 'messaging/invalid-registration-token' ||
-          errCode === 'messaging/registration-token-not-registered'
-        ) {
-          staleTokens.push(uniqueTokens[index]);
+    for (let i = 0; i < uniqueTokens.length; i += BATCH_SIZE) {
+      const batchTokens = uniqueTokens.slice(i, i + BATCH_SIZE);
+      const batchMessage = { ...message, tokens: batchTokens };
+      const response = await getMessaging().sendEachForMulticast(batchMessage);
+
+      totalSent += response.successCount;
+      totalFailed += response.failureCount;
+
+      response.responses.forEach((resp, index) => {
+        if (!resp.success && resp.error) {
+          const errCode = resp.error.code;
+          if (
+            errCode === 'messaging/invalid-registration-token' ||
+            errCode === 'messaging/registration-token-not-registered'
+          ) {
+            staleTokens.push(batchTokens[index]);
+          }
         }
-      }
-    });
+      });
+    }
 
     // Prune stale / unregistered tokens from DB
     if (staleTokens.length > 0) {
@@ -208,8 +238,8 @@ async function sendPushNotification({ userIds, title, body, data = {}, imageUrl 
     }
 
     return {
-      sent: response.successCount,
-      failed: response.failureCount,
+      sent: totalSent,
+      failed: totalFailed,
       total: uniqueTokens.length
     };
   } catch (err) {
@@ -218,9 +248,29 @@ async function sendPushNotification({ userIds, title, body, data = {}, imageUrl 
   }
 }
 
+/**
+ * Returns FCM statistics across all accounts.
+ */
+async function getFcmTokenStats() {
+  const [usersWithTokens, totalTokensResult] = await Promise.all([
+    User.countDocuments({ 'fcmTokens.0': { $exists: true } }),
+    User.aggregate([
+      { $match: { 'fcmTokens.0': { $exists: true } } },
+      { $project: { tokenCount: { $size: '$fcmTokens' } } },
+      { $group: { _id: null, total: { $sum: '$tokenCount' } } }
+    ])
+  ]);
+
+  return {
+    usersWithTokens,
+    totalTokens: (totalTokensResult[0] && totalTokensResult[0].total) || 0
+  };
+}
+
 module.exports = {
   initFirebaseAdmin,
   registerUserToken,
   removeUserToken,
-  sendPushNotification
+  sendPushNotification,
+  getFcmTokenStats
 };

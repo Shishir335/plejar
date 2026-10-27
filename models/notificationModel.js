@@ -9,7 +9,9 @@ const KINDS = [
   // From other travelers
   'post_reaction', 'post_comment', 'comment_reply', 'comment_reaction', 'post_share', 'new_follower',
   // From Plejar
-  'post_hidden'
+  'post_hidden',
+  // From Master Admin & Platform
+  'admin_broadcast', 'system_announcement'
 ];
 const notificationSchema = new mongoose.Schema(
   {

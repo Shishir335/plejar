@@ -122,6 +122,11 @@
           <span class="sidebar-text">App content</span>
         </button>
 
+        <button class="nav-link-btn" data-tab="notifications" onclick="switchTab('notifications'); loadAdminNotifications();">
+          <span>🔔</span>
+          <span class="sidebar-text">Notifications</span>
+        </button>
+
         <button class="nav-link-btn" data-tab="system" onclick="switchTab('system'); loadEndpoints();">
           <span>⚙️</span>
           <span class="sidebar-text">System Status</span>
@@ -921,6 +926,158 @@
           </div>
         </section>
 
+        <!-- NOTIFICATIONS TAB -->
+        <section id="tab-notifications" class="tab-pane">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 style="font-size: 1.4rem; font-weight: 700; margin: 0 0 6px 0;">Push Notifications & Broadcasts</h2>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Broadcast real-time push notifications via Firebase to mobile devices and in-app alerts to travelers and vendors.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="loadAdminNotifications(true)">
+              🔄 Refresh statistics
+            </button>
+          </div>
+
+          <!-- Statistics Cards -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px;">
+            <div class="stat-card">
+              <span class="stat-label">👥 App Travelers</span>
+              <div class="stat-value" id="notifTravelersCount">-</div>
+              <span class="stat-sub" id="notifTravelersWithFcm">Loading device tokens...</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">🏝️ Tour Vendors</span>
+              <div class="stat-value" id="notifVendorsCount">-</div>
+              <span class="stat-sub" id="notifVendorsWithFcm">Loading device tokens...</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">📱 Active Device Tokens</span>
+              <div class="stat-value" id="notifTotalTokens">-</div>
+              <span class="stat-sub">Registered with Firebase FCM</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">⚡ Firebase Status</span>
+              <div class="stat-value" style="font-size: 1.25rem; color: #22c55e;" id="notifFirebaseStatus">Connected</div>
+              <span class="stat-sub">Project: plezar-57856</span>
+            </div>
+          </div>
+
+          <!-- Notification Composer -->
+          <div class="detail-card" style="margin-bottom: 28px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--admin-border); padding-bottom: 14px; margin-bottom: 20px;">
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 4px 0;">Compose Broadcast Notification</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">This will trigger both a mobile phone push notification banner and an in-app inbox notification.</p>
+              </div>
+            </div>
+
+            <form id="adminBroadcastForm" onsubmit="handleSendAdminBroadcast(event)" novalidate>
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label" style="font-weight: 600;">Target Audience *</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-bg-alt, rgba(255,255,255,0.03));">
+                    <input type="radio" name="adminAudience" value="users" checked onchange="toggleAdminAudienceFields()">
+                    <span><strong>App Travelers (Users)</strong> <small class="text-muted" id="radioCountUsers"></small></span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-bg-alt, rgba(255,255,255,0.03));">
+                    <input type="radio" name="adminAudience" value="vendors" onchange="toggleAdminAudienceFields()">
+                    <span><strong>Vendors & Agencies</strong> <small class="text-muted" id="radioCountVendors"></small></span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-bg-alt, rgba(255,255,255,0.03));">
+                    <input type="radio" name="adminAudience" value="all" onchange="toggleAdminAudienceFields()">
+                    <span><strong>Everyone (All Accounts)</strong> <small class="text-muted" id="radioCountAll"></small></span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px 16px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-bg-alt, rgba(255,255,255,0.03));">
+                    <input type="radio" name="adminAudience" value="test" onchange="toggleAdminAudienceFields()">
+                    <span><strong>Test Single Account</strong></span>
+                  </label>
+                </div>
+              </div>
+
+              <div id="adminTestEmailGroup" class="form-group" style="display: none; margin-bottom: 20px;">
+                <label class="form-label" for="adminTestEmail">Target User Email *</label>
+                <input type="email" id="adminTestEmail" class="form-input" placeholder="e.g. user@example.com">
+                <small style="color: var(--text-muted); font-size: 0.78rem;">Sends the test notification only to this user's registered devices and inbox.</small>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label class="form-label" for="adminNotifTitle" style="margin: 0; font-weight: 600;">Notification Title *</label>
+                  <span id="adminTitleCount" style="font-size: 0.8rem; color: var(--text-muted);">0 / 120</span>
+                </div>
+                <input type="text" id="adminNotifTitle" class="form-input" maxlength="120" required placeholder="e.g. Weekend Special: 20% off all Cox's Bazar tour packages!">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label class="form-label" for="adminNotifBody" style="margin: 0; font-weight: 600;">Notification Message *</label>
+                  <span id="adminBodyCount" style="font-size: 0.8rem; color: var(--text-muted);">0 / 1000</span>
+                </div>
+                <textarea id="adminNotifBody" class="form-input" rows="4" maxlength="1000" required placeholder="Write clear, engaging information for recipients..."></textarea>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 22px;">
+                <div class="form-group">
+                  <label class="form-label" for="adminNotifRoute">In-App Target Route (Optional)</label>
+                  <select id="adminNotifRoute" class="form-select">
+                    <option value="/notifications" selected>Notifications Inbox (/notifications)</option>
+                    <option value="/tours">Tours & Events Explorer (/tours)</option>
+                    <option value="/promotions">Promotions & Vouchers (/promotions)</option>
+                    <option value="/destinations">Destinations Screen (/destinations)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="adminNotifImageUrl">Banner Image URL (Optional)</label>
+                  <input type="url" id="adminNotifImageUrl" class="form-input" placeholder="https://example.com/banner.jpg">
+                </div>
+              </div>
+
+              <div id="adminNotifFeedback" role="alert" style="display: none; padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 0.9rem;"></div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 12px; align-items: center;">
+                <button type="button" class="btn btn-secondary" onclick="resetAdminBroadcastForm()">Reset</button>
+                <button type="submit" class="btn btn-primary" id="adminNotifSubmitBtn">
+                  🚀 Send Push Notification
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Sent History -->
+          <div class="detail-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 4px 0;">Sent Notification History</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">Logs of broadcasts sent by Master Admins and tour vendors.</p>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" id="btnFilterAllBroadcasts" onclick="filterBroadcastHistory('all')">All</button>
+                <button class="btn btn-secondary btn-sm" id="btnFilterAdminBroadcasts" onclick="filterBroadcastHistory('admin')">Admin Only</button>
+                <button class="btn btn-secondary btn-sm" id="btnFilterVendorBroadcasts" onclick="filterBroadcastHistory('agency')">Vendors Only</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Date / Time</th>
+                    <th>Notification Details</th>
+                    <th>Scope & Audience</th>
+                    <th>Sender</th>
+                    <th>Recipients</th>
+                    <th>FCM Push Result</th>
+                  </tr>
+                </thead>
+                <tbody id="adminBroadcastHistoryBody">
+                  <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading broadcast history...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="adminBroadcastHistoryPagination" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;"></div>
+          </div>
+        </section>
+
         <!-- 4. SYSTEM DIAGNOSTICS TAB -->
         <section id="tab-system" class="tab-pane">
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
@@ -1590,5 +1747,6 @@
   <script src="/js/admin-system.js"></script>
   <script src="/js/admin-content.js"></script>
   <script src="/js/admin-rewards.js"></script>
+  <script src="/js/admin-notifications.js"></script>
 </body>
 </html>

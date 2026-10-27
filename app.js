@@ -38,6 +38,7 @@ const adminVendorRouter = require('./routes/adminVendorRoutes');
 const adminDestinationRouter = require('./routes/adminDestinationRoutes');
 const adminSystemRouter = require('./routes/adminSystemRoutes');
 const adminSocialRouter = require('./routes/adminSocialRoutes');
+const adminNotificationRouter = require('./routes/adminNotificationRoutes');
 
 const AppError = require('./utils/appError');
 const authController = require('./controllers/authController');
@@ -274,6 +275,7 @@ app.use('/api/v1/admin', adminSystemRouter);
 app.use('/api/v1/admin', adminSocialRouter);
 app.use('/api/v1/admin', adminContentRouter);
 app.use('/api/v1/admin', adminAgencyRouter);
+app.use('/api/v1/admin/notifications', adminNotificationRouter);
 
 // 404 UNHANDLED ROUTE CATCHER
 app.all('*', (req, res, next) => {
