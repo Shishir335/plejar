@@ -1,5 +1,5 @@
 /**
- * Plezar admin - Users section: list and filters, verification queue, complaints,
+ * Plejar admin - Users section: list and filters, verification queue, complaints,
  * reviews, login history, activity, and the full user profile page.
  * Depends on helpers from admin.js (adminFetch, escapeHTML, showAdminToast, switchTab, openModal...).
  */

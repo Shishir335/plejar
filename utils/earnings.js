@@ -9,8 +9,8 @@ const oid = id => (id instanceof mongoose.Types.ObjectId ? id : new mongoose.Typ
 const sums = rows => rows[0] || { amount: 0, commission: 0, count: 0 };
 
 /**
- * What a vendor has earned and what Plezar still owes it.
- * - earned: completed trips that were paid, minus Plezar's commission
+ * What a vendor has earned and what Plejar still owes it.
+ * - earned: completed trips that were paid, minus Plejar's commission
  * - upcoming: confirmed, paid trips that have not happened yet (not yet withdrawable)
  * - available: earned, minus money already paid out and payouts waiting to be paid
  */

@@ -1,5 +1,5 @@
 /**
- * Plezar agency panel
+ * Plejar agency panel
  */
 
 const $ = id => document.getElementById(id);
@@ -105,12 +105,12 @@ function setBusy(button, busy, label) {
 let agentGoogleInitialized = false;
 
 async function initAgentGoogleAuth() {
-  if (agentGoogleInitialized || !window.PlezarGoogleAuth) return;
+  if (agentGoogleInitialized || !window.PlejarGoogleAuth) return;
   const container = document.getElementById('agentGoogleBtn');
   if (!container) return;
   agentGoogleInitialized = true;
 
-  await window.PlezarGoogleAuth.renderButton({
+  await window.PlejarGoogleAuth.renderButton({
     target: 'agentGoogleBtn',
     theme: 'outline',
     text: 'continue_with',
@@ -119,7 +119,7 @@ async function initAgentGoogleAuth() {
     width: 340,
     onSuccess: handleAgentGoogleResponse,
     onError: err => {
-      console.warn('[Plezar Agent] Google auth warning:', err);
+      console.warn('[Plejar Agent] Google auth warning:', err);
     }
   });
 }
@@ -130,12 +130,12 @@ async function handleAgentGoogleResponse(response) {
   showAlert('loginNotice', 'Verifying Google account...');
 
   try {
-    const { ok, data } = await window.PlezarGoogleAuth.loginWithGoogleCredential(response.credential);
+    const { ok, data } = await window.PlejarGoogleAuth.loginWithGoogleCredential(response.credential);
     if (ok && data.token) {
       const roles = Array.isArray(data.data.roles) && data.data.roles.length ? data.data.roles : [data.data.role];
       if (!roles.includes('agent') || !data.data.agency) {
         showAlert('loginNotice', '');
-        showAlert('loginError', 'This Google account (' + (data.data.email || '') + ') is not linked to any registered tour agency. Use the Plezar mobile app or apply for vendor membership.');
+        showAlert('loginError', 'This Google account (' + (data.data.email || '') + ') is not linked to any registered tour agency. Use the Plejar mobile app or apply for vendor membership.');
         await api('/api/v1/users/logout').catch(() => {});
         return;
       }
@@ -196,7 +196,7 @@ $('passwordForm').addEventListener('submit', async e => {
     toast('Password saved. Welcome to your vendor panel.');
     await boot();
   } catch (err) {
-    showAlert('passwordError', err.status === 401 ? 'The temporary password is not right. Check the email from Plezar.' : err.message);
+    showAlert('passwordError', err.status === 401 ? 'The temporary password is not right. Check the email from Plejar.' : err.message);
   } finally {
     setBusy(btn, false);
   }
@@ -220,7 +220,7 @@ $('loginForm').addEventListener('submit', async e => {
     const data = await api('/api/v1/users/login', { method: 'POST', body: { email, password } });
     const roles = Array.isArray(data.data.roles) && data.data.roles.length ? data.data.roles : [data.data.role];
     if (!roles.includes('agent') || !data.data.agency) {
-      showAlert('loginError', 'This sign in is for tour agencies. Plezar staff use the admin console at /admin.');
+      showAlert('loginError', 'This sign in is for tour agencies. Plejar staff use the admin console at /admin.');
       await api('/api/v1/users/logout').catch(() => {});
       return;
     }
@@ -373,7 +373,7 @@ function renderOverview() {
   if (a.verified) {
     callout = '<div class="callout callout-ok"><div><strong>Your agency is verified</strong>Travelers see the verified mark on your profile and tour events.</div></div>';
   } else if (v.status === 'pending') {
-    callout = '<div class="callout callout-warn"><div><strong>Verification in review</strong>Plezar is checking your documents. This usually takes 1 to 2 working days.</div></div>';
+    callout = '<div class="callout callout-warn"><div><strong>Verification in review</strong>Plejar is checking your documents. This usually takes 1 to 2 working days.</div></div>';
   } else if (v.status === 'rejected') {
     callout = `<div class="callout callout-error"><div><strong>Verification needs changes</strong>${escapeHTML(v.note || 'Check your documents and submit again.')}</div>${isOwner() ? '<button class="btn btn-quiet btn-sm" data-action="go" data-view="verification">Update documents</button>' : ''}</div>`;
   } else if (isOwner()) {
@@ -520,7 +520,7 @@ function renderEvents() {
     $('eventList').innerHTML = `
       <div class="empty">
         <strong>No tour events yet</strong>
-        Create your first event with dates, seats and price. Once published, travelers can register in the Plezar app.
+        Create your first event with dates, seats and price. Once published, travelers can register in the Plejar app.
         <div style="margin-top: 14px;"><button class="btn btn-primary" data-action="new-event">Create a tour event</button></div>
       </div>`;
     return;
@@ -546,7 +546,7 @@ function renderEvents() {
         ${seatBar(e)}
         ${closes}
         ${e.status === 'cancelled' ? `<div class="pkg-note">Cancelled: ${escapeHTML(e.cancelReason)}</div>` : ''}
-        ${e.hiddenByAdmin ? '<div class="pkg-note">Hidden by Plezar</div>' : ''}
+        ${e.hiddenByAdmin ? '<div class="pkg-note">Hidden by Plejar</div>' : ''}
         ${e.status !== 'cancelled' && !e.planComplete ? `<div class="pkg-plan-missing">Tour plan missing ${plural(e.planMissing.length, 'thing')}. Edit to finish it before publishing.</div>` : ''}
         <div class="pkg-actions">
           <button class="btn btn-quiet btn-sm" data-action="registrations" data-id="${id}">Registrations${regs ? ` (${regs})` : ''}</button>
@@ -646,7 +646,7 @@ function renderItinerary() {
             <input data-field="place" list="placeOptions" maxlength="120" placeholder="Place *" value="${escapeHTML(st.place)}" aria-label="Place" class="${st.destinationRef ? 'is-linked' : ''}">
             <input data-field="note" maxlength="300" placeholder="What happens here" value="${escapeHTML(st.note)}" aria-label="Note">
             <div class="stop-actions">
-              <button type="button" class="icon-btn add" data-stop-addplace title="Add this place to Plezar's destinations" aria-label="Add this place to Plezar" ${st.place.trim() && !st.destinationRef ? '' : 'hidden'}>+</button>
+              <button type="button" class="icon-btn add" data-stop-addplace title="Add this place to Plejar's destinations" aria-label="Add this place to Plejar" ${st.place.trim() && !st.destinationRef ? '' : 'hidden'}>+</button>
               <button type="button" class="icon-btn" data-stop-move="-1" ${j === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
               <button type="button" class="icon-btn" data-stop-move="1" ${j === d.stops.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
               <button type="button" class="icon-btn danger" data-stop-remove aria-label="Remove stop">×</button>
@@ -675,7 +675,7 @@ $('evItinerary').addEventListener('input', e => {
     const stop = day.stops[Number(row.dataset.stop)];
     stop[field] = e.target.value;
     if (field === 'place') {
-      // Typing a Plezar destination's name links the stop to it
+      // Typing a Plejar destination's name links the stop to it
       const match = (state.places || []).find(p => p.name.toLowerCase() === e.target.value.trim().toLowerCase());
       stop.destinationRef = match ? match._id : '';
       e.target.classList.toggle('is-linked', Boolean(match));
@@ -804,14 +804,14 @@ function updatePlaceHint() {
   hint.classList.remove('hint-warn', 'hint-ok');
   if (place) {
     hint.textContent = place.status === 'draft'
-      ? `Linked to ${place.name}. It's waiting for Plezar's review; travelers see the destination once it's approved.`
-      : `Linked to ${place.name} on Plezar.`;
+      ? `Linked to ${place.name}. It's waiting for Plejar's review; travelers see the destination once it's approved.`
+      : `Linked to ${place.name} on Plejar.`;
     hint.classList.add('hint-ok');
   } else if (typed) {
     hint.textContent = 'Not in the list yet. Choose one of the suggestions, or add it as a new destination.';
     hint.classList.add('hint-warn');
   } else {
-    hint.textContent = "Pick from the list. Can't find it? Add it, and it's saved to Plezar's destinations for everyone.";
+    hint.textContent = "Pick from the list. Can't find it? Add it, and it's saved to Plejar's destinations for everyone.";
   }
 }
 
@@ -1130,7 +1130,7 @@ function openCancelDialog(id) {
   if (!ev) return;
   state.cancelling = ev;
   $('cancelTitle').textContent = `Cancel ${ev.title}?`;
-  $('cancelLead').textContent = `${plural(ev.stats.registrations, 'registration')} will be cancelled and those travelers get a notification with your reason. If anyone has paid, arrange their refund with Plezar support. This can't be undone.`;
+  $('cancelLead').textContent = `${plural(ev.stats.registrations, 'registration')} will be cancelled and those travelers get a notification with your reason. If anyone has paid, arrange their refund with Plejar support. This can't be undone.`;
   $('cancelReason').value = '';
   showAlert('cancelError', '');
   $('cancelDialog').hidden = false;
@@ -1233,7 +1233,7 @@ async function loadRegistrations() {
           <td><span class="badge badge-${escapeHTML(r.status)}">${escapeHTML(REG_TEXT[r.status])}</span>${r.status === 'cancelled' && r.cancelReason ? `<span class="cell-sub">${escapeHTML(r.cancelReason)}</span>` : ''}</td>
           <td class="actions">${actions.join('')}</td>
         </tr>`;
-    }).join('') : `<tr><td colspan="6">${status ? 'No registrations with this status.' : 'Nobody has registered yet. Published events show in the Plezar app, where travelers register.'}</td></tr>`;
+    }).join('') : `<tr><td colspan="6">${status ? 'No registrations with this status.' : 'Nobody has registered yet. Published events show in the Plejar app, where travelers register.'}</td></tr>`;
   } catch (err) {
     $('regBody').innerHTML = `<tr><td colspan="6">${escapeHTML(err.message)}</td></tr>`;
   }
@@ -1577,7 +1577,7 @@ function renderVerification() {
   const v = state.verification;
   const banners = {
     approved: '<div class="callout callout-ok"><div><strong>Verified</strong>Your agency has the verified mark. Upload new documents only if your license changes.</div></div>',
-    pending: `<div class="callout callout-warn"><div><strong>In review</strong>Submitted ${escapeHTML(fmtDate(v.submittedAt))}. Plezar usually reviews documents within 1 to 2 working days.</div></div>`,
+    pending: `<div class="callout callout-warn"><div><strong>In review</strong>Submitted ${escapeHTML(fmtDate(v.submittedAt))}. Plejar usually reviews documents within 1 to 2 working days.</div></div>`,
     rejected: `<div class="callout callout-error"><div><strong>Changes needed</strong>${escapeHTML(v.note || 'Check your documents and submit again.')}</div></div>`,
     none: ''
   };

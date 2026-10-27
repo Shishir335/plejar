@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 /**
  * Vouchers & Rewards: offers travelers buy with loyalty points ("Weekend Getaway, 25% OFF, 1500 points").
- * Plezar creates them in the admin panel. Redeeming one gives the traveler a personal code (UserVoucher).
+ * Plejar creates them in the admin panel. Redeeming one gives the traveler a personal code (UserVoucher).
  */
 const CATEGORIES = ['hotel', 'tour', 'guide', 'flight', 'airport', 'transport', 'restaurant'];
 // Tour, hotel and guide vouchers can be used on a booking in the app; the rest are shown at the partner

@@ -37,7 +37,7 @@ const APP_OPTIONS = {
     social_media: 'Social media',
     search_engine: 'Google or another search engine',
     friend: 'A friend or colleague',
-    plezar_app: 'The Plezar app',
+    plezar_app: 'The Plejar app',
     event: 'A travel fair or event',
     news: 'News or a blog',
     other: 'Other'

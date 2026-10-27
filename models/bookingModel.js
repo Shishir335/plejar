@@ -10,9 +10,9 @@ const bookingSchema = new mongoose.Schema(
   {
     reference: { type: String, unique: true, default: makeReference },
     user: { type: mongoose.Schema.ObjectId, ref: 'User', required: true, index: true },
-    // What was booked: a tour event, a hotel stay (listed by Plezar) or a day with an agency's guide
+    // What was booked: a tour event, a hotel stay (listed by Plejar) or a day with an agency's guide
     kind: { type: String, enum: KINDS, default: 'tour', index: true },
-    // Hotels are listed by Plezar, so a hotel booking has no agency
+    // Hotels are listed by Plejar, so a hotel booking has no agency
     agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', index: true, required: [function () { return this.kind !== 'hotel'; }, 'A booking needs an agency'] },
     package: { type: mongoose.Schema.ObjectId, ref: 'Package', required: [function () { return this.kind === 'tour'; }, 'A tour booking needs a tour'] },
     hotel: { type: mongoose.Schema.ObjectId, ref: 'Hotel', required: [function () { return this.kind === 'hotel'; }, 'A hotel booking needs a hotel'] },
@@ -33,14 +33,14 @@ const bookingSchema = new mongoose.Schema(
     pricePerPerson: { type: Number, required: true, min: 0 },
     regularPrice: { type: Number, min: 0, default: null }, // the struck-through price when booked on sale
     amount: { type: Number, required: true, min: 0 }, // total charged to the traveler, in taka
-    // A voucher from Vouchers & Rewards: Plezar pays the discount out of its commission
+    // A voucher from Vouchers & Rewards: Plejar pays the discount out of its commission
     subtotal: { type: Number, min: 0, default: null }, // price before the voucher
     discountAmount: { type: Number, min: 0, default: 0 },
     voucher: { type: mongoose.Schema.ObjectId, ref: 'UserVoucher' },
     voucherCode: { type: String, default: '' },
 
     commissionRate: { type: Number, required: true, min: 0, max: 100 }, // percent, snapshot at booking time
-    commissionAmount: { type: Number, required: true, min: 0 }, // Plezar's share of `amount`
+    commissionAmount: { type: Number, required: true, min: 0 }, // Plejar's share of `amount`
 
     status: {
       type: String,

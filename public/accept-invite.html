@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Set your password — Plezar</title>
+  <title>Set your password — Plejar</title>
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,7 @@
 <body>
   <main class="auth-page">
     <div class="auth-card">
-      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+      <a href="/" class="logo">plejar<span class="logo-dot"></span></a>
 
       <div id="inviteLoading"><p class="sub">Checking your invite...</p></div>
 
@@ -63,7 +63,7 @@
         const invite = data.data;
         $('inviteTitle').textContent = `Welcome, ${invite.name.split(' ')[0]}`;
         $('inviteSub').textContent = invite.agencyName
-          ? `You've been invited to manage ${invite.agencyName} on Plezar as ${invite.agencyRole === 'owner' ? 'the owner' : 'a team member'}. Set a password for ${invite.email} to continue.`
+          ? `You've been invited to manage ${invite.agencyName} on Plejar as ${invite.agencyRole === 'owner' ? 'the owner' : 'a team member'}. Set a password for ${invite.email} to continue.`
           : `Set a password for ${invite.email} to continue.`;
         $('inviteLoading').hidden = true;
         $('inviteForm').hidden = false;
@@ -98,7 +98,7 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.message || 'Could not set your password. Try again.');
         if (data.token) {
-          try { localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still signs you in */ }
+          try { localStorage.setItem('plejar_token', data.token); localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still signs you in */ }
         }
         window.location.href = '/agent';
       } catch (err) {

@@ -1,5 +1,5 @@
 /**
- * Plezar Google Identity Services (GIS) Web Authentication Helper
+ * Plejar Google Identity Services (GIS) Web Authentication Helper
  * Integrates Google Sign-In with backend /api/v1/users/google-login
  */
 (function (root) {
@@ -20,7 +20,7 @@
           cachedClientId = '';
         }
       } catch (err) {
-        console.warn('[Plezar Google Auth] Failed to fetch client ID from server:', err);
+        console.warn('[Plejar Google Auth] Failed to fetch client ID from server:', err);
         cachedClientId = '';
       } finally {
         fetchingClientId = null;
@@ -120,14 +120,14 @@
         logo_alignment: 'left'
       });
     } catch (err) {
-      console.error('[Plezar Google Auth Error]:', err);
+      console.error('[Plejar Google Auth Error]:', err);
       if (typeof onError === 'function') onError(err);
       container.innerHTML = `<p class="google-auth-err">Could not load Google Sign-In: ${err.message}</p>`;
     }
   }
 
   /**
-   * Post Google credential to the Plezar API
+   * Post Google credential to the Plejar API
    * @param {string} credential - Google JWT ID token
    * @returns {Promise<{ ok: boolean, data: any, status: number }>}
    */
@@ -146,9 +146,10 @@
     }
   }
 
-  root.PlezarGoogleAuth = {
+  root.PlejarGoogleAuth = {
     fetchGoogleClientId,
     renderButton,
     loginWithGoogleCredential
   };
+  root.PlezarGoogleAuth = root.PlejarGoogleAuth;
 })(window);

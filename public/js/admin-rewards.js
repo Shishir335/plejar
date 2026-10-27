@@ -1,5 +1,5 @@
 /**
- * Plezar admin - App content: vouchers travelers buy with points, the point rules,
+ * Plejar admin - App content: vouchers travelers buy with points, the point rules,
  * the Help Center's questions and contact information, and the About / Privacy / Terms pages.
  * Depends on admin.js, admin-users.js (E, fmtDate, tableMessage, formError, val, askReason),
  * admin-vendors.js (adminForm) and admin-content.js (taka, dayInput).

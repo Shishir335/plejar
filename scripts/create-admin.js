@@ -43,7 +43,7 @@ const databaseUri = () => {
 
 (async () => {
   try {
-    console.log(`\nPlezar admin setup — ${useDev ? 'DEVELOPMENT (plezar_dev)' : 'PRODUCTION'} database\n`);
+    console.log(`\nPlejar admin setup — ${useDev ? 'DEVELOPMENT (plezar_dev)' : 'PRODUCTION'} database\n`);
     await mongoose.connect(databaseUri(), { serverSelectionTimeoutMS: 10000 });
 
     const email = (await ask('Admin email: ')).toLowerCase();

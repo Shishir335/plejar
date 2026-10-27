@@ -34,7 +34,7 @@ const postSchema = new mongoose.Schema(
     commentCount: { type: Number, default: 0 },
     shareCount: { type: Number, default: 0 },
 
-    // Moderation: 'hidden' by Plezar after a report, 'removed' by the author or Plezar
+    // Moderation: 'hidden' by Plejar after a report, 'removed' by the author or Plejar
     status: { type: String, enum: ['active', 'hidden', 'removed'], default: 'active' },
     moderationNote: { type: String, trim: true, maxlength: 500, default: '' },
     moderatedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },

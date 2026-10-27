@@ -139,6 +139,6 @@ exports.unblock = catchAsync(async (req, res) => {
 exports.report = catchAsync(async (req, res) => {
   const user = await findTraveler(req.params.id);
   const result = await fileReport({ reporter: req.user, targetType: 'user', target: user._id, targetUser: user._id, reason: req.body.reason, note: req.body.note });
-  res.status(201).json({ status: 'success', message: result.duplicate ? 'You already reported this person. Plezar\'s team will look at it.' : 'Thanks. Plezar\'s team will review it.' });
+  res.status(201).json({ status: 'success', message: result.duplicate ? 'You already reported this person. Plejar\'s team will look at it.' : 'Thanks. Plejar\'s team will review it.' });
 });
 

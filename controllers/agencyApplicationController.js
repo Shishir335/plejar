@@ -171,8 +171,8 @@ const agencyStep = async (b, user) => {
   // works in the vendor panel too); someone else's account isn't.
   if (!errors.email) {
     const account = await User.findOne({ email: values.email }).setOptions({ includeInactive: true }).select('_id agency');
-    if (account && !(user && String(account._id) === String(user._id))) errors.email = "This email belongs to another Plezar account. Use your own email or your agency's business email.";
-    else if (account && account.agency) errors.email = 'Your account already belongs to an agency on Plezar.';
+    if (account && !(user && String(account._id) === String(user._id))) errors.email = "This email belongs to another Plejar account. Use your own email or your agency's business email.";
+    else if (account && account.agency) errors.email = 'Your account already belongs to an agency on Plejar.';
   }
   if (!errors.email || user) {
     const open = await AgentLead.findOne({
@@ -270,7 +270,7 @@ exports.mine = catchAsync(async (req, res) => {
 
 /**
  * POST /agency-application/:reference/reply (multipart: message, and files trade_license, insurance,
- * tax_id, other) — answer Plezar's request for more information. Hands over to the website's reply.
+ * tax_id, other) — answer Plejar's request for more information. Hands over to the website's reply.
  */
 exports.findMineForReply = catchAsync(async (req, res, next) => {
   const reference = text(req.params.reference, 20).toUpperCase();

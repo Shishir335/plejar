@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const REASONS = ['spam', 'harassment', 'hate', 'nudity', 'violence', 'false_information', 'scam', 'other'];
 
-// A traveler reporting a post, a comment or a person to Plezar's team
+// A traveler reporting a post, a comment or a person to Plejar's team
 const socialReportSchema = new mongoose.Schema(
   {
     reporter: { type: mongoose.Schema.ObjectId, ref: 'User', required: true },

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Money Plezar sends to a vendor from its earnings
+// Money Plejar sends to a vendor from its earnings
 const payoutSchema = new mongoose.Schema(
   {
     agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', required: true, index: true },

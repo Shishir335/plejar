@@ -100,7 +100,7 @@ const applyPostAction = async (req, post, action, note) => {
 
   const label = { hide: 'hidden', remove: 'removed', unhide: 'restored' }[action];
   if (action !== 'unhide') {
-    await tellAuthor(post.author, post, `Your post was ${label}`, `Your post "${snippet(post.text, 60) || 'with photos'}" was ${label} because it goes against Plezar's community rules. ${note}`);
+    await tellAuthor(post.author, post, `Your post was ${label}`, `Your post "${snippet(post.text, 60) || 'with photos'}" was ${label} because it goes against Plejar's community rules. ${note}`);
   }
   await logActivity(req, { action: `post.${label}`, summary: action === 'unhide' ? 'Post shown again' : `Post ${label}: ${note}`, user: post.author });
 };

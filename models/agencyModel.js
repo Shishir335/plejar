@@ -77,7 +77,7 @@ const agencySchema = new mongoose.Schema(
 
     categories: [{ type: mongoose.Schema.ObjectId, ref: 'VendorCategory' }],
 
-    // Percent of each booking Plezar keeps. Empty means the platform default applies.
+    // Percent of each booking Plejar keeps. Empty means the platform default applies.
     commissionRate: { type: Number, min: [0, 'Commission cannot be negative'], max: [100, 'Commission cannot be more than 100%'], default: null },
 
     contract: {
@@ -113,7 +113,7 @@ const agencySchema = new mongoose.Schema(
       reviewedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
     },
 
-    // Performance reports emailed to the owner by Plezar
+    // Performance reports emailed to the owner by Plejar
     reports: {
       schedule: { type: String, enum: ['off', 'daily', 'monthly'], default: 'off' },
       alsoToAgencyEmail: { type: Boolean, default: false },

@@ -7,7 +7,7 @@ const { logActivity } = require('../utils/activity');
 
 exports.createReview = catchAsync(async (req, res, next) => {
   if (restricted(req.user, 'reviews')) {
-    return next(new AppError('Writing reviews is switched off for your account. Contact Plezar support.', 403));
+    return next(new AppError('Writing reviews is switched off for your account. Contact Plejar support.', 403));
   }
 
   const booking = await Booking.findOne({ _id: req.body.bookingId, user: req.user._id });

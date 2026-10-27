@@ -31,7 +31,7 @@ const userSchema = new mongoose.Schema({
         enum: ['user', 'manager', 'admin', 'dev', 'agent'],
         default: 'user'
     },
-    // Everything this person is on Plezar: traveler, vendor (agent), staff. See utils/roles.js
+    // Everything this person is on Plejar: traveler, vendor (agent), staff. See utils/roles.js
     roles: [{ type: String, enum: ['user', 'manager', 'admin', 'dev', 'agent'] }],
 
     // Tour agency membership (only for role 'agent')
@@ -103,7 +103,7 @@ const userSchema = new mongoose.Schema({
         enum: ['invited', 'active'],
         default: 'active'
     },
-    // Set when Plezar creates the account with a temporary password; the agency panel asks for a new one first
+    // Set when Plejar creates the account with a temporary password; the agency panel asks for a new one first
     mustChangePassword: { type: Boolean, default: false },
     credentialsSentAt: Date,
     inviteToken: {
@@ -259,7 +259,7 @@ userSchema.pre('save', function (next) {
     if (!this.isModified('password') || this.isNew) return next();
 
     this.passwordChangedAt = Date.now() - 1000;
-    // Choosing your own password ends the temporary one (unless Plezar is issuing a new temporary one)
+    // Choosing your own password ends the temporary one (unless Plejar is issuing a new temporary one)
     if (!this.$locals.temporaryPassword) this.mustChangePassword = false;
     next();
 });

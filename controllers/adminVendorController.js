@@ -443,7 +443,7 @@ exports.getEarnings = catchAsync(async (req, res, next) => {
 });
 
 // Set or change the password of a vendor's owner or team member.
-// Either type one ({ password }) or let Plezar make a strong one ({ generate: true }).
+// Either type one ({ password }) or let Plejar make a strong one ({ generate: true }).
 // requireChange (default true) makes them choose their own the next time they sign in.
 exports.setMemberPassword = catchAsync(async (req, res, next) => {
   const agency = await findVendor(req.params.id, next, 'name');

@@ -312,7 +312,7 @@ exports.approve = catchAsync(async (req, res, next) => {
   let message = `${agency.name} is now a member. Email the sign-in details below to ${owner.name}; this is the only time the password is shown.`;
   if (emailSent === true) message = `${agency.name} is now a member, and the sign-in details were emailed to ${owner.email}.`;
   if (emailSent === false) message = `${agency.name} is now a member, but the email couldn't be sent (email isn't set up on the server). Send the details below to ${owner.name} yourself.`;
-  if (existing) message = `${agency.name} is now a member. ${owner.name} already has a Plezar account, so they sign in to the vendor panel with their usual email and password.`;
+  if (existing) message = `${agency.name} is now a member. ${owner.name} already has a Plejar account, so they sign in to the vendor panel with their usual email and password.`;
 
   res.status(201).json({
     status: 'success',

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 /**
- * Loyalty points: earned on completed trips and referrals, spent on vouchers, adjusted by Plezar.
+ * Loyalty points: earned on completed trips and referrals, spent on vouchers, adjusted by Plejar.
  * The balance is the sum of a traveler's entries.
  */
 const KINDS = ['earned', 'reversed', 'redeemed', 'adjusted', 'bonus'];

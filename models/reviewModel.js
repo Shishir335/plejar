@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const reviewSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.ObjectId, ref: 'User', required: true, index: true },
-    // Hotel reviews have no agency (hotels are listed by Plezar)
+    // Hotel reviews have no agency (hotels are listed by Plejar)
     agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', index: true, required: [function () { return !this.hotel; }, 'A review needs an agency'] },
     package: { type: mongoose.Schema.ObjectId, ref: 'Package' },
     hotel: { type: mongoose.Schema.ObjectId, ref: 'Hotel', index: true },

@@ -136,7 +136,7 @@ exports.submitMyVerification = catchAsync(async (req, res, next) => {
     const user = await saveVerificationDocuments(req);
     res.status(200).json({
         status: 'success',
-        message: 'Documents received. Plezar will review them and update your status.',
+        message: 'Documents received. Plejar will review them and update your status.',
         data: { verification: verificationView(user) }
     });
 });

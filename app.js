@@ -217,7 +217,7 @@ app.use(
     (req, res, next) => {
         const spec = getSwaggerSpec(req.app);
         swaggerUi.setup(spec, {
-            customSiteTitle: 'Plezar API Testing Dashboard',
+            customSiteTitle: 'Plejar API Testing Dashboard',
             customCss: '.swagger-ui .topbar { display: none } .swagger-ui .info { margin: 25px 0 }',
             swaggerOptions: {
                 persistAuthorization: true,

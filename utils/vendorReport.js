@@ -116,7 +116,7 @@ const reportText = r => [
   `Cancelled: ${r.registrations.cancelled}`,
   `Trips completed: ${r.trips.completed} (${r.trips.travelers} travelers)`,
   `Payments received: ${taka(r.money.paid)}`,
-  `Plezar commission: ${taka(r.money.commission)}`,
+  `Plejar commission: ${taka(r.money.commission)}`,
   `Your earnings: ${taka(r.money.earned)}`,
   `Payouts sent to you: ${taka(r.money.payoutsPaid)}`,
   `Available to pay out now: ${taka(r.money.available)}${r.money.pendingPayouts ? ` (${taka(r.money.pendingPayouts)} already requested)` : ''}`,

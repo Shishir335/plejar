@@ -1,5 +1,5 @@
 /**
- * Plezar admin - the vendor profile page (opened from Vendors > All vendors).
+ * Plejar admin - the vendor profile page (opened from Vendors > All vendors).
  * Depends on admin.js, admin-users.js and admin-vendors.js.
  */
 
@@ -304,7 +304,7 @@ function vendorPackages() {
       <td style="white-space: nowrap;">${p.startDate ? `${E(fmtDate(p.startDate))}${p.endDate && p.endDate !== p.startDate ? `<span class="lead-sub">to ${E(fmtDate(p.endDate))}</span>` : ''}` : '<span class="lead-sub" style="margin:0">No date</span>'}<span class="lead-sub">${Number(p.durationDays)}D / ${Number(p.durationNights || 0)}N</span></td>
       <td>${p.seats ? Number(p.seats) : '—'}</td>
       <td>${takaFmt(p.priceFrom)}</td>
-      <td><span class="badge ${STATUS_BADGE[p.status] || 'badge-inactive'}">${E(label(p.status))}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plezar</span>' : ''}${p.status === 'cancelled' && p.cancelReason ? `<span class="lead-sub">${E(p.cancelReason)}</span>` : ''}
+      <td><span class="badge ${STATUS_BADGE[p.status] || 'badge-inactive'}">${E(label(p.status))}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plejar</span>' : ''}${p.status === 'cancelled' && p.cancelReason ? `<span class="lead-sub">${E(p.cancelReason)}</span>` : ''}
         <span class="lead-sub" style="${p.planMissing && p.planMissing.length ? 'color: var(--color-warning, #b7791f)' : ''}">${p.planMissing && p.planMissing.length ? `Plan missing ${p.planMissing.length}` : 'Plan complete'}</span></td>
       <td style="text-align: right;"><div class="lead-actions" style="justify-content: flex-end;"><button class="btn btn-secondary btn-sm" onclick="showEventPlan('${E(p._id)}')">View plan</button>${p.status === 'cancelled' ? '' : p.hiddenByAdmin
         ? `<button class="btn btn-secondary btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', false)">Allow again</button>`
@@ -325,7 +325,7 @@ function showEventPlan(packageId) {
     const date = p.startDate ? new Date(new Date(p.startDate).getTime() + i * 86400000).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '';
     const meals = ['breakfast', 'lunch', 'dinner'].filter(m => d.meals && d.meals[m]);
     return `<div class="plan-day"><h4>Day ${d.day}${date ? `, ${E(date)}` : ''}${d.title ? `: ${E(d.title)}` : ''}</h4>
-      ${d.stops && d.stops.length ? `<ol class="plan-stops">${d.stops.map(st => `<li><span class="plan-time">${E(st.time || '')}</span><span><strong>${E(st.place)}</strong> <span class="tag">${E(STOP_TEXT[st.kind] || st.kind)}</span>${st.destinationRef && st.destinationRef.name ? ' <span class="lead-sub" style="display:inline">on Plezar</span>' : ''}${st.note ? `<span class="lead-sub">${E(st.note)}</span>` : ''}</span></li>`).join('')}</ol>` : '<p class="detail-muted">No stops.</p>'}
+      ${d.stops && d.stops.length ? `<ol class="plan-stops">${d.stops.map(st => `<li><span class="plan-time">${E(st.time || '')}</span><span><strong>${E(st.place)}</strong> <span class="tag">${E(STOP_TEXT[st.kind] || st.kind)}</span>${st.destinationRef && st.destinationRef.name ? ' <span class="lead-sub" style="display:inline">on Plejar</span>' : ''}${st.note ? `<span class="lead-sub">${E(st.note)}</span>` : ''}</span></li>`).join('')}</ol>` : '<p class="detail-muted">No stops.</p>'}
       <p class="lead-sub">${meals.length ? `Meals: ${E(meals.join(', '))}` : 'No meals included'}${d.stay ? `. Night at ${E(d.stay)}` : ''}</p></div>`;
   };
   document.getElementById('epTitle').textContent = p.title;
@@ -372,7 +372,7 @@ async function loadVendorBookings(page) {
   const { ok, data } = await adminFetch(`/api/v1/admin/bookings?${queryString({ agency: V.detail.agency._id, page, limit: 15 })}`);
   if (!ok) { body.innerHTML = `<p style="color: var(--color-danger); padding: 16px;">${E(data.message)}</p>`; return; }
   body.innerHTML = data.data.bookings.length ? `
-    <p class="totals-line">${data.data.total} booking${data.data.total === 1 ? '' : 's'} · ${takaFmt(data.data.totals.amount)} booked · ${takaFmt(data.data.totals.commission)} Plezar commission</p>
+    <p class="totals-line">${data.data.total} booking${data.data.total === 1 ? '' : 's'} · ${takaFmt(data.data.totals.amount)} booked · ${takaFmt(data.data.totals.commission)} Plejar commission</p>
     <div class="table-container"><table class="admin-table lead-table">
       <thead><tr><th>Booking</th><th>Traveler</th><th>Travel date</th><th>Amount</th><th>Status</th><th>Payment</th><th style="text-align: right;">Actions</th></tr></thead>
       <tbody>${data.data.bookings.map(b => bookingRow(b, { withVendor: false })).join('')}</tbody></table></div>
@@ -425,7 +425,7 @@ function vendorEarnings({ payouts, earnings: e }, { monthly }) {
   return `
     <div class="wallet-top">
       <div><div class="kpi-label">Available to pay out</div><div class="wallet-balance">${takaFmt(e.available)}</div>
-        <p class="detail-muted" style="margin: 4px 0 0;">Earned from completed, paid trips, after Plezar's commission and any payouts already sent or waiting.</p></div>
+        <p class="detail-muted" style="margin: 4px 0 0;">Earned from completed, paid trips, after Plejar's commission and any payouts already sent or waiting.</p></div>
       ${canPay ? `<button class="btn btn-primary" onclick="openPayoutModal()" ${e.available < 1 ? 'disabled' : ''}>Create payout</button>` : '<span class="detail-muted" style="margin:0">Only administrators can create payouts.</span>'}
     </div>
     <div class="kpi-grid" style="margin-bottom: 20px;">
@@ -433,11 +433,11 @@ function vendorEarnings({ payouts, earnings: e }, { monthly }) {
       ${vTile('Coming up', takaFmt(e.upcoming), `${e.upcomingTrips} paid trip${e.upcomingTrips === 1 ? '' : 's'} not yet taken`)}
       ${vTile('Paid out', takaFmt(e.paidOut), 'Sent to the vendor')}
       ${vTile('Waiting to be paid', takaFmt(e.pendingPayouts), `${e.pendingPayoutCount} payout${e.pendingPayoutCount === 1 ? '' : 's'}`)}
-      ${vTile('Plezar commission', takaFmt(e.commission), `On ${takaFmt(e.gross)} of completed trips`)}
+      ${vTile('Plejar commission', takaFmt(e.commission), `On ${takaFmt(e.gross)} of completed trips`)}
     </div>
     <h3 class="section-label">Last six months (by completion date)</h3>
     <div class="table-container" style="margin-bottom: 24px;"><table class="admin-table">
-      <thead><tr><th>Month</th><th>Trips</th><th>Booked</th><th>Plezar commission</th><th>Vendor earned</th></tr></thead>
+      <thead><tr><th>Month</th><th>Trips</th><th>Booked</th><th>Plejar commission</th><th>Vendor earned</th></tr></thead>
       <tbody>${monthly.map(m => `<tr><td>${E(new Date(`${m.month}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }))}</td><td>${m.trips}</td><td>${takaFmt(m.gross)}</td><td>${takaFmt(m.commission)}</td><td><strong>${takaFmt(m.net)}</strong></td></tr>`).join('')}</tbody></table></div>
     <h3 class="section-label">Payouts</h3>
     ${payouts.length ? `<div class="table-container"><table class="admin-table lead-table">
@@ -494,7 +494,7 @@ function vendorCommission() {
         <h3>Commission rate</h3>
         <div class="commission-rate">${pct(c.rate)}</div>
         <p class="detail-muted">${c.custom ? `This vendor has its own rate. The platform default is ${pct(c.defaultRate)}.` : 'This vendor pays the platform default rate.'}</p>
-        <p class="detail-muted">Example: on a ${takaFmt(sample)} booking, Plezar keeps ${takaFmt(keep)} and the vendor receives ${takaFmt(sample - keep)}.</p>
+        <p class="detail-muted">Example: on a ${takaFmt(sample)} booking, Plejar keeps ${takaFmt(keep)} and the vendor receives ${takaFmt(sample - keep)}.</p>
         <p class="detail-muted">A new rate applies to bookings made after the change. Existing bookings keep the rate they were made with.</p>
         ${isMoneyAdmin() ? `<button class="btn btn-primary" onclick="openCommissionModal('${E(d.agency._id)}', ${c.rate}, ${c.custom})">Change commission</button>` : '<p class="detail-muted">Only administrators can change commission.</p>'}
       </div>
@@ -599,7 +599,7 @@ function vendorTeam() {
 
 function memberSignInBadge(m) {
   if (m.accountStatus === 'invited') return '<span class="badge badge-manager">Invite not accepted</span>';
-  if (m.mustChangePassword) return `<span class="badge badge-manager">Hasn't signed in yet</span><span class="lead-sub">${m.credentialsSentAt ? `Details emailed ${E(fmtDate(m.credentialsSentAt))}` : 'Using a password set by Plezar'}</span>`;
+  if (m.mustChangePassword) return `<span class="badge badge-manager">Hasn't signed in yet</span><span class="lead-sub">${m.credentialsSentAt ? `Details emailed ${E(fmtDate(m.credentialsSentAt))}` : 'Using a password set by Plejar'}</span>`;
   return `<span class="badge badge-active">Active</span><span class="lead-sub">${m.lastLoginAt ? `Last sign-in ${E(fmtDate(m.lastLoginAt))}` : 'Hasn\'t signed in yet'}</span>`;
 }
 
@@ -617,7 +617,7 @@ function openVendorPasswordModal(userId, from, { sending = false } = {}) {
     ? `Send login details for ${source.agencyName}`
     : `${source.member.accountStatus === 'invited' || source.member.mustChangePassword ? 'Set' : 'Change'} password for ${source.member.name}`;
   document.getElementById('vpLead').textContent = sending
-    ? 'Passwords are stored scrambled, so Plezar can\'t look one up. Sending login details sets a new password and emails it with the vendor ID, sign-in email and the vendor panel link.'
+    ? 'Passwords are stored scrambled, so Plejar can\'t look one up. Sending login details sets a new password and emails it with the vendor ID, sign-in email and the vendor panel link.'
     : `${source.member.name} (${source.member.email}) signs in to the ${source.agencyName} vendor panel with this password. Any device they're signed in on will be signed out.`;
   const keepSend = document.getElementById('vpSend').checked;
   document.getElementById('vendorPasswordForm').reset();
@@ -738,7 +738,7 @@ function reportTable(r) {
       </dl>
       <dl class="kv">
         ${row('Payments received', takaFmt(r.money.paid))}
-        ${row('Plezar commission', takaFmt(r.money.commission))}
+        ${row('Plejar commission', takaFmt(r.money.commission))}
         ${row('Vendor earnings', takaFmt(r.money.earned))}
         ${row('Payouts sent', takaFmt(r.money.payoutsPaid))}
         ${row('Available now', takaFmt(r.money.available))}

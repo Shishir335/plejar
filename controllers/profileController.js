@@ -227,7 +227,7 @@ exports.saveInterests = catchAsync(async (req, res, next) => {
 // ---------- Transaction History ----------
 
 const PAYMENT_STATUS = { paid: 'Paid', partially_refunded: 'Partly refunded', refunded: 'Refunded' };
-const WALLET_TITLES = { topup: 'Wallet top-up', refund: 'Refund', booking: 'Paid from wallet', promo: 'Promo credit', adjustment: 'Adjustment by Plezar' };
+const WALLET_TITLES = { topup: 'Wallet top-up', refund: 'Refund', booking: 'Paid from wallet', promo: 'Promo credit', adjustment: 'Adjustment by Plejar' };
 
 /**
  * GET /me/transactions?type=payment|wallet&page — booking payments and wallet changes, newest first.

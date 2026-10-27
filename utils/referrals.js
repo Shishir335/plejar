@@ -18,7 +18,7 @@ const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 /** The traveler's code (made the first time it's asked for), e.g. RAHIM7K3Q */
 const ensureReferralCode = async user => {
   if (user.referralCode) return user.referralCode;
-  const base = String(user.firstName || user.name || 'PLEZAR').normalize('NFKD').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'PLEZAR';
+  const base = String(user.firstName || user.name || 'PLEJAR').normalize('NFKD').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'PLEJAR';
   for (let i = 0; i < 6; i += 1) {
     const code = base + Array.from(crypto.randomBytes(4), b => LETTERS[b % LETTERS.length]).join('');
     // Set only if still empty, so two requests at once agree on one code

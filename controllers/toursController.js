@@ -490,7 +490,7 @@ exports.getTour = catchAsync(async (req, res, next) => {
           mine: myBooking ? { _id: myBooking._id, reference: myBooking.reference, status: myBooking.status, travelers: myBooking.travelers, amount: myBooking.amount } : null
         },
         countdown: { departsAt: leaves, started: leaves ? leaves <= new Date() : false },
-        share: { url: shareUrl, text: `${tour.title}${card.location ? ` in ${card.location}` : ''}: ${card.durationDays} days from BDT ${card.price.amount} on Plezar` },
+        share: { url: shareUrl, text: `${tour.title}${card.location ? ` in ${card.location}` : ''}: ${card.durationDays} days from BDT ${card.price.amount} on Plejar` },
         // "Message Tour Guide": POST /tours/:id/messages, then continue in /conversations/:id
         contact: { conversationId: conversation ? conversation._id : null, unread: conversation ? conversation.travelerUnread : 0 }
       }

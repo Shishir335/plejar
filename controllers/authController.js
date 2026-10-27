@@ -19,7 +19,7 @@ const getGoogleAudiences = () => {
         process.env.GOOGLE_SERVER_CLIENT_ID,
         process.env.GOOGLE_IOS_CLIENT_ID,
         process.env.GOOGLE_ANDROID_CLIENT_ID,
-        // Known client IDs for Plezar (Web, Android & iOS from Google/Firebase console)
+        // Known client IDs for Plejar (Web, Android & iOS from Google/Firebase console)
         '783619291102-9ujg3f0v6hr5b7l357i6j8n5g8vh78qi.apps.googleusercontent.com',
         '756555119906-8737egoq23k7pfmcsqa7fuiodd43crcl.apps.googleusercontent.com',
         '756555119906-q67kbkuacjahi41jl8btrs6en7q7ps4o.apps.googleusercontent.com',
@@ -59,7 +59,7 @@ const isAdminEmail = email => Boolean(email) && getAdminEmails().includes(email.
 // Explain why an account can't be used right now, or return null when it can.
 // Suspensions with an end date lift themselves once that date has passed.
 const blockedReason = async user => {
-    if (user.deletedAt) return 'This account has been removed. Contact Plezar support if this is a mistake.';
+    if (user.deletedAt) return 'This account has been removed. Contact Plejar support if this is a mistake.';
     if (user.status === 'suspended' || user.status === 'deactivated') {
         if (user.status === 'suspended' && user.statusUntil && user.statusUntil <= new Date()) {
             user.status = 'active';
@@ -71,8 +71,8 @@ const blockedReason = async user => {
         const until = user.statusUntil ? ` until ${user.statusUntil.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
         const why = user.statusReason ? ` Reason: ${user.statusReason.replace(/[.\s]+$/, '')}.` : '';
         return user.status === 'suspended'
-            ? `Your account is suspended${until}.${why} Contact Plezar support.`
-            : `Your account is deactivated.${why} Contact Plezar support to reactivate it.`;
+            ? `Your account is suspended${until}.${why} Contact Plejar support.`
+            : `Your account is deactivated.${why} Contact Plejar support to reactivate it.`;
     }
     return null;
 };

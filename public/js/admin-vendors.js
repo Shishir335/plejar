@@ -1,5 +1,5 @@
 /**
- * Plezar admin - Vendors section: vendor list, applications, verification, categories,
+ * Plejar admin - Vendors section: vendor list, applications, verification, categories,
  * bookings, payouts, commission, activity logs, and the full vendor profile page.
  * Depends on helpers from admin.js and admin-users.js (adminFetch, E, fmtDate, askReason...).
  */
@@ -266,9 +266,9 @@ function bookingRow(b, { withVendor = true } = {}) {
     <tr>
       <td><span class="lead-main">${E(b.packageTitle)}</span><span class="lead-sub">${E(KIND_LABEL[b.kind || 'tour'])} · ${E(b.reference)} · booked ${E(fmtDate(b.createdAt))}</span></td>
       <td>${b.user ? `<a href="#" onclick="event.preventDefault(); openUser('${E(b.user._id)}')">${E(b.user.name)}</a><span class="lead-sub">${b.travelers} traveler${b.travelers === 1 ? '' : 's'}</span>` : '—'}</td>
-      ${withVendor ? `<td>${b.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(b.agency._id)}')">${E(b.agency.name)}</a>` : (b.kind === 'hotel' ? '<span class="lead-sub" style="display:inline;">Plezar confirms</span>' : '—')}</td>` : ''}
+      ${withVendor ? `<td>${b.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(b.agency._id)}')">${E(b.agency.name)}</a>` : (b.kind === 'hotel' ? '<span class="lead-sub" style="display:inline;">Plejar confirms</span>' : '—')}</td>` : ''}
       <td style="white-space: nowrap;">${E(fmtDate(b.travelDate))}${b.endDate && b.endDate !== b.travelDate ? `<span class="lead-sub">to ${E(fmtDate(b.endDate))}${b.units ? ` · ${b.units} ${b.kind === 'hotel' ? 'night' : 'day'}${b.units === 1 ? '' : 's'}` : ''}</span>` : ''}</td>
-      <td style="white-space: nowrap;">${takaFmt(b.amount)}<span class="lead-sub">Plezar ${takaFmt(b.commissionAmount)} (${pct(b.commissionRate)})</span></td>
+      <td style="white-space: nowrap;">${takaFmt(b.amount)}<span class="lead-sub">Plejar ${takaFmt(b.commissionAmount)} (${pct(b.commissionRate)})</span></td>
       <td><span class="badge ${BOOKING_BADGE[b.status]}">${E(label(b.status))}</span></td>
       <td>${E(PAY_LABEL[b.paymentStatus] || b.paymentStatus)}</td>
       <td style="text-align: right;"><button class="btn btn-secondary btn-sm" onclick="openBookingModal('${E(b._id)}')">Manage</button></td>
@@ -284,7 +284,7 @@ async function loadBookings(page = 1) {
     if (!ok) return tableMessage('bookingsTableBody', 8, data.message || 'Could not load bookings.', true);
     renderPager('bookingsPager', data.data, 'loadBookings');
     document.getElementById('bookingTotals').textContent = data.data.total
-      ? `${data.data.total} booking${data.data.total === 1 ? '' : 's'} · ${takaFmt(data.data.totals.amount)} booked · ${takaFmt(data.data.totals.commission)} Plezar commission`
+      ? `${data.data.total} booking${data.data.total === 1 ? '' : 's'} · ${takaFmt(data.data.totals.amount)} booked · ${takaFmt(data.data.totals.commission)} Plejar commission`
       : '';
     if (!data.data.bookings.length) return tableMessage('bookingsTableBody', 8, 'No bookings match these filters.');
     document.getElementById('bookingsTableBody').innerHTML = data.data.bookings.map(b => bookingRow(b)).join('');
@@ -425,7 +425,7 @@ async function loadCommissionPane() {
   const canEdit = isMoneyAdmin();
   document.getElementById('commissionHero').innerHTML = `
     <div><div class="kpi-label">Platform default commission</div><div class="commission-rate">${pct(V.defaultRate)}</div>
-    <p class="pane-sub">Plezar keeps this share of every booking, unless the vendor has its own rate below.</p></div>
+    <p class="pane-sub">Plejar keeps this share of every booking, unless the vendor has its own rate below.</p></div>
     ${canEdit ? '<button class="btn btn-primary" onclick="openCommissionModal(null)">Change default</button>' : '<span class="detail-muted" style="margin:0">Only administrators can change commission.</span>'}`;
   const vendors = list.data.data.vendors;
   if (!vendors.length) return tableMessage('commissionTableBody', 4, 'No vendor has a custom rate. They all pay the platform default.');
@@ -449,7 +449,7 @@ function openCommissionModal(vendorId, rate, custom) {
   document.getElementById('vcTitle').textContent = vendorId ? `Commission for ${name}` : 'Platform default commission';
   document.getElementById('vcLead').textContent = vendorId
     ? 'Set a rate for this vendor only. It applies to bookings made after you save; existing bookings keep their rate.'
-    : 'The share of each booking Plezar keeps from vendors without their own rate. It applies to bookings made after you save.';
+    : 'The share of each booking Plejar keeps from vendors without their own rate. It applies to bookings made after you save.';
   document.getElementById('vcLabel').textContent = vendorId ? 'Commission for this vendor (%)' : 'Default commission (%)';
   const startRate = vendorId ? (rate != null ? rate : (d ? d.commission.rate : V.defaultRate)) : V.defaultRate;
   document.getElementById('vcRate').value = startRate;

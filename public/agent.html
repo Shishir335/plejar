@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vendor panel — Plezar</title>
+  <title>Vendor panel — Plejar</title>
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,7 @@
   <!-- Sign in -->
   <main class="auth-page" id="loginView" hidden>
     <form class="auth-card" id="loginForm" novalidate>
-      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+      <a href="/" class="logo">plejar<span class="logo-dot"></span></a>
       <h1>Vendor sign in</h1>
       <p class="sub">Manage your tour events, registrations, announcements and team.</p>
       <div class="alert alert-error" id="loginError" role="alert" hidden></div>
@@ -47,9 +47,9 @@
   <!-- First sign-in: replace the temporary password -->
   <main class="auth-page" id="passwordView" hidden>
     <form class="auth-card" id="passwordForm" novalidate>
-      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+      <a href="/" class="logo">plejar<span class="logo-dot"></span></a>
       <h1>Choose your own password</h1>
-      <p class="sub">You signed in with the temporary password Plezar sent you. Pick a new one that only you know before you continue.</p>
+      <p class="sub">You signed in with the temporary password Plejar sent you. Pick a new one that only you know before you continue.</p>
       <div class="alert alert-error" id="passwordError" role="alert" hidden></div>
       <div class="field" id="currentPasswordField">
         <label for="pwCurrent">Temporary password</label>
@@ -72,7 +72,7 @@
   <!-- Panel -->
   <div class="panel" id="panelView" hidden>
     <aside class="side">
-      <a href="/" class="logo">plezar<span class="logo-dot"></span></a>
+      <a href="/" class="logo">plejar<span class="logo-dot"></span></a>
       <div class="side-agency" id="sideAgency"></div>
       <nav class="side-nav" aria-label="Agency panel">
         <button data-view="overview" class="active">Overview</button>
@@ -99,7 +99,7 @@
         <div class="page-head">
           <div>
             <h1 id="overviewTitle">Overview</h1>
-            <p>Here's how your agency looks on Plezar right now.</p>
+            <p>Here's how your agency looks on Plejar right now.</p>
           </div>
           <button class="btn btn-primary" data-action="new-event">Create a tour event</button>
         </div>
@@ -185,7 +185,7 @@
         <div class="page-head">
           <div>
             <h1>Tour events</h1>
-            <p>Published events appear in the Plezar app, where travelers register. Drafts are only visible to your team.</p>
+            <p>Published events appear in the Plejar app, where travelers register. Drafts are only visible to your team.</p>
           </div>
           <button class="btn btn-primary" data-action="new-event">Create a tour event</button>
         </div>
@@ -287,7 +287,7 @@
         <div class="page-head">
           <div>
             <h1>Notifications</h1>
-            <p>Send a message straight to travelers' Plezar app. Use it for things they need to know: pickup times, changes, new trips.</p>
+            <p>Send a message straight to travelers' Plejar app. Use it for things they need to know: pickup times, changes, new trips.</p>
           </div>
         </div>
         <form class="card" id="broadcastForm" novalidate>
@@ -359,13 +359,13 @@
         <div class="page-head">
           <div>
             <h1>Verification</h1>
-            <p>Verified agencies get a mark on their profile and tour events. Plezar checks your trade license and the owner's national ID.</p>
+            <p>Verified agencies get a mark on their profile and tour events. Plejar checks your trade license and the owner's national ID.</p>
           </div>
         </div>
         <div id="verificationStatus"></div>
         <form class="card" id="verificationForm" novalidate>
           <h2>Documents</h2>
-          <p class="muted">Documents are private. Only you and the Plezar team can see them.</p>
+          <p class="muted">Documents are private. Only you and the Plejar team can see them.</p>
           <ul class="doc-list" id="docList"></ul>
           <div class="field">
             <label for="vfLicenseNo">Trade license number *</label>
@@ -399,7 +399,7 @@
         <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
       </div>
       <p class="drawer-lead">Travelers see the whole plan before they register, so declare everything: price, stops, transport and stay. You can save a draft any time; publishing needs the full plan.</p>
-      <div class="alert alert-warn" id="eventHiddenNote" hidden>Plezar has hidden this event. You can edit it, but contact support before publishing it again.</div>
+      <div class="alert alert-warn" id="eventHiddenNote" hidden>Plejar has hidden this event. You can edit it, but contact support before publishing it again.</div>
       <div class="alert alert-warn" id="eventRegisteredNote" hidden></div>
 
       <section class="plan-section">
@@ -411,12 +411,12 @@
         <div class="field">
           <label for="evPlaceSearch">Destination *</label>
           <div class="place-picker">
-            <input id="evPlaceSearch" list="destinationOptions" maxlength="160" autocomplete="off" placeholder="Search Plezar's destinations, e.g. Sajek Valley">
+            <input id="evPlaceSearch" list="destinationOptions" maxlength="160" autocomplete="off" placeholder="Search Plejar's destinations, e.g. Sajek Valley">
             <button type="button" class="btn btn-quiet" data-action="add-place">+ Add a new destination</button>
           </div>
           <datalist id="destinationOptions"></datalist>
           <input type="hidden" id="evPlace" name="destinationRef">
-          <span class="hint" id="evPlaceHint">Pick from the list. Can't find it? Add it, and it's saved to Plezar's destinations for everyone.</span>
+          <span class="hint" id="evPlaceHint">Pick from the list. Can't find it? Add it, and it's saved to Plejar's destinations for everyone.</span>
         </div>
         <div class="field">
           <label for="evDescription">Overview</label>
@@ -534,7 +534,7 @@
 
       <section class="plan-section">
         <h3>How it shows in the app</h3>
-        <p class="hint">Travelers see these on the tour card in the Plezar app's Tours screen.</p>
+        <p class="hint">Travelers see these on the tour card in the Plejar app's Tours screen.</p>
         <div class="field-row field-row-3">
           <div class="field">
             <label for="evTourType">Tour type</label>
@@ -649,11 +649,11 @@
     </form>
   </div>
 
-  <!-- Add a destination to Plezar's shared list -->
+  <!-- Add a destination to Plejar's shared list -->
   <div class="drawer-bg dialog-bg" id="placeDialog" hidden>
     <form class="dialog dialog-wide" id="placeForm" role="dialog" aria-modal="true" aria-labelledby="placeTitle" novalidate>
       <h2 id="placeTitle">Add a new destination</h2>
-      <p class="muted">It's saved to Plezar's destinations, so you and other agencies can use it. You can link it to your tour straight away; travelers see it once Plezar's team has reviewed it.</p>
+      <p class="muted">It's saved to Plejar's destinations, so you and other agencies can use it. You can link it to your tour straight away; travelers see it once Plejar's team has reviewed it.</p>
       <div class="field">
         <span class="label">What is it? *</span>
         <label class="radio"><input type="radio" name="plType" value="attraction" checked> <span>A place to visit (a hill, beach, waterfall, lake...)</span></label>

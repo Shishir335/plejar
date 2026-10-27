@@ -40,7 +40,7 @@ const bookingRequested = booking => tell(
 );
 
 /**
- * Call after a booking's status changed (by the agency, Plezar or the traveler).
+ * Call after a booking's status changed (by the agency, Plejar or the traveler).
  * `by` is who changed it: 'agency', 'admin' or 'traveler'.
  */
 const bookingStatusChanged = async (booking, previous, { by } = {}) => {

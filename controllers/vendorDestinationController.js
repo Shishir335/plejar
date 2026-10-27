@@ -8,8 +8,8 @@ const { saveDestinationImage } = require('../utils/uploads');
 const { uniqueSlug, toLocation } = require('../utils/destinations');
 const { ensureDivision, ensureDistrict, geographyWithExisting, findDivision, findDistrict } = require('../utils/geography');
 
-// Vendors share Plezar's destination list: they link tour events to it, and add places that are missing.
-// Places a vendor adds start as drafts; Plezar's team reviews and publishes them.
+// Vendors share Plejar's destination list: they link tour events to it, and add places that are missing.
+// Places a vendor adds start as drafts; Plejar's team reviews and publishes them.
 
 const MAX_PENDING = 50;
 
@@ -55,12 +55,12 @@ exports.addDestination = catchAsync(async (req, res, next) => {
   if (geo.district && (!found || found.division.code !== geo.division)) return next(new AppError('Choose a district in that division.', 400));
   if (type === 'attraction' && !found) return next(new AppError('Choose the district the place is in.', 400));
 
-  // A district from the list is official geography: use it (adding it if Plezar doesn't have it yet)
+  // A district from the list is official geography: use it (adding it if Plejar doesn't have it yet)
   if (type === 'city' && found) {
     const district = await ensureDistrict(found.district.code, opts);
     return res.status(district.created ? 201 : 200).json({
       status: 'success',
-      message: district.created ? `${district.node.name} added.` : `${district.node.name} is already on Plezar, so we linked it.`,
+      message: district.created ? `${district.node.name} added.` : `${district.node.name} is already on Plejar, so we linked it.`,
       data: { destination: { _id: district.node._id, name: district.node.name, type: 'city', status: district.node.status }, existing: !district.created }
     });
   }
@@ -74,14 +74,14 @@ exports.addDestination = catchAsync(async (req, res, next) => {
   if (same) {
     return res.status(200).json({
       status: 'success',
-      message: `${same.name} is already on Plezar, so we linked it.`,
+      message: `${same.name} is already on Plejar, so we linked it.`,
       data: { destination: { _id: same._id, name: same.name, type: same.type, status: same.status }, existing: true }
     });
   }
 
   const pending = await Destination.countDocuments({ addedByAgency: req.agency._id, source: 'vendor', status: 'draft' });
   if (pending >= MAX_PENDING) {
-    return next(new AppError(`You have ${MAX_PENDING} places waiting for Plezar's review. Please wait for some to be reviewed before adding more.`, 429));
+    return next(new AppError(`You have ${MAX_PENDING} places waiting for Plejar's review. Please wait for some to be reviewed before adding more.`, 429));
   }
 
   const location = toLocation(b.lat, b.lng);
@@ -107,11 +107,11 @@ exports.addDestination = catchAsync(async (req, res, next) => {
     dest.coverImage = url;
   }
   await dest.save();
-  await logActivity(req, { action: 'destination.suggested', summary: `Added the destination "${dest.name}" for Plezar's review`, agency: req.agency._id });
+  await logActivity(req, { action: 'destination.suggested', summary: `Added the destination "${dest.name}" for Plejar's review`, agency: req.agency._id });
 
   res.status(201).json({
     status: 'success',
-    message: `${dest.name} added. You can use it right away; travelers see it once Plezar reviews it.`,
+    message: `${dest.name} added. You can use it right away; travelers see it once Plejar reviews it.`,
     data: { destination: { _id: dest._id, name: dest.name, type: dest.type, status: dest.status }, existing: false }
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Plezar Starter - Administration Console Controller
+ * Plejar Starter - Administration Console Controller
  */
 
 const adminState = {
@@ -102,13 +102,13 @@ async function checkAdminAuth() {
 let adminGoogleInitialized = false;
 
 async function initAdminGoogleAuth(force = false) {
-  if ((adminGoogleInitialized && !force) || !window.PlezarGoogleAuth) return;
+  if ((adminGoogleInitialized && !force) || !window.PlejarGoogleAuth) return;
   const container = document.getElementById('adminGoogleBtn');
   if (!container) return;
   adminGoogleInitialized = true;
   const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
 
-  await window.PlezarGoogleAuth.renderButton({
+  await window.PlejarGoogleAuth.renderButton({
     target: 'adminGoogleBtn',
     theme: currentTheme === 'light' ? 'outline' : 'filled_black',
     text: 'continue_with',
@@ -117,7 +117,7 @@ async function initAdminGoogleAuth(force = false) {
     width: 340,
     onSuccess: handleAdminGoogleResponse,
     onError: err => {
-      console.warn('[Plezar Admin] Google auth warning:', err);
+      console.warn('[Plejar Admin] Google auth warning:', err);
     }
   });
 }
@@ -127,7 +127,7 @@ async function handleAdminGoogleResponse(response) {
   showAdminToast('Verifying Google credentials...', 'info');
 
   try {
-    const { ok, data } = await window.PlezarGoogleAuth.loginWithGoogleCredential(response.credential);
+    const { ok, data } = await window.PlejarGoogleAuth.loginWithGoogleCredential(response.credential);
     if (ok && data.token) {
       if (!isStaff(data.data)) {
         showAdminToast('Access restricted: Google account (' + (data.data.email || '') + ') is not an administrator. Add to ADMIN_EMAILS in config.env.', 'error');

@@ -153,7 +153,7 @@ const applyPackageStatus = (pkg, status, next) => {
     return false;
   }
   if (status === 'published' && pkg.hiddenByAdmin) {
-    next(new AppError('Plezar has hidden this tour event. Contact support before publishing it again.', 403));
+    next(new AppError('Plejar has hidden this tour event. Contact support before publishing it again.', 403));
     return false;
   }
   pkg.status = status;
@@ -290,7 +290,7 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
   pkg.photos.push(...added);
   await pkg.save();
   await Promise.all(removed.map(removeAgencyImage));
-  // Registrations count towards the event's destination in Plezar's statistics
+  // Registrations count towards the event's destination in Plejar's statistics
   if (destinationChanged) await Booking.updateMany({ package: pkg._id }, { destinationRef: pkg.destinationRef || null });
 
   // A new date moves everyone's registration with it, and they are told
@@ -429,23 +429,23 @@ exports.inviteStaff = catchAsync(async (req, res, next) => {
     return next(new AppError('Enter the team member\'s name and email.', 400));
   }
 
-  // Someone who already uses Plezar (as a traveler, say) joins with the account they have
+  // Someone who already uses Plejar (as a traveler, say) joins with the account they have
   const existing = await User.findOne({ email });
   if (existing) {
     if (existing.agency) {
-      return next(new AppError(String(existing.agency) === String(req.agency._id) ? 'This person is already on your team.' : 'This person already belongs to another agency on Plezar.', 400));
+      return next(new AppError(String(existing.agency) === String(req.agency._id) ? 'This person is already on your team.' : 'This person already belongs to another agency on Plejar.', 400));
     }
     if (existing.deletedAt || existing.status !== 'active') {
-      return next(new AppError('This Plezar account can\'t be added right now. Use a different email.', 400));
+      return next(new AppError('This Plejar account can\'t be added right now. Use a different email.', 400));
     }
     addRole(existing, 'agent');
     existing.agency = req.agency._id;
     existing.agencyRole = 'staff';
     await existing.save({ validateBeforeSave: false });
-    await logActivity(req, { action: 'team.added', summary: `Added ${existing.name} (existing Plezar account) to the team`, agency: req.agency._id });
+    await logActivity(req, { action: 'team.added', summary: `Added ${existing.name} (existing Plejar account) to the team`, agency: req.agency._id });
     return res.status(201).json({
       status: 'success',
-      message: `${existing.name} already has a Plezar account, so they were added straight away. They sign in to the vendor panel with their usual email and password.`,
+      message: `${existing.name} already has a Plejar account, so they were added straight away. They sign in to the vendor panel with their usual email and password.`,
       data: { member: teamView(existing), inviteURL: null, emailSent: false, existingAccount: true }
     });
   }
@@ -582,7 +582,7 @@ exports.submitVerification = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    message: 'Documents submitted. Plezar will review them and update your verification status.',
+    message: 'Documents submitted. Plejar will review them and update your verification status.',
     data: { verification: verificationView(agency) }
   });
 });
@@ -667,7 +667,7 @@ exports.requestPayout = catchAsync(async (req, res, next) => {
     agency: req.agency._id, amount, method: req.body.method, account: req.body.account, note: req.body.note, source: 'vendor', requestedBy: req.user._id
   });
   await logActivity(req, { action: 'payout.requested', summary: `Requested a payout of ৳${amount} via ${payout.method}`, agency: req.agency._id });
-  res.status(201).json({ status: 'success', message: 'Payout requested. Plezar will send it and update the status.', data: { payout } });
+  res.status(201).json({ status: 'success', message: 'Payout requested. Plejar will send it and update the status.', data: { payout } });
 });
 
 // Labels for the endpoint list in the admin panel (utils/routeCatalog.js)

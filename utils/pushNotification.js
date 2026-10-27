@@ -161,7 +161,7 @@ async function sendPushNotification({ userIds, title, body, data = {}, imageUrl 
   const message = {
     tokens: uniqueTokens,
     notification: {
-      title: String(title || 'Plezar Update'),
+      title: String(title || 'Plejar Update'),
       body: String(body || ''),
       ...(imageUrl ? { imageUrl } : {})
     },

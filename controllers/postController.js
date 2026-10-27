@@ -130,7 +130,7 @@ exports.getPost = catchAsync(async (req, res) => {
 exports.updatePost = catchAsync(async (req, res, next) => {
   assertCanPost(req.user);
   const post = await loadOwnPost(req.params.id, req.user);
-  if (post.status === 'hidden') return next(new AppError('Plezar has hidden this post, so it can\'t be edited.', 403));
+  if (post.status === 'hidden') return next(new AppError('Plejar has hidden this post, so it can\'t be edited.', 403));
   const files = req.files || [];
   const remove = [].concat(req.body.removeMedia || []).flatMap(v => String(v).split(',')).map(s => s.trim()).filter(Boolean);
   const kept = post.media.filter(m => !remove.includes(m.url));
@@ -253,7 +253,7 @@ const fileReport = async ({ reporter, targetType, target, targetUser, reason, no
 };
 exports.fileReport = fileReport;
 
-const reportMessage = r => (r.duplicate ? 'You already reported this. Plezar\'s team will look at it.' : 'Thanks. Plezar\'s team will review it.');
+const reportMessage = r => (r.duplicate ? 'You already reported this. Plejar\'s team will look at it.' : 'Thanks. Plejar\'s team will review it.');
 
 exports.reportPost = catchAsync(async (req, res) => {
   const ctx = await viewerContext(req.user);

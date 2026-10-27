@@ -125,7 +125,7 @@ const PLACES = [
 
 (async () => {
   try {
-    console.log(`\nPlezar starter destinations — ${useDev ? 'DEVELOPMENT (plezar_dev)' : 'PRODUCTION'} database, ${publish ? 'published' : 'as drafts'}\n`);
+    console.log(`\nPlejar starter destinations — ${useDev ? 'DEVELOPMENT (plezar_dev)' : 'PRODUCTION'} database, ${publish ? 'published' : 'as drafts'}\n`);
     await mongoose.connect(databaseUri(), { serverSelectionTimeoutMS: 10000 });
 
     const categories = await Promise.all(CATEGORIES.map(([name, nameBn]) =>

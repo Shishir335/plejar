@@ -1,4 +1,4 @@
-# Plezar // Full-Stack Node.js Application Starter
+# Plejar // Full-Stack Node.js Application Starter
 
 A clean, modern, and production-ready **Node.js, Express, and MongoDB** application starter template. Preconfigured with JWT authentication, role-based access control (RBAC), enterprise security middlewares, transactional email dispatcher, and a user administration dashboard.
 

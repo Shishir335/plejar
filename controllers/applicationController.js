@@ -108,7 +108,7 @@ exports.createApplication = catchAsync(async (req, res, next) => {
     return next(new AppError('We already have an application for this agency that is being reviewed. Check it with the reference number we emailed you.', 409));
   }
   if (await User.exists({ email: values.email })) {
-    return next(new AppError('This email already has a Plezar account. Sign in to the Plezar app and apply from My Account > Agency Application to use the same account, or apply here with a different email.', 409));
+    return next(new AppError('This email already has a Plejar account. Sign in to the Plejar app and apply from My Account > Agency Application to use the same account, or apply here with a different email.', 409));
   }
 
   // Only categories the admin has switched on

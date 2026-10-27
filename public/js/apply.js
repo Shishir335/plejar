@@ -1,5 +1,5 @@
 /**
- * Plezar membership application (/apply) and application status (/apply/status)
+ * Plejar membership application (/apply) and application status (/apply/status)
  * Uses escapeHTML, showToast, serverText, BD_PHONE and EMAIL from app.js, and t() from i18n.js.
  */
 
@@ -395,7 +395,7 @@ async function handleStatus(e) {
 
 function initStatus() {
   document.getElementById('statusView').hidden = false;
-  const title = 'Check your application — Plezar';
+  const title = 'Check your application — Plejar';
   document.body.dataset.titleKey = 'statusMetaTitle';
   if (i18n.original.has(document)) i18n.original.get(document).title = title;
   document.title = i18n.lang === 'bn' ? BN.statusMetaTitle : title;

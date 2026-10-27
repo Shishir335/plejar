@@ -16,14 +16,14 @@ const escapeRx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Shown under "Contact Information" until the admin changes them
 const DEFAULT_CONTACT = {
-  email: 'support@plezar.com',
+  email: 'support@plejar.com',
   emailHours: 'We reply within 24 hours',
   emergencyPhone: '+880 1700-000000',
   emergencyHours: 'Available 24/7 for travelers on a trip',
   headquarters: 'Dhaka, Bangladesh',
   whatsapp: '',
   // "Need Assistance?" on the Travel Agency Application
-  partnerEmail: 'partners@plezar.com',
+  partnerEmail: 'partners@plejar.com',
   partnerPhone: '+880 1700-000000'
 };
 const contactInfo = async () => ({ ...DEFAULT_CONTACT, ...((await getSetting('supportContact', {})) || {}) });
@@ -119,7 +119,7 @@ exports.contact = catchAsync(async (req, res) => {
     booking: booking ? booking._id : undefined,
     againstAgency: booking ? booking.agency : undefined
   });
-  await logActivity(req, { action: 'help.contacted', summary: `Asked Plezar support: ${complaint.subject}`, user: req.user._id });
+  await logActivity(req, { action: 'help.contacted', summary: `Asked Plejar support: ${complaint.subject}`, user: req.user._id });
   const contact = await contactInfo();
   res.status(201).json({
     status: 'success',

@@ -1,5 +1,5 @@
 /**
- * Plezar admin: membership applications (Vendors > Applications, and the application page)
+ * Plejar admin: membership applications (Vendors > Applications, and the application page)
  * Depends on admin.js (adminFetch, switchTab, showAdminToast, openModal, closeModal, leadLink, inviteLinkBox)
  * and admin-users.js (E, fmtDate, fmtDateTime, label, val, tableMessage, renderPager, makeDebounce, askReason, formError).
  */
@@ -133,8 +133,8 @@ function applicationChecks(app, checks) {
   if (checks.account) {
     const roles = (checks.account.roles && checks.account.roles.length ? checks.account.roles : [checks.account.role]).map(r => ROLE_NAMES[r] || r).join(', ');
     if (checks.account.agency) notes.push(['error', `${app.email} already belongs to an agency (${checks.account.name}). Accepting needs a different email.`]);
-    else if (app.applicant && String(app.applicant._id || app.applicant) === String(checks.account._id)) notes.push(['info', `${app.email} is the applicant's own Plezar account (${roles}). Accepting adds the vendor role to it; they sign in with their usual password.`]);
-    else notes.push(['warn', `${app.email} already has a Plezar account (${checks.account.name}, ${roles}). Accepting adds the vendor role to that account; tick the box when you accept.`]);
+    else if (app.applicant && String(app.applicant._id || app.applicant) === String(checks.account._id)) notes.push(['info', `${app.email} is the applicant's own Plejar account (${roles}). Accepting adds the vendor role to it; they sign in with their usual password.`]);
+    else notes.push(['warn', `${app.email} already has a Plejar account (${checks.account.name}, ${roles}). Accepting adds the vendor role to that account; tick the box when you accept.`]);
   }
   if (checks.agencyWithLicense) notes.push(['error', `The vendor "${checks.agencyWithLicense.name}" already uses trade license ${app.tradeLicenseNumber}.`]);
   (checks.otherApplications || []).forEach(o => notes.push(['info', `Earlier application ${o.reference || ''} for "${o.agencyName}" (${APPLICATION_LABELS[o.status] || o.status}, ${fmtDate(o.createdAt)}) used the same email, phone or license.`]));
@@ -197,7 +197,7 @@ function renderApplication() {
     : '<li><span>No documents. This came from the old contact form.</span></li>';
 
   const thread = a.messages.length ? `<ul class="app-thread">${a.messages.map(m => `
-    <li class="from-${m.from}"><div class="lead-sub" style="margin:0 0 4px">${E(m.from === 'admin' ? (m.byName || 'Plezar team') : `${a.contactName} (applicant)`)}, ${E(fmtDateTime(m.at))}</div><p>${E(m.text)}</p></li>`).join('')}</ul>`
+    <li class="from-${m.from}"><div class="lead-sub" style="margin:0 0 4px">${E(m.from === 'admin' ? (m.byName || 'Plejar team') : `${a.contactName} (applicant)`)}, ${E(fmtDateTime(m.at))}</div><p>${E(m.text)}</p></li>`).join('')}</ul>`
     : '<p class="detail-muted">No messages yet. Use "Ask for more" to request something from the applicant; they reply on their application page.</p>';
 
   document.getElementById('applicationDetail').innerHTML = `
@@ -337,7 +337,7 @@ async function openApproveModal() {
   document.getElementById('approveLead').textContent =
     `${a.agencyName} becomes a vendor and ${a.contactName} (${a.email}) gets an owner account with a temporary password. You'll see the sign-in details next, ready to email to them.`;
   document.getElementById('apVerify').checked = true;
-  // Someone who already has a Plezar account can be made the owner with the login they have
+  // Someone who already has a Plejar account can be made the owner with the login they have
   const acct = AP.detail.checks && AP.detail.checks.account;
   const own = acct && a.applicant && String(a.applicant._id || a.applicant) === String(acct._id);
   document.getElementById('apUseExistingRow').hidden = !acct || Boolean(acct.agency) || own;

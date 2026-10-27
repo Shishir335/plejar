@@ -140,7 +140,7 @@ exports.updateAgency = catchAsync(async (req, res, next) => {
   }
 
   await agency.save();
-  await logActivity(req, { action: 'agency.edited', summary: 'Plezar admin edited the agency profile', agency: agency._id });
+  await logActivity(req, { action: 'agency.edited', summary: 'Plejar admin edited the agency profile', agency: agency._id });
   res.status(200).json({ status: 'success', data: { agency } });
 });
 
@@ -268,7 +268,7 @@ exports.createAgency = catchAsync(async (req, res, next) => {
     await logActivity(req, { action: 'agency.created', summary: `Agency created with ${owner.name}'s existing account as owner`, agency: agency._id });
     return res.status(201).json({
       status: 'success',
-      message: `${agency.name} created. ${owner.name} already has a Plezar account and signs in to the vendor panel with it.`,
+      message: `${agency.name} created. ${owner.name} already has a Plejar account and signs in to the vendor panel with it.`,
       data: { agency, owner: teamView(owner), inviteURL: null, emailSent: false, existingAccount: true }
     });
   }

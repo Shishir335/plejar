@@ -92,7 +92,7 @@ const bookTour = async (req, travelers) => {
   };
 };
 
-// Hotels are listed by Plezar: Plezar confirms the stay with the hotel, so there's no agency commission
+// Hotels are listed by Plejar: Plejar confirms the stay with the hotel, so there's no agency commission
 const bookHotel = async (req, travelers) => {
   const hotel = validId(req.body.hotelId) ? await Hotel.findOne({ _id: req.body.hotelId, status: 'published' }) : null;
   if (!hotel) throw new AppError('That hotel is not available.', 404);
@@ -168,11 +168,11 @@ const bookGuide = async (req, travelers) => {
  * Hotel: { kind: "hotel", hotelId, checkIn, checkOut, rooms, travelers }
  * Guide: { kind: "guide", guideId, startDate, endDate, travelers }
  * Any of them can add voucherCode (a voucher redeemed in Vouchers & Rewards) for a discount.
- * Every booking starts as pending until the agency (or Plezar, for hotels) confirms it.
+ * Every booking starts as pending until the agency (or Plejar, for hotels) confirms it.
  */
 exports.createBooking = catchAsync(async (req, res, next) => {
-  if (!hasRole(req.user, 'user')) return next(new AppError('Only traveler accounts can book trips. Sign in to the Plezar app first.', 403));
-  if (restricted(req.user, 'booking')) return next(new AppError('Booking is switched off for your account. Contact Plezar support.', 403));
+  if (!hasRole(req.user, 'user')) return next(new AppError('Only traveler accounts can book trips. Sign in to the Plejar app first.', 403));
+  if (restricted(req.user, 'booking')) return next(new AppError('Booking is switched off for your account. Contact Plejar support.', 403));
   let kind = req.body.kind || 'tour';
   if (!req.body.kind && req.body.hotelId) kind = 'hotel';
   if (!req.body.kind && req.body.guideId) kind = 'guide';
@@ -185,7 +185,7 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   let voucher = null;
   if (String(req.body.voucherCode || '').trim()) {
     voucher = await claimVoucher(req.user._id, req.body.voucherCode, kind, fields.amount);
-    // Plezar pays for the discount from its commission, so the agency's share stays the same
+    // Plejar pays for the discount from its commission, so the agency's share stays the same
     fields.subtotal = fields.amount;
     fields.discountAmount = voucher.discount;
     fields.amount -= voucher.discount;
@@ -204,7 +204,7 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   await bookingRequested(booking);
   await logActivity(req, { action: 'booking.created', summary: `Booked ${booking.packageTitle} (${booking.reference}) for ${travelers} traveler${travelers === 1 ? '' : 's'}`, user: req.user._id, agency: booking.agency });
 
-  res.status(201).json({ status: 'success', message: kind === 'hotel' ? 'Request sent. Plezar will confirm your stay with the hotel.' : 'Request sent. You will get a notification when it is confirmed.', data: { booking } });
+  res.status(201).json({ status: 'success', message: kind === 'hotel' ? 'Request sent. Plejar will confirm your stay with the hotel.' : 'Request sent. You will get a notification when it is confirmed.', data: { booking } });
 });
 
 // ---------- My Bookings ----------

@@ -1,6 +1,6 @@
 /**
  * One person, one account, several roles: the same login can be a traveler in the app, part of an
- * agency in the vendor panel, and Plezar staff in the admin panel.
+ * agency in the vendor panel, and Plejar staff in the admin panel.
  * `roles` holds them all; `role` is kept as the main one (the most powerful) for older code and labels.
  */
 

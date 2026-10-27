@@ -1,5 +1,5 @@
 /**
- * Plezar showcase page - frontend logic
+ * Plejar showcase page - frontend logic
  */
 
 const dom = {
@@ -155,12 +155,12 @@ document.addEventListener('click', e => {
 });
 
 async function initWebGoogleAuth() {
-  if (webGoogleInitialized || !window.PlezarGoogleAuth) return;
+  if (webGoogleInitialized || !window.PlejarGoogleAuth) return;
   const target = document.getElementById('webGoogleBtn');
   if (!target) return;
   webGoogleInitialized = true;
 
-  await window.PlezarGoogleAuth.renderButton({
+  await window.PlejarGoogleAuth.renderButton({
     target: 'webGoogleBtn',
     theme: 'outline',
     text: 'continue_with',
@@ -179,7 +179,7 @@ async function handleWebGoogleResponse(response) {
   showAlertInModal('Signing you in with Google...', 'info');
 
   try {
-    const { ok, data } = await window.PlezarGoogleAuth.loginWithGoogleCredential(response.credential);
+    const { ok, data } = await window.PlejarGoogleAuth.loginWithGoogleCredential(response.credential);
     if (ok && data.token) {
       currentUser = data.data;
       try { localStorage.setItem('plezar_token', data.token); } catch (e) { /* cookie still active */ }
@@ -214,7 +214,7 @@ function updateUserUI(user) {
     if (avatar) avatar.src = user.photo && user.photo !== 'profile.png' ? user.photo : '/img/users/profile.png';
     const firstName = user.firstName || (user.name ? user.name.split(' ')[0] : 'Account');
     if (nameEl) nameEl.textContent = firstName;
-    if (dropName) dropName.textContent = user.name || 'Plezar traveler';
+    if (dropName) dropName.textContent = user.name || 'Plejar traveler';
     if (dropEmail) dropEmail.textContent = user.email || '';
 
     const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role || 'user'];

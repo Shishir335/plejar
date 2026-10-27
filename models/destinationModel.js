@@ -77,7 +77,7 @@ const destinationSchema = new mongoose.Schema(
     status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' },
     views: { type: Number, default: 0 },
 
-    // Who added it: Plezar's team, or a vendor while planning a tour (vendor places start as drafts for review)
+    // Who added it: Plejar's team, or a vendor while planning a tour (vendor places start as drafts for review)
     source: { type: String, enum: ['admin', 'vendor'], default: 'admin' },
     addedByAgency: { type: mongoose.Schema.ObjectId, ref: 'Agency' },
     createdBy: { type: mongoose.Schema.ObjectId, ref: 'User' },

@@ -146,7 +146,7 @@ exports.register = catchAsync(async (req, res) => {
       existingUser.confirmPassword = b.confirmPassword;
     }
 
-    if (String(b.firstName || '').trim() && (!existingUser.firstName || existingUser.name === 'Plezar traveler')) {
+    if (String(b.firstName || '').trim() && (!existingUser.firstName || existingUser.name === 'Plejar traveler' || existingUser.name === 'Plejar traveler')) {
       existingUser.firstName = readPersonName(b.firstName, 'first name');
     }
     if (String(b.lastName || '').trim() && !existingUser.lastName) {
@@ -178,7 +178,7 @@ exports.register = catchAsync(async (req, res) => {
     const welcomePoints = referrer && !existingUser.referredBy ? await applyReferral(existingUser, referrer) : 0;
 
     await recordLogin(req, { user: existingUser, email: existingUser.email || phone, success: true, reason: 'role_added_traveler' });
-    const welcome = existingUser.firstName ? `Welcome to Plezar, ${existingUser.firstName}!` : 'Welcome to Plezar!';
+    const welcome = existingUser.firstName ? `Welcome to Plejar, ${existingUser.firstName}!` : 'Welcome to Plejar!';
     return sendSession(res, 200, existingUser, photoWarning || (welcomePoints ? `${welcome} The traveler role has been added to your account. You got ${welcomePoints.toLocaleString('en-US')} welcome points.` : `${welcome} The traveler role has been added to your account.`));
   }
 
@@ -194,7 +194,7 @@ exports.register = catchAsync(async (req, res) => {
   };
   if (String(b.firstName || '').trim()) fields.firstName = readPersonName(b.firstName, 'first name');
   if (String(b.lastName || '').trim()) fields.lastName = readPersonName(b.lastName, 'last name');
-  if (!fields.firstName && !fields.lastName) fields.name = 'Plezar traveler';
+  if (!fields.firstName && !fields.lastName) fields.name = 'Plejar traveler';
   const user = await User.create(fields);
   const welcomePoints = await applyReferral(user, referrer);
 
@@ -219,7 +219,7 @@ exports.register = catchAsync(async (req, res) => {
   }
 
   await recordLogin(req, { user, email, success: true, reason: 'signup' });
-  const welcome = user.firstName ? `Welcome to Plezar, ${user.firstName}!` : 'Your account is ready.';
+  const welcome = user.firstName ? `Welcome to Plejar, ${user.firstName}!` : 'Your account is ready.';
   sendSession(res, 201, user, photoWarning || (welcomePoints ? `${welcome} You got ${welcomePoints.toLocaleString('en-US')} welcome points.` : welcome));
 });
 
@@ -297,7 +297,7 @@ exports.login = catchAsync(async (req, res, next) => {
   user.loginCount = (user.loginCount || 0) + 1;
   await user.save({ validateBeforeSave: false });
   await recordLogin(req, { user, email: contact.value, success: true });
-  sendSession(res, 200, user, joined ? 'Welcome to the Plezar app! Your account now works here too.' : undefined);
+  sendSession(res, 200, user, joined ? 'Welcome to the Plejar app! Your account now works here too.' : undefined);
 });
 
 const googleClient = new OAuth2Client();
@@ -307,7 +307,7 @@ const googleAudiences = () => {
     process.env.GOOGLE_SERVER_CLIENT_ID,
     process.env.GOOGLE_IOS_CLIENT_ID,
     process.env.GOOGLE_ANDROID_CLIENT_ID,
-    // Known client IDs for Plezar (Web, Android & iOS from Google/Firebase console)
+    // Known client IDs for Plejar (Web, Android & iOS from Google/Firebase console)
     '783619291102-9ujg3f0v6hr5b7l357i6j8n5g8vh78qi.apps.googleusercontent.com',
     '756555119906-8737egoq23k7pfmcsqa7fuiodd43crcl.apps.googleusercontent.com',
     '756555119906-q67kbkuacjahi41jl8btrs6en7q7ps4o.apps.googleusercontent.com',
@@ -357,7 +357,7 @@ exports.google = catchAsync(async (req, res, next) => {
       role: 'user',
       firstName: (payload.given_name || '').slice(0, 30),
       lastName: (payload.family_name || '').slice(0, 30),
-      name: payload.name || 'Plezar traveler',
+      name: payload.name || 'Plejar traveler',
       photo: payload.picture || 'profile.png'
     });
   }
@@ -423,7 +423,7 @@ const deliverCode = async (user, contact, code, req) => {
     await new Email(user, `${req.protocol}://${req.get('host')}/`, { code }).sendPasswordCode();
     return true;
   }
-  const { delivered } = await sendSms(contact.value, `${code} is your Plezar security code. It works for 10 minutes. Don't share it with anyone.`);
+  const { delivered } = await sendSms(contact.value, `${code} is your Plejar security code. It works for 10 minutes. Don't share it with anyone.`);
   return delivered;
 };
 
@@ -444,7 +444,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   }
   if (recent.length >= MAX_CODES_PER_HOUR) return next(new AppError('Too many codes asked for. Try again in an hour.', 429));
   if (!exposeDevCode(contact.channel) && !(contact.channel === 'email' ? Email.isConfigured() : smsConfigured())) {
-    return next(new AppError(`Sending codes by ${contact.channel === 'email' ? 'email' : 'SMS'} isn't set up yet. Contact Plezar support.`, 503));
+    return next(new AppError(`Sending codes by ${contact.channel === 'email' ? 'email' : 'SMS'} isn't set up yet. Contact Plejar support.`, 503));
   }
 
   const code = String(crypto.randomInt(0, 10000)).padStart(4, '0');

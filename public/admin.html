@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plezar // Administration & User Management Console</title>
+  <title>Plejar // Administration & User Management Console</title>
   <meta name="color-scheme" content="dark light">
   <script>
     (function () {
       var theme = 'dark';
       try {
-        var saved = localStorage.getItem('plezar_admin_theme');
+        var saved = localStorage.getItem('plejar_admin_theme') || localStorage.getItem('plezar_admin_theme');
         theme = saved === 'light' || saved === 'dark' ? saved : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
       } catch (e) { /* storage blocked: stay dark */ }
       document.documentElement.setAttribute('data-theme', theme);
@@ -41,7 +41,7 @@
       <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
         <div class="form-group">
           <label class="form-label">Administrator Email</label>
-          <input type="email" name="email" class="form-input" placeholder="admin@plezar.com" required autocomplete="username">
+          <input type="email" name="email" class="form-input" placeholder="admin@plejar.com" required autocomplete="username">
         </div>
         <div class="form-group">
           <label class="form-label">Password</label>
@@ -83,7 +83,7 @@
       <div class="sidebar-header">
         <div class="sidebar-brand-badge">P</div>
         <div class="sidebar-brand-name">
-          <span style="font-weight: 700; font-size: 1.1rem; display: block;">Plezar</span>
+          <span style="font-weight: 700; font-size: 1.1rem; display: block;">Plejar</span>
           <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;">Admin Console</span>
         </div>
       </div>
@@ -458,7 +458,7 @@
           </div>
 
           <div class="subpane" id="csub-vouchers">
-            <p class="lead-sub" style="margin: 0 0 12px;">Vouchers travelers buy with their points in the app. Tour, hotel and guide vouchers take money off a booking; Plezar pays the discount out of its commission.</p>
+            <p class="lead-sub" style="margin: 0 0 12px;">Vouchers travelers buy with their points in the app. Tour, hotel and guide vouchers take money off a booking; Plejar pays the discount out of its commission.</p>
             <form id="rewardSettingsForm" onsubmit="saveRewardSettings(event)" novalidate style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:14px; padding:14px; border:1px solid var(--admin-border); border-radius:10px;">
               <div class="form-group" style="margin:0;"><label class="form-label" for="rsPerTaka">Points per ৳1 spent</label><input id="rsPerTaka" type="number" min="0" step="0.1" class="form-input" style="width:140px;"></div>
               <div class="form-group" style="margin:0;"><label class="form-label" for="rsReferral">Points per successful referral</label><input id="rsReferral" type="number" min="0" step="50" class="form-input" style="width:180px;"></div>
@@ -595,7 +595,7 @@
                   <option value="">Any availability</option><option value="open">Open all year</option><option value="seasonal">Seasonal</option><option value="restricted">Restricted</option><option value="closed">Closed</option>
                 </select>
                 <select id="dSourceF" class="form-select" aria-label="Added by" onchange="loadDestinations(1)">
-                  <option value="">Added by anyone</option><option value="admin">Added by Plezar</option><option value="vendor">Added by vendors</option>
+                  <option value="">Added by anyone</option><option value="admin">Added by Plejar</option><option value="vendor">Added by vendors</option>
                 </select>
                 <select id="dMissingF" class="form-select" aria-label="Missing" onchange="loadDestinations(1)">
                   <option value="">Complete or not</option><option value="location">No map location</option><option value="cover">No cover photo</option><option value="description">No description</option><option value="seo">No search text</option>
@@ -796,7 +796,7 @@
                 <select id="bkPayment" class="form-select" aria-label="Payment" onchange="loadBookings(1)">
                   <option value="">Any payment</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partially_refunded">Part refunded</option><option value="refunded">Refunded</option>
                 </select>
-                <select id="bkKind" class="form-select" aria-label="What was booked" onchange="loadBookings(1)"><option value="">Tours, hotels and guides</option><option value="tour">Tours</option><option value="hotel">Hotel stays (Plezar confirms)</option><option value="guide">Guides</option></select>
+                <select id="bkKind" class="form-select" aria-label="What was booked" onchange="loadBookings(1)"><option value="">Tours, hotels and guides</option><option value="tour">Tours</option><option value="hotel">Hotel stays (Plejar confirms)</option><option value="guide">Guides</option></select>
                 <select id="bkVendor" class="form-select" aria-label="Vendor" onchange="loadBookings(1)"><option value="">All vendors</option></select>
               </div>
               <button class="btn btn-secondary" onclick="loadBookings()">↻ Refresh</button>
@@ -1181,7 +1181,7 @@
       <form id="approveForm" onsubmit="submitApprove(event)" novalidate>
         <p class="modal-lead" id="approveLead"></p>
         <label class="check"><input type="checkbox" id="apSend" checked><span>Email the sign-in details (vendor ID, email, temporary password and the vendor panel link) to the applicant now. You'll also see them here.</span></label>
-        <label class="check" id="apUseExistingRow" hidden><input type="checkbox" id="apUseExisting"><span>Add the vendor role to their existing Plezar account. They sign in to the vendor panel with the email and password they already use.</span></label>
+        <label class="check" id="apUseExistingRow" hidden><input type="checkbox" id="apUseExisting"><span>Add the vendor role to their existing Plejar account. They sign in to the vendor panel with the email and password they already use.</span></label>
         <label class="check"><input type="checkbox" id="apVerify" checked><span>Mark as verified. The trade license and NID they sent become the vendor's verification documents. Untick to send them to the Verification queue instead.</span></label>
         <div class="form-group" id="apCategoriesGroup" hidden>
           <span class="form-label">Categories</span>

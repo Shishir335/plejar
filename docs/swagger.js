@@ -1,5 +1,5 @@
 /**
- * OpenAPI 3.0 Specification and Swagger UI generator for Plezar
+ * OpenAPI 3.0 Specification and Swagger UI generator for Plejar
  */
 const { buildCatalog } = require('../utils/routeCatalog');
 
@@ -71,7 +71,7 @@ const corePaths = {
               type: 'object',
               required: ['email', 'password'],
               properties: {
-                email: { type: 'string', format: 'email', example: 'admin@plezar.com' },
+                email: { type: 'string', format: 'email', example: 'admin@plejar.com' },
                 password: { type: 'string', format: 'password', example: 'Secret123!' }
               }
             }
@@ -90,7 +90,7 @@ const corePaths = {
                   user: {
                     id: '671abc1234567890abcdef12',
                     name: 'Admin User',
-                    email: 'admin@plezar.com',
+                    email: 'admin@plejar.com',
                     role: 'admin'
                   }
                 }
@@ -740,11 +740,11 @@ function getSwaggerSpec(app) {
   return {
     openapi: '3.0.0',
     info: {
-      title: 'Plezar REST API Documentation',
+      title: 'Plejar REST API Documentation',
       version: '1.0.0',
       description: `
 ### Interactive API Testing Dashboard
-Test any Plezar API endpoint directly from your browser.
+Test any Plejar API endpoint directly from your browser.
 
 #### How to test protected endpoints:
 1. Call **\`POST /api/v1/users/login\`** below with your credentials.

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 /**
- * Hotels and resorts listed by Plezar, for "Hotels Near You" on the Tours screen
+ * Hotels and resorts listed by Plejar, for "Hotels Near You" on the Tours screen
  * (and the Hotels tab later). Located at a destination and on the map.
  */
 const STAY_TYPES = ['hotel', 'resort', 'cottage', 'guest_house', 'homestay', 'eco_resort', 'houseboat'];
@@ -27,7 +27,7 @@ const hotelSchema = new mongoose.Schema(
     highlights: { type: [String], default: [] },
     amenities: { type: [String], default: [] },
     starRating: { type: Number, min: 1, max: 5, default: null },
-    // Guest rating from a source Plezar trusts (until hotel reviews come to the app)
+    // Guest rating from a source Plejar trusts (until hotel reviews come to the app)
     rating: {
       average: { type: Number, min: 0, max: 5, default: null },
       count: { type: Number, min: 0, default: 0 },

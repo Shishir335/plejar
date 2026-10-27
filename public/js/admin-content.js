@@ -1,5 +1,5 @@
 /**
- * Plezar admin - App content: banners on the app's Tours screen, and hotels for "Hotels Near You".
+ * Plejar admin - App content: banners on the app's Tours screen, and hotels for "Hotels Near You".
  * Vouchers and the Help Center are in admin-rewards.js.
  * Depends on admin.js, admin-users.js (E, fmtDate, renderPager, tableMessage, formError, makeDebounce,
  * queryString, val), admin-vendors.js (adminForm) and admin-destinations.js (ensureDestinationOptions).

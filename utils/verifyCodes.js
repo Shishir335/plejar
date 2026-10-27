@@ -34,14 +34,14 @@ const sendVerifyCode = async (user, channel, req) => {
     throw new AppError(`Please wait ${Math.ceil((RESEND_AFTER - (Date.now() - recent[0].createdAt.getTime())) / 1000)} seconds before asking for another code.`, 429);
   }
   if (recent.length >= MAX_PER_HOUR) throw new AppError('Too many codes asked for. Try again in an hour.', 429);
-  if (!exposeDevCode(channel) && !configured(channel)) throw new AppError(`Sending codes by ${channel === 'email' ? 'email' : 'SMS'} isn't set up yet. Contact Plezar support.`, 503);
+  if (!exposeDevCode(channel) && !configured(channel)) throw new AppError(`Sending codes by ${channel === 'email' ? 'email' : 'SMS'} isn't set up yet. Contact Plejar support.`, 503);
 
   const code = String(crypto.randomInt(0, 10000)).padStart(4, '0');
   await Otp.updateMany({ purpose, user: user._id, verifiedAt: null }, { expiresAt: new Date() });
   const otp = await Otp.create({ purpose, channel, destination, user: user._id, codeHash: sha256(code), expiresAt: new Date(Date.now() + CODE_LIFETIME) });
   try {
     if (channel === 'email' && configured('email')) await new Email(user, `${req.protocol}://${req.get('host')}/`, { code }).sendVerifyCode();
-    else if (channel === 'phone') await sendSms(destination, `${code} is your Plezar code to confirm this number. It works for 10 minutes.`);
+    else if (channel === 'phone') await sendSms(destination, `${code} is your Plejar code to confirm this number. It works for 10 minutes.`);
   } catch (err) {
     await Otp.deleteOne({ _id: otp._id });
     console.error('[CODE NOT SENT]', err.message);

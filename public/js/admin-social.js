@@ -1,5 +1,5 @@
 /**
- * Plezar admin - Users > Posts & reports: what travelers post in the app, and the reports on it.
+ * Plejar admin - Users > Posts & reports: what travelers post in the app, and the reports on it.
  * Depends on helpers from admin.js and admin-users.js (adminFetch, E, askReason, renderPager...).
  */
 

@@ -78,7 +78,7 @@ const travelerConversationView = c => ({
 
 const assertCanMessage = user => {
   if (!hasRole(user, 'user')) throw new AppError('Messaging tour guides is for traveler accounts in the app.', 403);
-  if (restricted(user, 'messaging')) throw new AppError('Messaging is switched off for your account. Contact Plezar support.', 403);
+  if (restricted(user, 'messaging')) throw new AppError('Messaging is switched off for your account. Contact Plejar support.', 403);
 };
 
 // POST /tours/:id/messages { text } — starts the thread for this tour, or adds to it
@@ -142,7 +142,7 @@ exports.replyAsTraveler = catchAsync(async (req, res, next) => {
   const text = readText(req.body);
   const c = await ownConversation(req, next);
   if (!c) return;
-  if (!c.agency) return next(new AppError('This agency is no longer on Plezar.', 400));
+  if (!c.agency) return next(new AppError('This agency is no longer on Plejar.', 400));
   const message = await addMessage(c, req.user, 'traveler', text);
   res.status(201).json({ status: 'success', data: { message: messageView({ ...message.toObject(), sender: req.user }, 'traveler') } });
 });

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Help Center questions and answers, written by Plezar in the admin panel
+// Help Center questions and answers, written by Plejar in the admin panel
 const CATEGORIES = [
   { key: 'booking', label: 'Booking & Reservations', description: 'Find help with bookings & reservations' },
   { key: 'payments', label: 'Payment & Refunds', description: 'Find help with payment & refunds' },

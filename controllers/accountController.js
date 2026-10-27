@@ -144,7 +144,7 @@ exports.documentsSaved = catchAsync(async (req, res) => {
   const user = await User.findById(req.user._id);
   res.status(200).json({
     status: 'success',
-    message: 'Documents received. Plezar will review them and update your status.',
+    message: 'Documents received. Plejar will review them and update your status.',
     data: { verification: verificationSteps(user) }
   });
 });
@@ -188,7 +188,7 @@ exports.referrals = catchAsync(async (req, res) => {
     referralStats(req.user._id),
     User.find({ referredBy: req.user._id }).sort({ createdAt: -1 }).limit(50).select('name firstName lastName photo verification.status createdAt referralRewardedAt').lean()
   ]);
-  const text = `Join me on Plezar and get ${bonus.toLocaleString('en-US')} points to start! Use my code ${code} when you sign up: ${link}`;
+  const text = `Join me on Plejar and get ${bonus.toLocaleString('en-US')} points to start! Use my code ${code} when you sign up: ${link}`;
   const enc = encodeURIComponent;
   res.status(200).json({
     status: 'success',
@@ -197,7 +197,7 @@ exports.referrals = catchAsync(async (req, res) => {
       link,
       shareText: text,
       share: {
-        email: `mailto:?subject=${enc('Join me on Plezar')}&body=${enc(text)}`,
+        email: `mailto:?subject=${enc('Join me on Plejar')}&body=${enc(text)}`,
         twitter: `https://twitter.com/intent/tweet?text=${enc(text)}`,
         messenger: `fb-messenger://share/?link=${enc(link)}`,
         whatsapp: `https://wa.me/?text=${enc(text)}`
@@ -205,7 +205,7 @@ exports.referrals = catchAsync(async (req, res) => {
       reward: { perReferral: reward, friendWelcomeBonus: bonus },
       howItWorks: [
         { step: 1, title: 'Share your code', text: 'Send your referral code or link to friends.' },
-        { step: 2, title: 'Friend signs up', text: `Your friend joins Plezar with your code and gets ${bonus.toLocaleString('en-US')} welcome points.` },
+        { step: 2, title: 'Friend signs up', text: `Your friend joins Plejar with your code and gets ${bonus.toLocaleString('en-US')} welcome points.` },
         { step: 3, title: 'You earn points', text: `You get ${reward.toLocaleString('en-US')} points when they complete their first trip.` }
       ],
       stats,

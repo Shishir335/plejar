@@ -64,11 +64,11 @@ const canComment = (post, ctx, authorSettings) => {
   return true;
 };
 
-// Signed-in travelers can post and interact, unless Plezar switched it off for them
+// Signed-in travelers can post and interact, unless Plejar switched it off for them
 const assertCanPost = user => {
-  if (!hasRole(user, 'user')) throw new AppError('Posting, reacting and commenting are for traveler accounts in the Plezar app.', 403);
+  if (!hasRole(user, 'user')) throw new AppError('Posting, reacting and commenting are for traveler accounts in the Plejar app.', 403);
   const r = user.restrictions || {};
-  if (r.posting && (!r.until || r.until > new Date())) throw new AppError('Posting and commenting are switched off for your account. Contact Plezar support.', 403);
+  if (r.posting && (!r.until || r.until > new Date())) throw new AppError('Posting and commenting are switched off for your account. Contact Plejar support.', 403);
 };
 
 // ---------- Shapes for the app ----------

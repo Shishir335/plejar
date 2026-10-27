@@ -88,7 +88,7 @@ if (isPlaceholderUri) {
 }
 
 const port = process.env.PORT || 3000;
-const appName = process.env.APP_NAME || 'Plezar';
+const appName = process.env.APP_NAME || 'Plejar';
 
 const server = app.listen(port, () => {
   console.log(`[SERVER] ${appName} server running on http://localhost:${port}`);

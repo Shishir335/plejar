@@ -1,5 +1,5 @@
 /**
- * Plezar admin - System Status: every API endpoint, grouped by category, read from the running server.
+ * Plejar admin - System Status: every API endpoint, grouped by category, read from the running server.
  * Depends on admin.js (adminFetch, showAdminToast) and admin-users.js (E, val).
  */
 

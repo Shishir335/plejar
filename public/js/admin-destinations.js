@@ -1,5 +1,5 @@
 /**
- * Plezar admin - Destinations: list, map, featured and trending, categories, statistics,
+ * Plejar admin - Destinations: list, map, featured and trending, categories, statistics,
  * and the destination editor (details, location, photos, availability, search, statistics).
  * Depends on admin.js (adminFetch, switchTab, showAdminToast, openModal, closeModal)
  * and admin-users.js (E, fmtDate, fmtDateTime, takaFmt, val, tableMessage, renderPager, makeDebounce, formError).
@@ -253,7 +253,7 @@ async function loadFeaturedPane() {
       <li>
         <div class="feature-item">
           ${d.coverImage ? `<img class="dest-thumb" src="${E(d.coverImage)}" alt="">` : '<span class="dest-thumb dest-thumb-empty"></span>'}
-          <div><strong>${E(d.name)}</strong><span class="lead-sub">${d.trendingPinned ? 'Pinned by Plezar. ' : ''}${n(d.stats.recentTravelers)} travelers in 30 days, ${n(d.stats.upcomingEvents)} upcoming events</span></div>
+          <div><strong>${E(d.name)}</strong><span class="lead-sub">${d.trendingPinned ? 'Pinned by Plejar. ' : ''}${n(d.stats.recentTravelers)} travelers in 30 days, ${n(d.stats.upcomingEvents)} upcoming events</span></div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="toggleTrendingPin('${E(d._id)}', ${!d.trendingPinned})">${d.trendingPinned ? 'Unpin' : 'Pin'}</button>
       </li>`).join('') : '<li class="detail-muted">Nothing is trending yet. Places show up here as travelers register for tour events linked to them, or when you pin one.</li>';
@@ -1026,7 +1026,7 @@ function destSeoTab() {
         <div class="slug-row"><span>/destinations/</span><input id="deSlug" class="form-input" maxlength="120" value="${E(d.slug)}" oninput="updateSeoPreview()"></div>
         <p class="detail-muted">Letters, numbers and dashes. Changing it breaks links people already shared.</p></div>
       <div class="form-group"><label class="form-label" for="deSeoTitle">Search title <span class="detail-muted" id="deSeoTitleCount"></span></label>
-        <input id="deSeoTitle" class="form-input" maxlength="70" value="${E(d.seo.title)}" placeholder="${E(`${d.name}: travel guide and tours | Plezar`)}" oninput="updateSeoPreview()"></div>
+        <input id="deSeoTitle" class="form-input" maxlength="70" value="${E(d.seo.title)}" placeholder="${E(`${d.name}: travel guide and tours | Plejar`)}" oninput="updateSeoPreview()"></div>
       <div class="form-group"><label class="form-label" for="deSeoDesc">Search description <span class="detail-muted" id="deSeoDescCount"></span></label>
         <textarea id="deSeoDesc" class="form-input" rows="3" maxlength="170" placeholder="${E(d.summary || 'What makes this place worth the trip, in one or two sentences.')}" oninput="updateSeoPreview()">${E(d.seo.description)}</textarea></div>
       <div class="form-group"><label class="form-label" for="deSeoKeys">Keywords</label>
@@ -1039,7 +1039,7 @@ function destSeoTab() {
 
 function updateSeoPreview() {
   const d = D.detail.destination;
-  const title = val('deSeoTitle').trim() || `${d.name}: travel guide and tours | Plezar`;
+  const title = val('deSeoTitle').trim() || `${d.name}: travel guide and tours | Plejar`;
   const desc = val('deSeoDesc').trim() || d.summary || '';
   countChars('deSeoTitle', 70);
   countChars('deSeoDesc', 170);

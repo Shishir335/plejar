@@ -39,7 +39,7 @@ const dateOfBirthProblem = value => {
   const dob = new Date(`${text}T00:00:00.000Z`);
   if (dob > new Date()) return "Your date of birth can't be in the future.";
   const age = ageOn(dob);
-  if (age < MIN_AGE) return `You need to be at least ${MIN_AGE} to use Plezar.`;
+  if (age < MIN_AGE) return `You need to be at least ${MIN_AGE} to use Plejar.`;
   if (age > MAX_AGE) return 'Check your date of birth.';
   return null;
 };

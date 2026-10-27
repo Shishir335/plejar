@@ -9,8 +9,8 @@ module.exports = class Email {
         this.name = user.name || 'User';
         this.url = url;
         this.data = data;
-        const appName = process.env.APP_NAME || 'Plezar';
-        const fromAddress = process.env.EMAIL_FROM || 'support@plezar.com';
+        const appName = process.env.APP_NAME || 'Plejar';
+        const fromAddress = process.env.EMAIL_FROM || 'support@plejar.com';
         this.from = `${appName} <${fromAddress}>`;
     }
 
@@ -62,7 +62,7 @@ module.exports = class Email {
             firstName: this.firstName,
             name: this.name,
             url: this.url,
-            appName: process.env.APP_NAME || 'Plezar',
+            appName: process.env.APP_NAME || 'Plejar',
             subject,
             ...this.data
         });
@@ -71,7 +71,7 @@ module.exports = class Email {
         const mailOptions = {
             from: this.from,
             to: this.to,
-            replyTo: process.env.EMAIL_FROM || 'support@plezar.com',
+            replyTo: process.env.EMAIL_FROM || 'support@plejar.com',
             subject,
             html,
             text: convert(html)
@@ -82,12 +82,12 @@ module.exports = class Email {
     }
 
     async sendWelcome() {
-        const appName = process.env.APP_NAME || 'Plezar';
+        const appName = process.env.APP_NAME || 'Plejar';
         await this.send('welcome', `Welcome to ${appName}! 🎉`);
     }
 
     async sendAgentInvite() {
-        const appName = process.env.APP_NAME || 'Plezar';
+        const appName = process.env.APP_NAME || 'Plejar';
         await this.send('agentInvite', `You're invited to manage ${this.data.agencyName || 'your agency'} on ${appName}`);
     }
 
@@ -100,7 +100,7 @@ module.exports = class Email {
     }
 
     async sendApplicationRejected() {
-        await this.send('applicationRejected', `Your application to ${process.env.APP_NAME || 'Plezar'} (${this.data.reference})`);
+        await this.send('applicationRejected', `Your application to ${process.env.APP_NAME || 'Plejar'} (${this.data.reference})`);
     }
 
     async sendVendorLogin(subject) {
@@ -113,12 +113,12 @@ module.exports = class Email {
 
     // 4-digit code for "forgot password" in the app (this.data.code)
     async sendPasswordCode() {
-        await this.send('passwordCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plezar'} security code`);
+        await this.send('passwordCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plejar'} security code`);
     }
 
     // 4-digit code to confirm the traveler's email address (this.data.code)
     async sendVerifyCode() {
-        await this.send('verifyCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plezar'} email code`);
+        await this.send('verifyCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plejar'} email code`);
     }
 
     // Whether any mail account is set up in config.env (otherwise sending fails)
