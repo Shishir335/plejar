@@ -192,7 +192,10 @@ async function loadUsers(page = 1) {
         <td><div class="user-cell">${avatarOf(u.name)}<div class="user-cell-info">
           <span class="user-cell-name">${E(u.name) || 'Unnamed'}</span>
           <span class="user-cell-email">${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}</span></div></div></td>
-        <td>${roleBadges(u)}</td>
+        <td>
+          ${roleBadges(u)}
+          ${isMoneyAdmin() ? `<button type="button" class="btn btn-secondary btn-xs" style="padding: 1px 6px; font-size: 0.7rem; border-radius: 4px; margin-left: 4px; vertical-align: middle;" title="Change roles" onclick="openEditRoleModal('${E(u.id)}', '${E(u.name).replace(/'/g, "\\'")}', ${JSON.stringify(rolesOf(u)).replace(/"/g, '&quot;')})">✎</button>` : ''}
+        </td>
         <td class="standing">${standingBadges(u)}</td>
         <td style="color: var(--text-muted); font-size: 0.85rem;">${u.lastLoginAt ? E(fmtDate(u.lastLoginAt)) : 'Never'}</td>
         <td style="color: var(--text-muted); font-size: 0.85rem;">${E(fmtDate(u.joinedAt))}</td>
@@ -456,13 +459,23 @@ function userActionButtons(u) {
   const me = adminState.currentUser || {};
   const self = String(me._id || me.id) === String(u.id);
   const managerBlocked = !isMoneyAdmin() && !isTravelerOnly(u);
-  if (self || managerBlocked) return '<span class="detail-muted" style="margin:0">You can view this account but not change it.</span>';
+  if (managerBlocked) return '<span class="detail-muted" style="margin:0">Managers can only manage traveler accounts.</span>';
 
   const id = E(u.id);
   if (u.deleted) {
     return `<button class="btn btn-primary" onclick="restoreUser('${id}')">Restore account</button>
       ${isMoneyAdmin() ? `<button class="btn btn-danger" onclick="permanentlyDeleteUser('${id}')">Delete permanently</button>` : ''}`;
   }
+
+  // If viewing own account: allow changing roles & resetting password, but prevent accidental self-suspension/deletion
+  if (self) {
+    return `
+      <span class="detail-muted" style="margin:0 6px 0 0; font-size:0.82rem;">(Your account)</span>
+      <button class="btn btn-secondary" onclick="openRoleForOpenUser()">Change roles</button>
+      <button class="btn btn-secondary" onclick="openResetForOpenUser()">Reset password</button>
+    `;
+  }
+
   const status = u.status === 'active'
     ? '<button class="btn btn-danger" onclick="openStatusModal()">Suspend or deactivate</button>'
     : '<button class="btn btn-primary" onclick="reactivateUser()">Reactivate</button>';
@@ -488,7 +501,7 @@ function renderUserDetail(tab = 'overview') {
         <div>
           <h2>${E(u.name)}</h2>
           <p>${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}${u.dateOfBirth ? ` · Born ${E(fmtDate(u.dateOfBirth))}` : ''}</p>
-          <p class="profile-badges">${roleBadges(u)} ${standingBadges(u)}</p>
+          <p class="profile-badges">${roleBadges(u)} ${standingBadges(u)} ${isMoneyAdmin() ? `<button type="button" class="btn btn-secondary btn-xs" style="margin-left: 6px; padding: 2px 8px; font-size: 0.72rem; vertical-align: middle; border-radius: 999px;" onclick="openRoleForOpenUser()">✎ Change roles</button>` : ''}</p>
         </div>
       </div>
       <div class="profile-actions">${userActionButtons(u)}</div>
@@ -580,6 +593,34 @@ function overviewPanel() {
         <button type="submit" class="btn btn-primary" id="udSave">Save details</button>
       </form>
       <div>
+        <div class="detail-card" style="margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Roles & Permissions</h3>
+            ${isMoneyAdmin() ? `<button type="button" class="btn btn-secondary btn-sm" onclick="openRoleForOpenUser()">Change roles</button>` : ''}
+          </div>
+          <p class="detail-muted" style="font-size: 0.82rem; margin-bottom: 10px;">Active roles assigned to this account:</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
+            ${rolesOf(u).map(r => `
+              <span class="badge badge-${E(r)}" style="padding: 5px 10px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px;">
+                ${E(ROLE_NAMES[r] || r)}${r === 'agent' && u.agencyRole ? ` · ${E(u.agencyRole)}` : ''}
+                ${isMoneyAdmin() && rolesOf(u).length > 1 ? `<button type="button" onclick="quickRemoveRole('${E(u.id)}', '${E(r)}')" title="Remove ${E(ROLE_NAMES[r] || r)} role" style="background: none; border: none; padding: 0; cursor: pointer; color: inherit; font-size: 1.1rem; line-height: 1; display: inline-flex; align-items: center; margin-left: 2px;">&times;</button>` : ''}
+              </span>
+            `).join('')}
+          </div>
+          ${isMoneyAdmin() ? `
+            <div style="border-top: 1px solid var(--border-color, rgba(255,255,255,0.08)); padding-top: 12px;">
+              <p class="detail-muted" style="font-size: 0.8rem; margin-bottom: 8px;">Add role:</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                ${['user', 'agent', 'manager', 'admin', 'dev'].filter(r => !rolesOf(u).includes(r)).map(r => `
+                  <button type="button" class="btn btn-secondary btn-xs" onclick="quickAddRole('${E(u.id)}', '${E(r)}')" style="border-radius: 999px; font-size: 0.76rem; padding: 3px 10px;">
+                    + Add ${E(ROLE_NAMES[r] || r)}
+                  </button>
+                `).join('') || '<span class="detail-muted" style="font-size: 0.8rem;">All available roles are currently assigned.</span>'}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
         <div class="detail-card">
           <h3>Account standing</h3>
           <p>${standingBadges(u)}</p>

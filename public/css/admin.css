@@ -43,6 +43,7 @@
   --badge-manager-fg: #fbbf24; --badge-manager-bg: rgba(245, 158, 11, 0.15); --badge-manager-line: rgba(245, 158, 11, 0.3);
   --badge-user-fg: #818cf8;    --badge-user-bg: rgba(99, 102, 241, 0.15);   --badge-user-line: rgba(99, 102, 241, 0.3);
   --badge-agent-fg: #2dd4bf;   --badge-agent-bg: rgba(20, 184, 166, 0.15);  --badge-agent-line: rgba(20, 184, 166, 0.3);
+  --badge-dev-fg: #c084fc;     --badge-dev-bg: rgba(192, 132, 252, 0.15);   --badge-dev-line: rgba(192, 132, 252, 0.35);
   --badge-active-fg: #34d399;  --badge-active-bg: rgba(16, 185, 129, 0.15);
   --badge-inactive-fg: #94a3b8; --badge-inactive-bg: rgba(100, 116, 139, 0.2);
   --note-ok-fg: #6ee7b7;       --note-ok-bg: rgba(16, 185, 129, 0.12);
@@ -100,6 +101,7 @@
   --badge-manager-fg: #92400e; --badge-manager-bg: rgba(217, 119, 6, 0.13); --badge-manager-line: rgba(217, 119, 6, 0.3);
   --badge-user-fg: #4338ca;    --badge-user-bg: rgba(79, 70, 229, 0.1);     --badge-user-line: rgba(79, 70, 229, 0.25);
   --badge-agent-fg: #0f766e;   --badge-agent-bg: rgba(13, 148, 136, 0.12);  --badge-agent-line: rgba(13, 148, 136, 0.28);
+  --badge-dev-fg: #7e22ce;     --badge-dev-bg: rgba(126, 34, 206, 0.1);     --badge-dev-line: rgba(126, 34, 206, 0.25);
   --badge-active-fg: #047857;  --badge-active-bg: rgba(5, 150, 105, 0.12);
   --badge-inactive-fg: #475569; --badge-inactive-bg: rgba(100, 116, 139, 0.16);
   --note-ok-fg: #047857;       --note-ok-bg: rgba(5, 150, 105, 0.1);
@@ -401,6 +403,7 @@ body {
 .badge-admin { background: var(--badge-admin-bg); color: var(--badge-admin-fg); border: 1px solid var(--badge-admin-line); }
 .badge-manager { background: var(--badge-manager-bg); color: var(--badge-manager-fg); border: 1px solid var(--badge-manager-line); }
 .badge-user { background: var(--badge-user-bg); color: var(--badge-user-fg); border: 1px solid var(--badge-user-line); }
+.badge-dev { background: var(--badge-dev-bg); color: var(--badge-dev-fg); border: 1px solid var(--badge-dev-line); }
 .badge-active { background: var(--badge-active-bg); color: var(--badge-active-fg); }
 .badge-inactive { background: var(--badge-inactive-bg); color: var(--badge-inactive-fg); }
 

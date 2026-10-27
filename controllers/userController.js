@@ -174,14 +174,16 @@ exports.getUserDetails = catchAsync(async (req, res, next) => {
     });
 });
 
-// Roles an admin can give or take away here. Vendor (agent) comes with an agency, from the vendor pages.
-const GRANTABLE = ['user', 'manager', 'admin'];
+// Roles an admin can give or take away. System supports traveler, vendor, manager, admin, dev.
+const GRANTABLE = ['user', 'agent', 'manager', 'admin', 'dev'];
 const isFullAdmin = user => hasRole(user, 'admin', 'dev');
 
-// { roles: [...] }, or the older { role } (one staff role, keeping the traveler and vendor roles they have)
+// { roles: [...] }, { addRole: 'admin' }, { removeRole: 'manager' }, or legacy { role: 'admin' }
 const wantedRoles = (body, current) => {
     if (Array.isArray(body.roles)) return body.roles.map(String);
-    if (body.role) return [...current.filter(r => !STAFF.includes(r)), body.role];
+    if (body.addRole || body.roleToAdd) return [...current, String(body.addRole || body.roleToAdd).trim()];
+    if (body.removeRole || body.roleToRemove) return current.filter(r => r !== String(body.removeRole || body.roleToRemove).trim());
+    if (body.role) return [...current.filter(r => !STAFF.includes(r)), String(body.role).trim()];
     return null;
 };
 
@@ -206,7 +208,7 @@ exports.createUser = catchAsync(async (req, res, next) => {
         confirmPassword: confirmPassword || password
     }), targetRoles);
     await newUser.save();
-    const targetRole = targetRoles.map(r => LABELS[r]).join(' + ');
+    const targetRole = targetRoles.map(r => LABELS[r] || r).join(' + ');
 
     newUser.password = undefined;
 
@@ -240,26 +242,36 @@ exports.updateUser = catchAsync(async (req, res, next) => {
         }
     }
 
-    // Role validation & self-demotion protection. The vendor role stays as it is: it follows the agency.
+    // Role validation & self-demotion protection
     let nextRoles = null;
     if (wanted) {
-        if (wanted.some(r => !GRANTABLE.includes(r) && r !== 'agent')) {
+        if (wanted.some(r => !GRANTABLE.includes(r))) {
             return next(new AppError(`Choose roles from: ${GRANTABLE.join(', ')}.`, 400));
         }
-        nextRoles = [...wanted.filter(r => r !== 'agent'), ...(current.includes('agent') ? ['agent'] : [])];
-        if (current.includes('dev')) nextRoles.push('dev');
+        nextRoles = Array.from(new Set(wanted.filter(r => GRANTABLE.includes(r))));
         if (!nextRoles.length) return next(new AppError('An account needs at least one role.', 400));
-        const staffBefore = current.filter(r => STAFF.includes(r)).sort().join();
-        const staffAfter = nextRoles.filter(r => STAFF.includes(r)).sort().join();
-        if (req.user.id === req.params.id && staffBefore !== staffAfter) {
-            return next(new AppError('You cannot change your own role to prevent accidental lockout.', 400));
+
+        // Prevent accidental lockout: if modifying own account, cannot remove last admin/dev role
+        if (String(req.user.id || req.user._id) === String(targetUser.id || targetUser._id)) {
+            const wasAdmin = hasRole(req.user, 'admin', 'dev');
+            const willBeAdmin = nextRoles.some(r => ['admin', 'dev'].includes(r));
+            if (wasAdmin && !willBeAdmin) {
+                return next(new AppError('You cannot remove your own administrator or developer role to prevent accidental lockout.', 400));
+            }
         }
     }
 
     // Only allow profile fields and roles; password changes go through adminResetUserPassword
     const filteredBody = filterObj(req.body, 'name', 'email', 'phone', 'address', 'photo');
     Object.assign(targetUser, filteredBody);
-    if (nextRoles) setRoles(targetUser, nextRoles);
+    if (nextRoles) {
+        setRoles(targetUser, nextRoles);
+        await logActivity(req, {
+            action: 'user.roles_changed',
+            summary: `Roles changed from [${current.join(', ')}] to [${nextRoles.join(', ')}] by ${req.user.name || 'Admin'}`,
+            user: targetUser._id
+        });
+    }
     await targetUser.save({ validateBeforeSave: false });
     const updatedUser = targetUser;
 

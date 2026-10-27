@@ -8,7 +8,7 @@ const ActivityLog = require('../models/activityLogModel');
 const WalletTransaction = require('../models/walletTransactionModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
-const { ROLES, hasRole, rolesOf, isTravelerOnly, roleFilter } = require('../utils/roles');
+const { ROLES, STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, roleFilter, setRoles } = require('../utils/roles');
 const { logActivity } = require('../utils/activity');
 const { privateDocumentPath, removePrivateDocument } = require('../utils/uploads');
 
@@ -200,6 +200,53 @@ exports.getUser = catchAsync(async (req, res, next) => {
   });
 });
 
+// Helper to compute and validate role changes
+const computeNextRoles = (req, targetUser, body) => {
+  const current = rolesOf(targetUser);
+  let nextRoles = null;
+
+  if (Array.isArray(body.roles)) {
+    nextRoles = body.roles.map(String);
+  } else if (body.addRole || body.roleToAdd) {
+    const toAdd = String(body.addRole || body.roleToAdd).trim();
+    nextRoles = [...current, toAdd];
+  } else if (body.removeRole || body.roleToRemove) {
+    const toRemove = String(body.removeRole || body.roleToRemove).trim();
+    nextRoles = current.filter(r => r !== toRemove);
+  } else if (body.role) {
+    nextRoles = [...current.filter(r => !STAFF.includes(r)), String(body.role).trim()];
+  }
+
+  if (!nextRoles) return { roles: null };
+
+  // Filter unique valid roles
+  nextRoles = Array.from(new Set(nextRoles.filter(r => ROLES.includes(r))));
+  if (!nextRoles.length) {
+    return { error: 'An account needs at least one role.' };
+  }
+
+  // Managers cannot elevate privileges or modify non-travelers
+  if (!hasRole(req.user, 'admin', 'dev')) {
+    if (!isTravelerOnly(targetUser)) {
+      return { error: 'Managers can only modify standard traveler accounts.' };
+    }
+    if (nextRoles.some(r => r !== 'user')) {
+      return { error: 'Managers cannot elevate account privileges.' };
+    }
+  }
+
+  // Prevent accidental lockout: if modifying own account, cannot remove last admin/dev role
+  if (String(req.user._id || req.user.id) === String(targetUser._id || targetUser.id)) {
+    const wasAdmin = hasRole(req.user, 'admin', 'dev');
+    const willBeAdmin = nextRoles.some(r => ['admin', 'dev'].includes(r));
+    if (wasAdmin && !willBeAdmin) {
+      return { error: 'You cannot remove your own administrator or developer role to prevent accidental lockout.' };
+    }
+  }
+
+  return { roles: nextRoles };
+};
+
 exports.updateUser = catchAsync(async (req, res, next) => {
   const user = await findUser(req.params.id, next);
   if (!user) return;
@@ -210,6 +257,20 @@ exports.updateUser = catchAsync(async (req, res, next) => {
   ['name', 'email', 'phone', 'address'].forEach(f => {
     if (req.body[f] !== undefined) user[f] = req.body[f];
   });
+
+  // Handle role changes if passed in the body
+  const roleCalc = computeNextRoles(req, user, req.body);
+  if (roleCalc.error) return next(new AppError(roleCalc.error, 400));
+  if (roleCalc.roles) {
+    const currentRoles = rolesOf(user);
+    setRoles(user, roleCalc.roles);
+    await logActivity(req, {
+      action: 'user.roles_changed',
+      summary: `Roles changed from [${currentRoles.join(', ')}] to [${rolesOf(user).join(', ')}] by ${req.user.name || 'Admin'}`,
+      user: user._id
+    });
+  }
+
   await user.save({ validateBeforeSave: true });
 
   const changed = ['name', 'email', 'phone'].filter(f => before[f] !== user[f]);
@@ -217,6 +278,47 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     await logActivity(req, { action: 'user.edited', summary: `Profile details changed by admin: ${changed.join(', ')}`, user: user._id });
   }
   res.status(200).json({ status: 'success', data: { user: userView(user) } });
+});
+
+exports.setRoles = catchAsync(async (req, res, next) => {
+  const user = await findUser(req.params.id, next);
+  if (!user) return;
+  const blocked = guard(req, user, { allowSelf: true });
+  if (blocked) return next(new AppError(blocked, 403));
+
+  const roleCalc = computeNextRoles(req, user, req.body);
+  if (roleCalc.error) return next(new AppError(roleCalc.error, 400));
+  if (!roleCalc.roles) return next(new AppError('No valid roles provided.', 400));
+
+  const currentRoles = rolesOf(user);
+  setRoles(user, roleCalc.roles);
+  await user.save({ validateBeforeSave: false });
+
+  await logActivity(req, {
+    action: 'user.roles_changed',
+    summary: `Roles updated from [${currentRoles.join(', ')}] to [${rolesOf(user).join(', ')}] by ${req.user.name || 'Admin'}`,
+    user: user._id
+  });
+
+  res.status(200).json({ status: 'success', data: { user: userView(user) } });
+});
+
+exports.addRole = catchAsync(async (req, res, next) => {
+  const role = req.body.role || req.body.addRole;
+  if (!role || !ROLES.includes(role)) {
+    return next(new AppError(`Please provide a valid role from: ${ROLES.join(', ')}.`, 400));
+  }
+  req.body = { addRole: role };
+  return exports.setRoles(req, res, next);
+});
+
+exports.removeRole = catchAsync(async (req, res, next) => {
+  const role = req.body.role || req.body.removeRole;
+  if (!role || !ROLES.includes(role)) {
+    return next(new AppError(`Please provide a valid role from: ${ROLES.join(', ')}.`, 400));
+  }
+  req.body = { removeRole: role };
+  return exports.setRoles(req, res, next);
 });
 
 // ---------- Account status, restrictions, delete and restore ----------

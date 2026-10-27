@@ -328,8 +328,11 @@ function openEditRoleModal(userId, name, currentRoles) {
   const roles = [].concat(currentRoles || []);
   document.getElementById('editRoleId').value = userId;
   document.getElementById('editRoleUserName').textContent = name;
-  document.querySelectorAll('input[name="editRoles"]').forEach(box => { box.checked = roles.includes(box.value); });
-  document.getElementById('editRoleVendorNote').hidden = !roles.includes('agent');
+  document.querySelectorAll('input[name="editRoles"]').forEach(box => {
+    box.checked = roles.includes(box.value);
+  });
+  const vendorNote = document.getElementById('editRoleVendorNote');
+  if (vendorNote) vendorNote.hidden = !roles.includes('agent');
   openModal('editRoleModal');
 }
 
@@ -337,26 +340,76 @@ async function handleUpdateRole(e) {
   e.preventDefault();
   const userId = document.getElementById('editRoleId').value;
   const roles = [...document.querySelectorAll('input[name="editRoles"]:checked')].map(box => box.value);
-  if (!roles.length && document.getElementById('editRoleVendorNote').hidden) {
-    showAdminToast('Choose at least one role.', 'error');
+  if (!roles.length) {
+    showAdminToast('Please select at least one role for this account.', 'error');
     return;
   }
 
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
+
   try {
-    const { ok, data } = await adminFetch(`/api/v1/users/${userId}`, {
+    const { ok, data } = await adminFetch(`/api/v1/admin/users/${userId}/roles`, {
       method: 'PATCH',
       body: JSON.stringify({ roles })
     });
 
     if (ok) {
-      showAdminToast('Roles updated.', 'success');
+      showAdminToast('Account roles updated successfully.', 'success');
       closeModal('editRoleModal');
+      if (typeof reloadUser === 'function') reloadUser();
       refreshUsersViews();
     } else {
-      showAdminToast(data.message || 'Could not update role.', 'error');
+      showAdminToast(data.message || 'Could not update roles.', 'error');
     }
   } catch (err) {
-    showAdminToast('Network error.', 'error');
+    showAdminToast('Network error while updating roles.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function quickAddRole(userId, role) {
+  const roleName = (typeof ROLE_NAMES !== 'undefined' && ROLE_NAMES[role]) ? ROLE_NAMES[role] : role;
+  try {
+    const { ok, data } = await adminFetch(`/api/v1/admin/users/${userId}/roles/add`, {
+      method: 'POST',
+      body: JSON.stringify({ role })
+    });
+
+    if (ok) {
+      showAdminToast(`Added "${roleName}" role successfully.`, 'success');
+      if (typeof reloadUser === 'function') reloadUser();
+      refreshUsersViews();
+    } else {
+      showAdminToast(data.message || `Could not add ${roleName} role.`, 'error');
+    }
+  } catch (err) {
+    showAdminToast('Network error while adding role.', 'error');
+  }
+}
+
+async function quickRemoveRole(userId, role) {
+  const roleName = (typeof ROLE_NAMES !== 'undefined' && ROLE_NAMES[role]) ? ROLE_NAMES[role] : role;
+  if (!confirm(`Are you sure you want to remove the "${roleName}" role from this account?`)) {
+    return;
+  }
+
+  try {
+    const { ok, data } = await adminFetch(`/api/v1/admin/users/${userId}/roles/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ role })
+    });
+
+    if (ok) {
+      showAdminToast(`Removed "${roleName}" role successfully.`, 'success');
+      if (typeof reloadUser === 'function') reloadUser();
+      refreshUsersViews();
+    } else {
+      showAdminToast(data.message || `Could not remove ${roleName} role.`, 'error');
+    }
+  } catch (err) {
+    showAdminToast('Network error while removing role.', 'error');
   }
 }
 

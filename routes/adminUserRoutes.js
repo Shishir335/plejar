@@ -13,6 +13,10 @@ router
   .patch(adminUserController.updateUser)
   .delete(adminUserController.deleteUser);
 
+router.patch('/users/:id/roles', authController.restrictTo('admin', 'dev'), adminUserController.setRoles);
+router.post('/users/:id/roles/add', authController.restrictTo('admin', 'dev'), adminUserController.addRole);
+router.post('/users/:id/roles/remove', authController.restrictTo('admin', 'dev'), adminUserController.removeRole);
+
 router.post('/users/:id/status', adminUserController.setStatus);
 router.post('/users/:id/restrictions', adminUserController.setRestrictions);
 router.post('/users/:id/restore', adminUserController.restoreUser);

@@ -1035,15 +1035,17 @@
           Update system role and access permissions for <strong id="editRoleUserName" style="color: var(--text-primary);">-</strong>:
         </p>
         <div class="form-group">
-          <label class="form-label">Roles</label>
-          <div class="check-list" id="editRoleChecks">
-            <label class="check"><input type="checkbox" name="editRoles" value="user"><span>Traveler (uses the app)</span></label>
-            <label class="check"><input type="checkbox" name="editRoles" value="manager"><span>Manager</span></label>
-            <label class="check"><input type="checkbox" name="editRoles" value="admin"><span>Administrator</span></label>
+          <label class="form-label">Roles & Permissions</label>
+          <div class="check-list" id="editRoleChecks" style="display: flex; flex-direction: column; gap: 8px;">
+            <label class="check"><input type="checkbox" name="editRoles" value="user"><span><strong>Traveler</strong> &mdash; Mobile app user (books trips, reviews, wallet)</span></label>
+            <label class="check"><input type="checkbox" name="editRoles" value="agent"><span><strong>Vendor</strong> &mdash; Tour agency partner (access to Vendor Panel)</span></label>
+            <label class="check"><input type="checkbox" name="editRoles" value="manager"><span><strong>Manager</strong> &mdash; Operations staff (manages travelers & operations)</span></label>
+            <label class="check"><input type="checkbox" name="editRoles" value="admin"><span><strong>Administrator</strong> &mdash; Full administrative access to Admin Console</span></label>
+            <label class="check"><input type="checkbox" name="editRoles" value="dev"><span><strong>Developer</strong> &mdash; System engineer and superadmin access</span></label>
           </div>
-          <p class="lead-sub" id="editRoleVendorNote" hidden>This person is also a vendor. That role follows their agency and is managed under Vendors.</p>
+          <p class="lead-sub" id="editRoleVendorNote" style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted);" hidden>Note: Vendor (agent) access also connects to an agency profile under Vendors.</p>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Update Roles</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 14px;">Save Roles</button>
       </form>
     </div>
   </div>
