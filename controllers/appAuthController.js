@@ -75,22 +75,112 @@ const findTraveler = ({ channel, value }, { withPassword = false, includeInactiv
  * POST /auth/register (JSON, or multipart with an optional "photo")
  * email and/or phone, password, confirmPassword; dateOfBirth (YYYY-MM-DD), firstName and lastName
  * may come now or in /auth/complete-profile (user.profileComplete says if that step is needed).
+ * If the user already has an account (e.g. admin or vendor) without traveler access, registering
+ * with their existing password seamlessly grants them the traveler role.
  */
 exports.register = catchAsync(async (req, res) => {
   const b = req.body;
   const errors = signupProblems(b);
   const email = String(b.email || '').trim().toLowerCase();
   const phone = normalizePhone(b.phone);
-  if (!errors.email && email && await User.exists({ email }).setOptions({ includeInactive: true })) {
-    errors.email = 'An account with this email already exists. Log in instead.';
+
+  let existingUser = null;
+  if (!errors.email && email) {
+    existingUser = await User.findOne({ email }).setOptions({ includeInactive: true }).select('+password');
+    if (existingUser) {
+      if (hasRole(existingUser, 'user')) {
+        errors.email = 'An account with this email already exists. Log in instead.';
+      } else {
+        // User exists with another role (e.g. admin, agent, staff) or previously had traveler removed
+        const blocked = await blockedReason(existingUser);
+        if (blocked) {
+          errors.email = blocked;
+        } else if (existingUser.password) {
+          const ok = await existingUser.correctPassword(b.password, existingUser.password);
+          if (!ok) {
+            errors.password = 'An account with this email already exists. Enter your existing account password to add traveler access, or log in.';
+          }
+        }
+      }
+    }
   }
-  if (!errors.phone && phone && await User.exists({ $and: [{ phone }, roleFilter('user')] }).setOptions({ includeInactive: true })) {
-    errors.phone = 'An account with this mobile number already exists. Log in instead.';
+
+  if (!errors.phone && phone) {
+    // If phone is registered to another traveler account
+    const phoneTraveler = await User.findOne({ $and: [{ phone }, roleFilter('user')] }).setOptions({ includeInactive: true }).select('_id');
+    if (phoneTraveler && (!existingUser || String(phoneTraveler._id) !== String(existingUser._id))) {
+      errors.phone = 'An account with this mobile number already exists. Log in instead.';
+    } else if (!existingUser) {
+      // If signing up by phone only, check for existing non-traveler account with that phone
+      const existingByPhone = await User.findOne({ phone }).setOptions({ includeInactive: true }).select('+password');
+      if (existingByPhone) {
+        if (hasRole(existingByPhone, 'user')) {
+          errors.phone = 'An account with this mobile number already exists. Log in instead.';
+        } else {
+          existingUser = existingByPhone;
+          const blocked = await blockedReason(existingUser);
+          if (blocked) {
+            errors.phone = blocked;
+          } else if (existingUser.password) {
+            const ok = await existingUser.correctPassword(b.password, existingUser.password);
+            if (!ok) {
+              errors.password = 'An account with this mobile number already exists. Enter your existing account password to add traveler access, or log in.';
+            }
+          }
+        }
+      }
+    }
   }
+
   // Optional code from a friend's Refer Friends link
   const referrer = String(b.referralCode || '').trim() ? await findReferrer(b.referralCode) : null;
   if (String(b.referralCode || '').trim() && !referrer) errors.referralCode = "This referral code doesn't exist. Check it or leave it empty.";
   if (Object.keys(errors).length) return fieldErrors(res, errors);
+
+  if (existingUser) {
+    // Existing user (e.g. admin, vendor) adding the traveler role or re-applying
+    addRole(existingUser, 'user');
+
+    if (!existingUser.password) {
+      existingUser.password = b.password;
+      existingUser.confirmPassword = b.confirmPassword;
+    }
+
+    if (String(b.firstName || '').trim() && (!existingUser.firstName || existingUser.name === 'Plezar traveler')) {
+      existingUser.firstName = readPersonName(b.firstName, 'first name');
+    }
+    if (String(b.lastName || '').trim() && !existingUser.lastName) {
+      existingUser.lastName = readPersonName(b.lastName, 'last name');
+    }
+    if (existingUser.firstName || existingUser.lastName) {
+      existingUser.name = [existingUser.firstName, existingUser.lastName].filter(Boolean).join(' ') || existingUser.name;
+    }
+    if (phone && !existingUser.phone) {
+      existingUser.phone = phone;
+    }
+    if (String(b.dateOfBirth || '').trim() && !existingUser.dateOfBirth) {
+      existingUser.dateOfBirth = readDateOfBirth(b.dateOfBirth);
+    }
+
+    let photoWarning;
+    if (req.file) {
+      try {
+        existingUser.photo = await saveProfileImage(req.file, existingUser._id, 'user');
+      } catch (err) {
+        photoWarning = "Your account is ready, but the photo couldn't be used. Add one from Settings.";
+      }
+    }
+
+    existingUser.lastLoginAt = new Date();
+    existingUser.loginCount = (existingUser.loginCount || 0) + 1;
+    await existingUser.save({ validateBeforeSave: false });
+
+    const welcomePoints = referrer && !existingUser.referredBy ? await applyReferral(existingUser, referrer) : 0;
+
+    await recordLogin(req, { user: existingUser, email: existingUser.email || phone, success: true, reason: 'role_added_traveler' });
+    const welcome = existingUser.firstName ? `Welcome to Plezar, ${existingUser.firstName}!` : 'Welcome to Plezar!';
+    return sendSession(res, 200, existingUser, photoWarning || (welcomePoints ? `${welcome} The traveler role has been added to your account. You got ${welcomePoints.toLocaleString('en-US')} welcome points.` : `${welcome} The traveler role has been added to your account.`));
+  }
 
   const fields = {
     // Left out when not sent, so phone-only accounts don't collide on the unique email index
@@ -140,12 +230,21 @@ exports.checkAvailability = catchAsync(async (req, res) => {
   if (contact.channel === 'email' && signupProblems({ email: contact.value }).email) {
     return fieldErrors(res, { email: 'Enter a valid email address, for example rahim@gmail.com.' });
   }
-  const taken = Boolean(await findTraveler(contact, { includeInactive: true }).select('_id'));
+
+  const existing = await User.findOne(contact.channel === 'email' ? { email: contact.value } : { phone: contact.value })
+    .setOptions({ includeInactive: true })
+    .select('_id role roles status');
+
+  const alreadyTraveler = Boolean(existing && hasRole(existing, 'user'));
+  const canJoinRole = Boolean(existing && !alreadyTraveler);
+  const taken = alreadyTraveler;
   const label = contact.channel === 'email' ? 'email' : 'mobile number';
+
   res.status(200).json({
     status: 'success',
     ...(taken ? { message: `An account with this ${label} already exists. Log in instead.` } : {}),
-    data: { [contact.channel]: contact.value, available: !taken }
+    ...(canJoinRole ? { message: `An account with this ${label} exists. You can register with your password to activate your traveler profile.` } : {}),
+    data: { [contact.channel]: contact.value, available: !taken, canJoinRole }
   });
 });
 

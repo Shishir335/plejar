@@ -266,6 +266,10 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     Object.assign(targetUser, filteredBody);
     if (nextRoles) {
         setRoles(targetUser, nextRoles);
+        if (!nextRoles.includes('agent')) {
+            targetUser.agency = null;
+            targetUser.agencyRole = null;
+        }
         await logActivity(req, {
             action: 'user.roles_changed',
             summary: `Roles changed from [${current.join(', ')}] to [${nextRoles.join(', ')}] by ${req.user.name || 'Admin'}`,

@@ -264,6 +264,10 @@ exports.updateUser = catchAsync(async (req, res, next) => {
   if (roleCalc.roles) {
     const currentRoles = rolesOf(user);
     setRoles(user, roleCalc.roles);
+    if (!roleCalc.roles.includes('agent')) {
+      user.agency = null;
+      user.agencyRole = null;
+    }
     await logActivity(req, {
       action: 'user.roles_changed',
       summary: `Roles changed from [${currentRoles.join(', ')}] to [${rolesOf(user).join(', ')}] by ${req.user.name || 'Admin'}`,
@@ -292,6 +296,10 @@ exports.setRoles = catchAsync(async (req, res, next) => {
 
   const currentRoles = rolesOf(user);
   setRoles(user, roleCalc.roles);
+  if (!roleCalc.roles.includes('agent')) {
+    user.agency = null;
+    user.agencyRole = null;
+  }
   await user.save({ validateBeforeSave: false });
 
   await logActivity(req, {
