@@ -342,14 +342,32 @@ exports.restrictTo = (...roles) => Object.assign((req, res, next) => {
     next();
 }, { roles }); // roles: read by the endpoint list in the admin panel
 
-exports.logout = (req, res) => {
+exports.logout = async (req, res) => {
+    try {
+        const fcmToken = req.body?.fcmToken || req.body?.token || req.query?.fcmToken;
+        if (fcmToken) {
+            const { removeUserToken } = require('../utils/pushNotification');
+            if (req.user && req.user._id) {
+                await removeUserToken(req.user._id, fcmToken);
+            } else {
+                await User.updateMany(
+                    { 'fcmTokens.token': String(fcmToken).trim() },
+                    { $pull: { fcmTokens: { token: String(fcmToken).trim() } } }
+                );
+            }
+        }
+    } catch (_) {
+        // Non-blocking cleanup
+    }
+
     const isSecure = process.env.NODE_ENV === 'production' || 
         Boolean(req && (req.secure || req.headers['x-forwarded-proto'] === 'https'));
     res.cookie('jwt', 'loggedout', {
-        expires: new Date(Date.now() + 5 * 1000),
+        expires: new Date(Date.now() + 1000),
         httpOnly: true,
         sameSite: 'lax',
-        secure: isSecure
+        secure: isSecure,
+        path: '/'
     });
     res.status(200).json({ status: 'success', message: 'Logged out successfully' });
 };

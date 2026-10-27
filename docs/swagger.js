@@ -103,10 +103,47 @@ const corePaths = {
     }
   },
 
-  '/api/v1/users/logout': {
+  '/api/v1/auth/logout': {
+    post: {
+      tags: ['Authentication & Users'],
+      summary: 'Sign out and clear session cookie / FCM device token',
+      requestBody: {
+        required: false,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                fcmToken: { type: 'string', example: 'fcm_token_to_remove' }
+              }
+            }
+          }
+        }
+      },
+      responses: {
+        200: { description: 'Logged out successfully.' }
+      }
+    },
     get: {
       tags: ['Authentication & Users'],
-      summary: 'Sign out and clear session cookie',
+      summary: 'Sign out via GET request',
+      responses: {
+        200: { description: 'Logged out successfully.' }
+      }
+    }
+  },
+
+  '/api/v1/users/logout': {
+    post: {
+      tags: ['Authentication & Users'],
+      summary: 'Sign out and clear session cookie (POST)',
+      responses: {
+        200: { description: 'Logged out successfully' }
+      }
+    },
+    get: {
+      tags: ['Authentication & Users'],
+      summary: 'Sign out and clear session cookie (GET)',
       responses: {
         200: { description: 'Logged out successfully' }
       }

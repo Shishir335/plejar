@@ -250,10 +250,37 @@ exports.google = catchAsync(async (req, res, next) => {
 
 exports.me = (req, res) => res.status(200).json({ status: 'success', data: { user: appUserView(req.user) } });
 
-// Tokens live on the phone; signing out there is enough. This also clears the website cookie.
-exports.logout = (req, res) => {
-  res.cookie('jwt', 'loggedout', { expires: new Date(Date.now() + 1000), httpOnly: true });
-  res.status(200).json({ status: 'success', message: 'Signed out.' });
+// Tokens live on the phone; signing out there is enough. This also clears the website cookie and prunes device FCM tokens.
+exports.logout = async (req, res) => {
+  try {
+    const fcmToken = req.body?.fcmToken || req.body?.token || req.query?.fcmToken;
+    if (fcmToken) {
+      const { removeUserToken } = require('../utils/pushNotification');
+      if (req.user && req.user._id) {
+        await removeUserToken(req.user._id, fcmToken);
+      } else {
+        await User.updateMany(
+          { 'fcmTokens.token': String(fcmToken).trim() },
+          { $pull: { fcmTokens: { token: String(fcmToken).trim() } } }
+        );
+      }
+    }
+  } catch (_) {
+    // Non-blocking cleanup
+  }
+
+  const isSecure = process.env.NODE_ENV === 'production' || 
+      Boolean(req && (req.secure || req.headers['x-forwarded-proto'] === 'https'));
+
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 1000),
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isSecure,
+    path: '/'
+  });
+
+  res.status(200).json({ status: 'success', message: 'Logged out successfully.' });
 };
 
 // ---------- Forgot password: code, verify, new password ----------

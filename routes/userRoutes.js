@@ -18,7 +18,9 @@ router.patch('/resetPassword/:token', authController.resetPassword);
 router.get('/invite/:token', authController.checkInvite);
 router.patch('/acceptInvite/:token', authController.acceptInvite);
 
-router.get('/logout', authController.logout);
+router.route('/logout')
+    .get(authController.optionalAuth, authController.logout)
+    .post(authController.optionalAuth, authController.logout);
 router.get('/google-client-id', authController.getGoogleClientId);
 
 // Protecting below router with this line. Above routes won't be affected with this protection

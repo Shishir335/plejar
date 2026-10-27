@@ -23,6 +23,8 @@ router.get('/me', protect, appAuth.me);
 router.post('/complete-profile', protect, signupPhotoUpload, appAuth.completeProfile);
 router.post('/fcm-token', protect, userController.registerFcmToken);
 router.delete('/fcm-token', protect, userController.removeFcmToken);
-router.post('/logout', appAuth.logout);
+router.route('/logout')
+  .get(authController.optionalAuth, appAuth.logout)
+  .post(authController.optionalAuth, appAuth.logout);
 
 module.exports = router;
