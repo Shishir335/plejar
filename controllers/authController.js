@@ -11,7 +11,23 @@ const { recordLogin } = require('../utils/activity');
 const { agencyBlockedReason } = require('../utils/agencyStanding');
 const { hasRole, addRole, rolesOf } = require('../utils/roles');
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client();
+
+const getGoogleAudiences = () => [
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_IOS_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_CLIENT_ID
+].filter(Boolean);
+
+// Public configuration endpoint so frontend apps know the Google Web Client ID
+exports.getGoogleClientId = (req, res) => {
+    res.status(200).json({
+        status: 'success',
+        data: {
+            clientId: process.env.GOOGLE_CLIENT_ID || ''
+        }
+    });
+};
 
 // Emails listed in ADMIN_EMAILS (comma-separated, exact match) are always treated as admins
 const getAdminEmails = () =>
@@ -141,21 +157,21 @@ exports.login = catchAsync(async (req, res, next) => {
 });
 
 exports.googleLogin = catchAsync(async (req, res, next) => {
-    const { credential } = req.body;
+    const credential = String(req.body.credential || req.body.idToken || '');
     if (!credential) {
         return next(new AppError('Google credential token is missing.', 400));
     }
 
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    if (!clientId) {
-        return next(new AppError('Google login is not configured on this server.', 500));
+    const audiences = getGoogleAudiences();
+    if (!audiences.length) {
+        return next(new AppError('Google sign-in is not configured on this server yet. Set GOOGLE_CLIENT_ID in server configuration.', 503));
     }
 
     let payload;
     try {
         const ticket = await googleClient.verifyIdToken({
             idToken: credential,
-            audience: clientId
+            audience: audiences
         });
         payload = ticket.getPayload();
     } catch (err) {
@@ -163,54 +179,90 @@ exports.googleLogin = catchAsync(async (req, res, next) => {
         return next(new AppError(`Invalid or expired Google credential: ${err.message}`, 401));
     }
 
-    const { sub: googleId, email, name, picture } = payload;
+    const {
+        sub: googleId,
+        email,
+        name,
+        picture,
+        given_name: givenName,
+        family_name: familyName,
+        email_verified: emailVerified
+    } = payload;
 
-    if (!email) {
-        return next(new AppError('Google profile did not provide an email address.', 400));
+    if (!email || emailVerified === false) {
+        return next(new AppError('Your Google account has no confirmed email address.', 400));
     }
+
+    const normalizedEmail = email.toLowerCase().trim();
 
     let user = await User.findOne({
         $or: [
             { googleId },
-            { email: email.toLowerCase() }
+            { email: normalizedEmail }
         ]
     });
 
+    let created = false;
     if (user) {
         if (!user.googleId) {
             user.googleId = googleId;
             user.authProvider = 'google';
-            if (picture && (!user.photo || user.photo === 'profile.png')) {
-                user.photo = picture;
-            }
-            if (isAdminEmail(email)) addRole(user, 'admin');
-            await user.save({ validateBeforeSave: false });
-        } else if (isAdminEmail(email) && !hasRole(user, 'admin')) {
-            addRole(user, 'admin');
-            await user.save({ validateBeforeSave: false });
         }
+        if (picture && (!user.photo || user.photo === 'profile.png')) {
+            user.photo = picture;
+        }
+        if (!user.firstName && givenName) {
+            user.firstName = String(givenName).slice(0, 30);
+        }
+        if (!user.lastName && familyName) {
+            user.lastName = String(familyName).slice(0, 30);
+        }
+        if (!user.emailVerifiedAt && emailVerified) {
+            user.emailVerifiedAt = new Date();
+        }
+        if (isAdminEmail(normalizedEmail) && !hasRole(user, 'admin')) {
+            addRole(user, 'admin');
+        }
+        await user.save({ validateBeforeSave: false });
     } else {
+        created = true;
         user = await User.create({
-            name: name || 'Google Collector',
-            email: email.toLowerCase(),
+            name: name || 'Google Traveler',
+            firstName: (givenName || '').slice(0, 30),
+            lastName: (familyName || '').slice(0, 30),
+            email: normalizedEmail,
             googleId,
             authProvider: 'google',
             photo: picture || 'profile.png',
-            roles: isAdminEmail(email) ? ['user', 'admin'] : ['user']
+            emailVerifiedAt: emailVerified ? new Date() : undefined,
+            roles: isAdminEmail(normalizedEmail) ? ['user', 'admin'] : ['user']
         });
     }
 
     const blocked = await blockedReason(user);
     if (blocked) {
-        await recordLogin(req, { user, email, success: false, reason: `blocked_${user.deletedAt ? 'deleted' : user.status}`, method: 'google' });
+        await recordLogin(req, {
+            user,
+            email: normalizedEmail,
+            success: false,
+            reason: `blocked_${user.deletedAt ? 'deleted' : user.status}`,
+            method: 'google'
+        });
         return next(new AppError(blocked, 403));
     }
 
     user.lastLoginAt = new Date();
     user.loginCount = (user.loginCount || 0) + 1;
     await user.save({ validateBeforeSave: false });
-    await recordLogin(req, { user, email, success: true, method: 'google' });
-    createAndSendToken(user, 200, req, res);
+    await recordLogin(req, {
+        user,
+        email: normalizedEmail,
+        success: true,
+        method: 'google',
+        reason: created ? 'signup' : ''
+    });
+
+    createAndSendToken(user, created ? 201 : 200, req, res);
 });
 
 exports.protect = catchAsync(async (req, res, next) => {

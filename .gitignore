@@ -6,6 +6,10 @@ config.env
 .env
 .env.*
 !.env.example
+*serviceAccount*.json
+*firebase-service-account*.json
+firebase-admin*.json
+google-services*.json
 
 # Large Bundles & Archives
 Archive.zip

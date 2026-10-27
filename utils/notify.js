@@ -26,6 +26,23 @@ const notifyUsers = async (userIds, fields) => {
   const recipients = userIds.filter(id => !optedOut.has(String(id)));
   if (!recipients.length) return 0;
   await Notification.insertMany(recipients.map(user => ({ ...fields, user })), { ordered: false });
+
+  // Send Firebase Push Notifications to the recipients
+  try {
+    const { sendPushNotification } = require('./pushNotification'); // eslint-disable-line global-require
+    sendPushNotification({
+      userIds: recipients,
+      title: fields.title,
+      body: fields.body,
+      data: {
+        kind: fields.kind || 'vendor_message',
+        eventId: fields.event ? String(fields.event) : '',
+        announcementId: fields.announcement ? String(fields.announcement) : '',
+        route: fields.event ? '/event-details' : '/notifications'
+      }
+    }).catch(() => {});
+  } catch (_) {}
+
   return recipients.length;
 };
 

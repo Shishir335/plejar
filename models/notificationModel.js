@@ -44,6 +44,33 @@ notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 60 *
 
 notificationSchema.index({ actor: 1, kind: 1, post: 1, comment: 1 });
 
+// Automatically dispatch push notification via Firebase Cloud Messaging
+notificationSchema.post('save', function (doc) {
+  try {
+    const { sendPushNotification } = require('../utils/pushNotification'); // eslint-disable-line global-require
+    sendPushNotification({
+      userIds: doc.user,
+      title: doc.title,
+      body: doc.body,
+      data: {
+        notificationId: String(doc._id),
+        kind: doc.kind || '',
+        eventId: doc.event ? String(doc.event) : '',
+        bookingId: doc.booking ? String(doc.booking) : '',
+        postId: doc.post ? String(doc.post) : '',
+        conversationId: doc.conversation ? String(doc.conversation) : '',
+        route: doc.event ? '/event-details' : (doc.conversation ? '/conversations' : '/notifications')
+      }
+    }).catch(err => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[FCM Push Notification]:', err.message);
+      }
+    });
+  } catch (_) {
+    // Graceful no-op
+  }
+});
+
 const Notification = mongoose.model('Notification', notificationSchema);
 Notification.KINDS = KINDS;
 module.exports = Notification;

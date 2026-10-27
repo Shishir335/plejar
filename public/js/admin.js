@@ -98,9 +98,66 @@ async function checkAdminAuth() {
   }
 }
 
+let adminGoogleInitialized = false;
+
+async function initAdminGoogleAuth(force = false) {
+  if ((adminGoogleInitialized && !force) || !window.PlezarGoogleAuth) return;
+  const container = document.getElementById('adminGoogleBtn');
+  if (!container) return;
+  adminGoogleInitialized = true;
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+
+  await window.PlezarGoogleAuth.renderButton({
+    target: 'adminGoogleBtn',
+    theme: currentTheme === 'light' ? 'outline' : 'filled_black',
+    text: 'continue_with',
+    shape: 'rectangular',
+    size: 'large',
+    width: 340,
+    onSuccess: handleAdminGoogleResponse,
+    onError: err => {
+      console.warn('[Plezar Admin] Google auth warning:', err);
+    }
+  });
+}
+
+async function handleAdminGoogleResponse(response) {
+  if (!response || !response.credential) return;
+  showAdminToast('Verifying Google credentials...', 'info');
+
+  try {
+    const { ok, data } = await window.PlezarGoogleAuth.loginWithGoogleCredential(response.credential);
+    if (ok && data.token) {
+      if (!isStaff(data.data)) {
+        showAdminToast('Access restricted: Google account (' + (data.data.email || '') + ') is not an administrator. Add to ADMIN_EMAILS in config.env.', 'error');
+        return;
+      }
+
+      adminState.token = data.token;
+      adminState.currentUser = data.data;
+      try { localStorage.setItem('plezar_token', data.token); } catch (e) { /* cookie still active */ }
+      showAdminToast(`Welcome, ${adminState.currentUser.name}!`, 'success');
+      showDashboard();
+      loadUsers();
+      loadSubscribers();
+      loadVendorSummary();
+      loadApplicationSummary();
+      loadAgencies();
+      loadPendingAgencies();
+      loadDashboard();
+      updateStats();
+    } else {
+      showAdminToast(data.message || 'Google sign-in failed.', 'error');
+    }
+  } catch (err) {
+    showAdminToast('Network connection failed.', 'error');
+  }
+}
+
 function showLogin() {
   document.getElementById('adminLoginView').style.display = 'flex';
   document.getElementById('adminDashboardView').style.display = 'none';
+  initAdminGoogleAuth();
 }
 
 function showDashboard() {
@@ -772,6 +829,9 @@ function applyTheme(pref) {
   document.querySelectorAll('[data-theme-choice]').forEach(btn => {
     btn.setAttribute('aria-checked', String(btn.dataset.themeChoice === pref));
   });
+  if (document.getElementById('adminLoginView') && document.getElementById('adminLoginView').style.display !== 'none') {
+    initAdminGoogleAuth(true);
+  }
 }
 
 document.querySelectorAll('[data-theme-toggle]').forEach(btn => {

@@ -102,11 +102,64 @@ function setBusy(button, busy, label) {
 
 // ---------- Sign in / out ----------
 
+let agentGoogleInitialized = false;
+
+async function initAgentGoogleAuth() {
+  if (agentGoogleInitialized || !window.PlezarGoogleAuth) return;
+  const container = document.getElementById('agentGoogleBtn');
+  if (!container) return;
+  agentGoogleInitialized = true;
+
+  await window.PlezarGoogleAuth.renderButton({
+    target: 'agentGoogleBtn',
+    theme: 'outline',
+    text: 'continue_with',
+    shape: 'rectangular',
+    size: 'large',
+    width: 340,
+    onSuccess: handleAgentGoogleResponse,
+    onError: err => {
+      console.warn('[Plezar Agent] Google auth warning:', err);
+    }
+  });
+}
+
+async function handleAgentGoogleResponse(response) {
+  if (!response || !response.credential) return;
+  showAlert('loginError', '');
+  showAlert('loginNotice', 'Verifying Google account...');
+
+  try {
+    const { ok, data } = await window.PlezarGoogleAuth.loginWithGoogleCredential(response.credential);
+    if (ok && data.token) {
+      const roles = Array.isArray(data.data.roles) && data.data.roles.length ? data.data.roles : [data.data.role];
+      if (!roles.includes('agent') || !data.data.agency) {
+        showAlert('loginNotice', '');
+        showAlert('loginError', 'This Google account (' + (data.data.email || '') + ') is not linked to any registered tour agency. Use the Plezar mobile app or apply for vendor membership.');
+        await api('/api/v1/users/logout').catch(() => {});
+        return;
+      }
+      state.token = data.token;
+      try { localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still works */ }
+      state.tempPassword = '';
+      showAlert('loginNotice', '');
+      await boot();
+    } else {
+      showAlert('loginNotice', '');
+      showAlert('loginError', data.message || 'Google sign-in failed.');
+    }
+  } catch (err) {
+    showAlert('loginNotice', '');
+    showAlert('loginError', 'Network connection failed.');
+  }
+}
+
 function showLogin(notice) {
   $('panelView').hidden = true;
   $('passwordView').hidden = true;
   $('loginView').hidden = false;
   showAlert('loginNotice', notice);
+  initAgentGoogleAuth();
 }
 
 // ---------- First sign-in: choose your own password ----------

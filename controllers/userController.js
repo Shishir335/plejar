@@ -367,3 +367,39 @@ exports.adminSendResetEmail = catchAsync(async (req, res, next) => {
         resetURL
     });
 });
+
+// ---------- Firebase Cloud Messaging (FCM) Device Tokens ----------
+
+exports.registerFcmToken = catchAsync(async (req, res, next) => {
+    const token = req.body.fcmToken || req.body.token;
+    if (!token) {
+        return next(new AppError('Please provide an FCM device token.', 400));
+    }
+
+    const { registerUserToken } = require('../utils/pushNotification');
+    await registerUserToken(req.user._id, {
+        token,
+        device: req.body.device || req.headers['user-agent'] || '',
+        platform: req.body.platform || 'android'
+    });
+
+    res.status(200).json({
+        status: 'success',
+        message: 'FCM device token registered successfully.'
+    });
+});
+
+exports.removeFcmToken = catchAsync(async (req, res, next) => {
+    const token = req.body.fcmToken || req.body.token;
+    if (!token) {
+        return next(new AppError('Please provide an FCM device token to remove.', 400));
+    }
+
+    const { removeUserToken } = require('../utils/pushNotification');
+    await removeUserToken(req.user._id, token);
+
+    res.status(200).json({
+        status: 'success',
+        message: 'FCM device token removed successfully.'
+    });
+});

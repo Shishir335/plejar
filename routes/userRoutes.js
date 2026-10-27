@@ -19,9 +19,13 @@ router.get('/invite/:token', authController.checkInvite);
 router.patch('/acceptInvite/:token', authController.acceptInvite);
 
 router.get('/logout', authController.logout);
+router.get('/google-client-id', authController.getGoogleClientId);
 
 // Protecting below router with this line. Above routes won't be affected with this protection
 router.use(authController.protect);
+
+router.post('/fcm-token', userController.registerFcmToken);
+router.delete('/fcm-token', userController.removeFcmToken);
 
 router.get('/me', authController.getMe);
 router.get('/me/verification', userController.getMyVerification);

@@ -211,7 +211,14 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: true,
         select: false
-    }
+    },
+    // Device tokens for Firebase Cloud Messaging (FCM) push notifications
+    fcmTokens: [{
+        token: { type: String, required: true, trim: true },
+        device: { type: String, trim: true, default: '' },
+        platform: { type: String, enum: ['android', 'ios', 'web', 'other'], default: 'android' },
+        updatedAt: { type: Date, default: Date.now }
+    }]
 });
 
 userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
@@ -219,6 +226,7 @@ userSchema.index({ phone: 1 });
 userSchema.index({ roles: 1 });
 userSchema.index({ referralCode: 1 }, { unique: true, partialFilterExpression: { referralCode: { $type: 'string' } } });
 userSchema.index({ referredBy: 1 });
+userSchema.index({ 'fcmTokens.token': 1 });
 
 // Keep name as "first last" (on validate for new accounts, on save for updates that skip validation)
 function syncName(next) {

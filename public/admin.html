@@ -19,6 +19,7 @@
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -47,6 +48,10 @@
           <input type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
         </div>
         <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Sign In to Console</button>
+        <div class="auth-divider"><span>or sign in with</span></div>
+        <div id="adminGoogleBtnWrap" class="google-btn-wrapper">
+          <div id="adminGoogleBtn"></div>
+        </div>
         <div style="margin-top: 14px; text-align: center;">
           <a href="#" onclick="event.preventDefault(); showForgotForm(true);" style="font-size: 0.85rem; color: var(--accent-primary);">Forgot password?</a>
         </div>
@@ -1571,6 +1576,7 @@
   <!-- Toast Notification Container -->
   <div id="adminToastContainer" class="toast-container"></div>
 
+  <script src="/js/google-auth.js"></script>
   <script src="/js/admin.js"></script>
   <script src="/js/admin-users.js"></script>
   <script src="/js/admin-social.js"></script>

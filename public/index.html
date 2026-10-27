@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/css/landing.css">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -39,6 +40,34 @@
       </nav>
       <button class="lang-toggle" id="langToggle" type="button" onclick="toggleLang()" lang="bn" aria-label="বাংলায় দেখুন">বাংলা</button>
       <a href="#updates" class="btn btn-light nav-cta" data-i18n="navCta">Get updates</a>
+      <button class="nav-signin" id="navSignInBtn" onclick="openAuthModal()" type="button" data-i18n="navSignIn">Sign in</button>
+
+      <!-- Logged-in user badge -->
+      <div id="navUserBadge" class="nav-user-badge" hidden>
+        <button type="button" class="nav-user-btn" id="navUserBtn" onclick="toggleUserDropdown(event)" aria-expanded="false" aria-haspopup="true">
+          <img id="navUserAvatar" src="/img/users/profile.png" alt="Profile" class="nav-avatar">
+          <span id="navUserName" class="nav-user-name">User</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div id="navUserDropdown" class="nav-user-dropdown" hidden>
+          <div class="dropdown-header">
+            <strong id="dropdownName">User</strong>
+            <span id="dropdownEmail">email@example.com</span>
+            <span id="dropdownRole" class="badge-role">Traveler</span>
+          </div>
+          <div class="dropdown-divider"></div>
+          <a href="/admin" id="dropdownAdminLink" class="dropdown-item" hidden>
+            <span>🛡️</span> Admin Console
+          </a>
+          <a href="/agent" id="dropdownAgentLink" class="dropdown-item" hidden>
+            <span>🏝️</span> Vendor Panel
+          </a>
+          <button type="button" class="dropdown-item dropdown-logout" onclick="handleWebLogout()">
+            <span>🚪</span> Sign out
+          </button>
+        </div>
+      </div>
+
       <button class="nav-toggle" aria-label="Menu" data-i18n-attr="aria-label:menuLabel" aria-expanded="false" aria-controls="navLinks" onclick="toggleNav(this)">
         <svg><use href="#i-menu"/></svg>
       </button>
@@ -308,7 +337,31 @@
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
+  <!-- Sign In Modal -->
+  <div id="authModal" class="auth-modal-backdrop" hidden onclick="handleAuthModalClick(event)">
+    <div class="auth-modal-card" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+      <button type="button" class="auth-modal-close" onclick="closeAuthModal()" aria-label="Close dialog">&times;</button>
+      <div class="auth-modal-header">
+        <div class="logo logo-sm" style="justify-content: center;">plezar<span class="logo-dot"></span></div>
+        <h2 id="authModalTitle">Welcome to Plezar</h2>
+        <p class="auth-modal-sub">Sign in with your Google account to access your trips, vendor portal, or admin console.</p>
+      </div>
+
+      <div class="auth-modal-alert" id="authModalAlert" role="alert" hidden></div>
+
+      <div class="auth-modal-body">
+        <div class="google-auth-container">
+          <div id="webGoogleBtn" class="google-btn-wrapper"></div>
+        </div>
+        <p class="auth-modal-note">
+          Are you a tour agency? You can also <a href="/agent">sign in with agency password</a> or <a href="/apply">apply for vendor membership</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/i18n.js"></script>
+  <script src="/js/google-auth.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
