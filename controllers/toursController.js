@@ -10,7 +10,7 @@ const Wishlist = require('../models/wishlistModel');
 const Notification = require('../models/notificationModel');
 const Review = require('../models/reviewModel');
 const Booking = require('../models/bookingModel');
-const { Conversation } = require('../models/conversationModel');
+const { ChatRoom } = require('../models/chatModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { escapeRegex, pageParams, paged } = require('../utils/query');
@@ -228,14 +228,26 @@ const searchSummary = s => {
       ? `${a.getUTCDate()} - ${b.getUTCDate()} ${MONTHS[b.getUTCMonth()]}`
       : `${a.getUTCDate()} ${MONTHS[a.getUTCMonth()]} - ${b.getUTCDate()} ${MONTHS[b.getUTCMonth()]}`);
   } else if (s.from) parts.push(`From ${d(s.from).getUTCDate()} ${MONTHS[d(s.from).getUTCMonth()]}`);
+  const f = s.filters || {};
+  if (!s.from && f.date) parts.push(`${d(f.date).getUTCDate()} ${MONTHS[d(f.date).getUTCMonth()]}`);
   const people = [s.adults ? `${s.adults} adult${s.adults > 1 ? 's' : ''}` : null, s.children ? `${s.children} child${s.children > 1 ? 'ren' : ''}` : null].filter(Boolean).join(', ');
   if (people) parts.push(people);
+  const taka = n => Number(n).toLocaleString('en-US');
+  if (f.minPrice != null && f.maxPrice != null) parts.push(`BDT ${taka(f.minPrice)} - ${taka(f.maxPrice)}`);
+  else if (f.maxPrice != null) parts.push(`Up to BDT ${taka(f.maxPrice)}`);
+  else if (f.minPrice != null) parts.push(`From BDT ${taka(f.minPrice)}`);
   return parts.join(', ');
+};
+
+// "Beach & Island tours" for a search by theme only
+const themeTitle = theme => {
+  const labels = String(theme || '').split(',').filter(Boolean).map(t => TAG_LABELS[t] || t);
+  return labels.length ? `${labels.join(' & ')} tours` : null;
 };
 
 const searchView = (row, photo) => ({
   _id: row._id,
-  title: row.query || (row.destination && row.destination.name) || TYPE_LABELS[row.tourType] || 'Tours',
+  title: row.query || (row.destination && row.destination.name) || themeTitle(row.filters && row.filters.theme) || TYPE_LABELS[row.tourType] || 'Tours',
   summary: searchSummary(row),
   photo: photo || (row.destination && row.destination.coverImage) || '',
   // Pass these back to GET /tours to run the search again
@@ -260,6 +272,11 @@ const recentSearches = async (user, limit = SEARCHES_KEEP) => {
     let photo = row.destination && row.destination.coverImage;
     if (!photo && row.query) {
       const tour = await Package.findOne({ status: 'published', title: { $regex: escapeRegex(row.query), $options: 'i' }, 'photos.0': { $exists: true } }).select('photos').lean();
+      photo = tour && tour.photos[0];
+    }
+    const theme = row.filters && row.filters.theme;
+    if (!photo && theme) {
+      const tour = await Package.findOne({ status: 'published', tags: { $in: String(theme).split(',') }, 'photos.0': { $exists: true } }).select('photos').lean();
       photo = tour && tour.photos[0];
     }
     return searchView(row, photo);
@@ -447,13 +464,14 @@ exports.getTour = catchAsync(async (req, res, next) => {
       .populate('guide')
     : null;
   if (!tour || !tour.agency || tour.agency.status !== 'active') return next(new AppError('This tour is not available.', 404));
-  const [ctx, stats, reviews, latest, myBooking, conversation] = await Promise.all([
+  const [ctx, stats, reviews, latest, myBooking, chat] = await Promise.all([
     tourContext([tour], req.user),
     registrationStats([tour._id]),
     reviewSummary(tour._id),
     Review.find({ package: tour._id, status: 'visible' }).sort({ createdAt: -1 }).limit(5).populate('user', 'name photo verification.status status role').lean(),
     req.user ? Booking.findOne({ user: req.user._id, package: tour._id, status: { $in: HOLDS_SEAT } }).select('reference status travelers amount travelDate').lean() : null,
-    req.user ? Conversation.findOne({ traveler: req.user._id, tour: tour._id }).select('_id travelerUnread').lean() : null
+    // The chat "Message Tour Guide" opens: with the tour's guide, or with the agency
+    req.user ? ChatRoom.findOne({ key: tour.guide && tour.guide.active ? `guide:${tour.guide._id}:${req.user._id}` : `agency:${tour.agency._id}:${req.user._id}` }).lean() : null
   ]);
   const detail = publicEvent(tour, stats);
   if (tour.status === 'cancelled') Object.assign(detail, { cancelled: true, cancelReason: tour.cancelReason, registrationOpen: false, registrationClosedReason: 'This tour was cancelled.' });
@@ -491,8 +509,12 @@ exports.getTour = catchAsync(async (req, res, next) => {
         },
         countdown: { departsAt: leaves, started: leaves ? leaves <= new Date() : false },
         share: { url: shareUrl, text: `${tour.title}${card.location ? ` in ${card.location}` : ''}: ${card.durationDays} days from BDT ${card.price.amount} on Plejar` },
-        // "Message Tour Guide": POST /tours/:id/messages, then continue in /conversations/:id
-        contact: { conversationId: conversation ? conversation._id : null, unread: conversation ? conversation.travelerUnread : 0 }
+        // "Message Tour Guide": POST /tours/:id/messages, then continue in the chat (/chats/:chatId)
+        contact: {
+          with: tour.guide && tour.guide.active ? 'guide' : 'agency',
+          chatId: chat ? chat._id : null,
+          unread: chat ? ((chat.members || []).find(m => String(m.user) === String(req.user._id)) || {}).unread || 0 : 0
+        }
       }
     }
   });
@@ -628,6 +650,8 @@ exports.home = catchAsync(async (req, res) => {
   const ctx = await tourContext(tours, req.user);
   const filtered = hasFilters(s);
   const ranked = filtered ? rank(tours, ctx, s) : null;
+  // The app searches through this screen, so remember it for "Continue Your Search" like GET /tours does
+  if (req.user && ranked && worthSaving(s) && req.query.remember !== 'false') await rememberSearch(req.user, s, ranked.length);
   const allowed = ranked ? new Set(ranked.map(c => String(c._id))) : null;
   const cards = tours.filter(t => !allowed || allowed.has(String(t._id))).map(t => ({ card: tourCard(t, ctx), score: popularityScore(t, ctx) }));
 

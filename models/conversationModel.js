@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 /**
- * A traveler's questions to an agency ("Message Tour Guide" on the tour page).
+ * OLD: a traveler's questions to an agency ("Message Tour Guide" on the tour page). These now live in
+ * the chat (models/chatModel.js); this model stays only so older threads can be moved over.
  * One thread per traveler, agency and tour; the agency's team answers in the vendor panel.
  */
 const conversationSchema = new mongoose.Schema(
@@ -16,7 +17,9 @@ const conversationSchema = new mongoose.Schema(
     // Messages the other side hasn't read yet
     travelerUnread: { type: Number, default: 0 },
     agencyUnread: { type: Number, default: 0 },
-    status: { type: String, enum: ['open', 'closed'], default: 'open' }
+    status: { type: String, enum: ['open', 'closed'], default: 'open' },
+    // Set once the thread was moved into the chat (utils/chatMigration.js)
+    chatRoom: { type: mongoose.Schema.ObjectId, ref: 'ChatRoom' }
   },
   { timestamps: true }
 );

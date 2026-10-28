@@ -41,7 +41,7 @@ exports.config = (req, res) => {
         { key: 'my_booking', label: 'My Booking', labelBn: 'আমার বুকিং', icon: 'booking', api: '/api/v1/bookings/mine', ready: true },
         { key: 'travel_history', label: 'Travel History', labelBn: 'ভ্রমণের ইতিহাস', icon: 'history', api: '/api/v1/me/travel-history', extraApi: '/api/v1/me/rewards', ready: true },
         { key: 'notifications', label: 'Notifications', labelBn: 'নোটিফিকেশন', icon: 'bell', api: '/api/v1/notifications', ready: true },
-        { key: 'chat', label: 'Chat', labelBn: 'চ্যাট', icon: 'chat', api: '/api/v1/conversations', unreadApi: '/api/v1/conversations/unread-count', ready: true },
+        { key: 'chat', label: 'Chat', labelBn: 'চ্যাট', icon: 'chat', api: '/api/v1/chats', unreadApi: '/api/v1/chats/unread', ready: true },
         { key: 'wishlist', label: 'Wishlist', labelBn: 'পছন্দের তালিকা', icon: 'heart', api: '/api/v1/me/wishlist', ready: true },
         { key: 'id_verification', label: 'ID Verification', labelBn: 'আইডি যাচাই', icon: 'verified', api: '/api/v1/me/verification', ready: true },
         { key: 'vouchers_rewards', label: 'Voucher & Rewards', labelBn: 'ভাউচার ও রিওয়ার্ড', icon: 'gift', api: '/api/v1/vouchers', extraApi: '/api/v1/me/points', ready: true },
@@ -53,6 +53,24 @@ exports.config = (req, res) => {
         { key: 'terms', label: 'Term & Condition', labelBn: 'শর্তাবলী', icon: 'document', api: '/api/v1/pages/terms', ready: true }
       ],
       logout: { label: 'Log out', labelBn: 'লগ আউট', api: '/api/v1/auth/logout' },
+      // Live chat: connect with socket.io-client after signing in. Send, history and read stay on
+      // the REST API; after a reconnect, catch up with GET /chats/:id/messages?after=<last id>.
+      realtime: {
+        transport: 'socket.io',
+        path: '/socket.io',
+        auth: 'Pass the sign-in token: io(url, { auth: { token } }). Wait for "ready" before using it.',
+        events: {
+          ready: '{ userId, serverTime } after signing in',
+          'chat:message': '{ chatId, message, chat } a new message in one of your chats (mine: true for your own other devices)',
+          'chat:unread': '{ total, chats } your new unread badge numbers',
+          'chat:updated': '{ chat } a chat changed: closed, reopened, someone joined or left, muted',
+          'chat:read': '{ chatId, side, userId, readAt } the other side read your messages ("Seen")',
+          'chat:deleted': '{ chatId, messageId } a message was deleted',
+          'chat:typing': '{ chatId, name, side, typing } someone is typing'
+        },
+        send: { 'chat:typing': '{ chatId, typing: true | false } while you type (at most once a second)' },
+        pollFallbackSeconds: 5
+      },
       features: { posts: true, comments: true, reactions: Reaction.KINDS, shares: true, follows: true, tours: true, hotels: true, restaurants: RESTAURANTS, transport: TRANSPORT, liveStreaming: LIVE },
       limits: { postText: 5000, commentText: 2000, mediaPerPost: MAX_MEDIA, videosPerPost: 1, photoMB: MAX_IMAGE / 1024 / 1024, videoMB: MAX_VIDEO / 1024 / 1024, bio: 300 },
       audiences: ['public', 'followers', 'private'],

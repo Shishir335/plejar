@@ -20,6 +20,7 @@ const Destination = require('../models/destinationModel');
 const { usableDestination } = require('./vendorDestinationController');
 const { releaseVoucher } = require('../utils/vouchers');
 const { hasRole, addRole, removeRole } = require('../utils/roles');
+const { closeTourGroup } = require('../utils/chats');
 const {
   saveAgencyImage,
   removeAgencyImage,
@@ -328,6 +329,7 @@ exports.cancelMyPackage = catchAsync(async (req, res, next) => {
   const result = await Booking.updateMany(filter, { status: 'cancelled', cancelledAt: new Date(), cancelReason: `Cancelled by the agency: ${reason}`.slice(0, 500) });
 
   await Promise.all(vouchers.map(releaseVoucher));
+  await closeTourGroup(pkg._id, reason);
 
   pkg.status = 'cancelled';
   pkg.cancelledAt = new Date();

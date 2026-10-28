@@ -3,9 +3,11 @@ const User = require('../models/userModel');
 const { awardBookingPoints } = require('./rewards');
 const { releaseVoucher } = require('./vouchers');
 const { rewardReferrer } = require('./referrals');
+const { joinTourGroup, leaveTourGroup } = require('./chats');
 
 // What happens around a booking's status: the traveler's notification, points when a trip is completed
-// (and the referral reward for whoever invited them), the voucher back when it's cancelled
+// (and the referral reward for whoever invited them), the voucher back when it's cancelled,
+// and the traveler's place in the tour's group chat
 
 const WHAT = { tour: 'tour', hotel: 'hotel stay', guide: 'guide booking' };
 
@@ -47,6 +49,13 @@ const bookingStatusChanged = async (booking, previous, { by } = {}) => {
   if (booking.status === previous) return;
   const what = WHAT[booking.kind] || 'booking';
   if (booking.status === 'cancelled' && booking.voucher) await releaseVoucher(booking.voucher);
+  // Tour group chat: confirmed travelers join, cancelled ones leave
+  try {
+    if (booking.status === 'confirmed') await joinTourGroup(booking, await User.findById(booking.user).select('name firstName'));
+    else if (booking.status === 'cancelled') await leaveTourGroup(booking);
+  } catch (err) {
+    console.warn('[CHAT WARNING]', err.message);
+  }
   if (booking.status === 'confirmed') {
     await tell(booking, 'booking_confirmed', `Confirmed: ${booking.packageTitle}`, `Your ${what} on ${dayText(booking.travelDate)} is confirmed. Reference ${booking.reference}.`);
   } else if (booking.status === 'cancelled' && by !== 'traveler') {

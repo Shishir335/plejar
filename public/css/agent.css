@@ -387,6 +387,14 @@ img { display: block; max-width: 100%; }
 .bubble .muted { font-size: 0.75rem; }
 .bubble.is-traveler { align-self: flex-start; background: var(--paper); border: 1px solid var(--line); }
 .bubble.is-agency { align-self: flex-end; background: color-mix(in srgb, var(--tea) 14%, var(--white)); }
+.bubble.is-system { align-self: center; max-width: 90%; background: transparent; padding: 2px 8px; text-align: center; }
+.bubble.is-system p { font-size: 0.8rem; color: var(--ink-soft); margin: 0; }
+.bubble-about { display: inline-block; font-size: 0.75rem; color: var(--tea); margin-bottom: 4px; }
+.bubble-photo { display: block; max-width: 220px; max-height: 220px; border-radius: 10px; margin: 4px 0; object-fit: cover; }
+.bubble-file { display: inline-block; margin: 4px 0; font-size: 0.85rem; }
+.reply-as { flex-basis: 100%; font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.thread-reply { flex-wrap: wrap; }
+.reply-attach { cursor: pointer; }
 .thread-reply { display: flex; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); align-items: flex-end; }
 .thread-reply textarea { flex: 1; resize: vertical; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
 @media (max-width: 760px) {

@@ -10,6 +10,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const app = require('./app');
+const realtime = require('./utils/realtime');
 const { startReportScheduler } = require('./utils/reportScheduler');
 
 // Handle uncaught exceptions gracefully
@@ -99,6 +100,9 @@ const server = app.listen(port, () => {
   console.log(`  - Admin Panel:  http://localhost:${port}/admin`);
   console.log(`  - API Testing:  http://localhost:${port}/api-docs`);
 });
+
+// Live chat over Socket.IO on the same port (utils/realtime.js)
+realtime.init(server);
 
 process.on('unhandledRejection', err => {
   console.error('[UNHANDLED REJECTION]', err.name, err.message);

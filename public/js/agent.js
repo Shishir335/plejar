@@ -249,6 +249,8 @@ $('forgotLink').addEventListener('click', async e => {
 });
 
 $('logoutBtn').addEventListener('click', async () => {
+  if (state.socket) state.socket.disconnect();
+  state.socket = null;
   await api('/api/v1/users/logout').catch(() => {});
   state.token = null;
   try { localStorage.removeItem('plezar_token'); } catch (e) { /* ignore */ }
@@ -337,6 +339,7 @@ async function boot() {
   const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'notifications', 'profile', 'team', 'verification'];
   refreshMessagesBadge();
   setInterval(refreshMessagesBadge, 60000);
+  connectChatSocket();
   showView(views.includes(start) ? start : (start === 'packages' ? 'events' : 'overview'));
 }
 
@@ -1851,18 +1854,21 @@ async function deleteGuide(id) {
   }
 }
 
-// ---------- Messages from travelers ----------
+// ---------- Messages: group chats and direct chats ----------
 
 state.guides = [];
 state.messageFilter = '';
-state.conversations = [];
-state.openConversation = null;
+state.chats = [];
+state.openChat = null; // { chat, latestId }
+state.chatPoll = null;
+
+const CHAT_API = '/api/v1/agency/me/chats';
 
 async function refreshMessagesBadge() {
   try {
-    const { data } = await api('/api/v1/agency/me/conversations?limit=1');
-    $('messagesBadge').textContent = data.unreadThreads;
-    $('messagesBadge').hidden = !data.unreadThreads;
+    const { data } = await api(`${CHAT_API}/unread`);
+    $('messagesBadge').textContent = data.chats;
+    $('messagesBadge').hidden = !data.chats;
   } catch (e) { /* the badge is optional */ }
 }
 
@@ -1872,13 +1878,15 @@ document.querySelectorAll('[data-msg-filter]').forEach(btn => btn.addEventListen
   loadConversations();
 }));
 
+const chatQuery = () => ({ unread: 'unread=true', group: 'kind=group', direct: 'kind=direct', closed: 'status=closed' }[state.messageFilter] || '');
+
 async function loadConversations() {
-  $('conversationList').innerHTML = '<p class="muted" style="padding: 14px;">Loading...</p>';
+  if (!state.chats.length) $('conversationList').innerHTML = '<p class="muted" style="padding: 14px;">Loading...</p>';
   try {
-    const { data } = await api(`/api/v1/agency/me/conversations?limit=50${state.messageFilter ? `&status=${state.messageFilter}` : ''}`);
-    state.conversations = data.conversations;
-    $('messagesBadge').textContent = data.unreadThreads;
-    $('messagesBadge').hidden = !data.unreadThreads;
+    const { data } = await api(`${CHAT_API}?${chatQuery()}`);
+    state.chats = data.chats;
+    $('messagesBadge').textContent = data.unread.chats;
+    $('messagesBadge').hidden = !data.unread.chats;
     renderConversationList();
   } catch (err) {
     $('conversationList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
@@ -1886,67 +1894,117 @@ async function loadConversations() {
 }
 
 function renderConversationList() {
-  if (!state.conversations.length) {
-    $('conversationList').innerHTML = `<p class="muted" style="padding: 18px;">${state.messageFilter ? 'Nothing here.' : 'No questions yet. Travelers can message you from any of your tour pages in the app.'}</p>`;
+  if (!state.chats.length) {
+    $('conversationList').innerHTML = `<p class="muted" style="padding: 18px;">${state.messageFilter ? 'Nothing here.' : 'No chats yet. A tour gets its group chat when you confirm the first booking, and travelers can message your guides from your tour pages.'}</p>`;
     return;
   }
-  $('conversationList').innerHTML = state.conversations.map(c => `
-    <button type="button" class="inbox-item ${state.openConversation === c._id ? 'is-open' : ''} ${c.unread ? 'is-unread' : ''}" data-action="open-conversation" data-id="${escapeHTML(c._id)}">
-      <span class="inbox-top"><strong>${escapeHTML(c.traveler ? c.traveler.name : 'Traveler')}</strong><span class="muted">${escapeHTML(fmtDateTime(c.lastMessageAt))}</span></span>
-      <span class="inbox-tour">${escapeHTML(c.tour ? c.tour.title : '')}${c.status === 'closed' ? ' · Closed' : ''}</span>
-      <span class="inbox-preview">${c.lastFromTraveler ? '' : 'You: '}${escapeHTML(c.lastMessage)}</span>
+  const openId = state.openChat && state.openChat.chat._id;
+  $('conversationList').innerHTML = state.chats.map(c => `
+    <button type="button" class="inbox-item ${openId === c._id ? 'is-open' : ''} ${c.unread ? 'is-unread' : ''}" data-action="open-conversation" data-id="${escapeHTML(c._id)}">
+      <span class="inbox-top"><strong>${escapeHTML(c.title)}</strong><span class="muted">${escapeHTML(fmtDateTime(c.lastMessageAt))}</span></span>
+      <span class="inbox-tour">${escapeHTML(c.subtitle || '')}${c.kind === 'tour_group' ? ` · ${Number(c.participantCount)} participants` : ''}${c.status === 'closed' ? ' · Closed' : ''}</span>
+      <span class="inbox-preview">${c.lastMessage ? `${c.lastMessage.mine ? 'You: ' : ''}${escapeHTML(c.lastMessage.text)}` : ''}</span>
       ${c.unread ? `<span class="nav-badge">${Number(c.unread)}</span>` : ''}
     </button>`).join('');
 }
 
+function bubbleHTML(m) {
+  if (m.type === 'system') return `<div class="bubble is-system"><p>${escapeHTML(m.text)}</p></div>`;
+  const files = (m.attachments || []).map(a => (a.kind === 'image'
+    ? `<a href="${escapeHTML(a.url)}" target="_blank" rel="noopener"><img class="bubble-photo" src="${escapeHTML(a.url)}" alt="${escapeHTML(a.name || 'Photo')}" loading="lazy"></a>`
+    : `<a class="bubble-file" href="${escapeHTML(a.url)}" target="_blank" rel="noopener">📄 ${escapeHTML(a.name || 'File')}</a>`)).join('');
+  return `
+    <div class="bubble ${m.mine ? 'is-agency' : 'is-traveler'}" data-message-id="${escapeHTML(m._id)}">
+      ${m.about ? `<span class="bubble-about">About: ${escapeHTML(m.about.title)}</span>` : ''}
+      ${m.text ? `<p class="${m.deleted ? 'muted' : ''}">${escapeHTML(m.text)}</p>` : ''}
+      ${files}
+      <span class="muted">${m.sender ? `${escapeHTML(m.sender.name)}, ` : ''}${escapeHTML(fmtDateTime(m.createdAt))}${m.mine && m.seen ? ' · Seen' : ''}</span>
+    </div>`;
+}
+
 async function openConversation(id) {
-  state.openConversation = id;
+  const chat = state.chats.find(c => c._id === id);
+  if (!chat) return;
+  state.openChat = { chat, latestId: null };
   renderConversationList();
   const box = $('conversationThread');
   box.innerHTML = '<p class="muted" style="padding: 18px;">Loading...</p>';
   try {
-    const { data } = await api(`/api/v1/agency/me/conversations/${id}`);
-    const c = data.conversation;
-    const t = c.traveler;
+    const [{ data }, guides] = await Promise.all([
+      api(`${CHAT_API}/${id}/messages`),
+      chat.kind === 'tour_group' ? fetchGuides() : Promise.resolve([])
+    ]);
+    state.openChat.latestId = data.latestId;
+    const direct = chat.kind === 'guide' || chat.kind === 'agency';
+    const postAs = chat.kind === 'tour_group' && guides.length ? `
+      <select id="replyAs" aria-label="Post as" class="reply-as">
+        <option value="">Post as ${escapeHTML(state.agency ? state.agency.name : 'your agency')}</option>
+        ${guides.filter(g => g.active !== false).map(g => `<option value="${escapeHTML(g._id)}">Post as ${escapeHTML(g.name)} (guide)</option>`).join('')}
+      </select>` : '';
     box.innerHTML = `
       <header class="thread-head">
-        <div><strong>${escapeHTML(t ? t.name : 'Traveler')}</strong>
-          <div class="muted">${[c.tour && c.tour.title, t && (t.phone || t.email)].filter(Boolean).map(escapeHTML).join(' · ')}</div></div>
-        <button type="button" class="btn btn-quiet btn-sm" data-action="toggle-conversation" data-id="${escapeHTML(c._id)}">${c.status === 'closed' ? 'Reopen' : 'Mark closed'}</button>
+        <div><strong>${escapeHTML(chat.title)}</strong>
+          <div class="muted">${escapeHTML(chat.subtitle || '')}${chat.kind === 'tour_group' ? ` · ${Number(chat.participantCount)} participants` : ''}</div></div>
+        ${direct ? `<button type="button" class="btn btn-quiet btn-sm" data-action="toggle-conversation" data-id="${escapeHTML(chat._id)}">${chat.status === 'closed' ? 'Reopen' : 'Mark done'}</button>` : ''}
       </header>
-      <div class="thread-messages" id="threadMessages">${data.messages.map(m => `
-        <div class="bubble ${m.side === 'agency' ? 'is-agency' : 'is-traveler'}">
-          <p>${escapeHTML(m.text)}</p>
-          <span class="muted">${m.side === 'agency' && m.sender ? `${escapeHTML(m.sender.name)}, ` : ''}${escapeHTML(fmtDateTime(m.createdAt))}</span>
-        </div>`).join('')}</div>
-      <form class="thread-reply" id="replyForm">
-        <textarea id="replyText" rows="2" maxlength="2000" placeholder="Write your reply" aria-label="Reply"></textarea>
+      <div class="thread-messages" id="threadMessages">${data.messages.map(bubbleHTML).join('')}</div>
+      ${chat.canSend ? `<form class="thread-reply" id="replyForm">
+        ${postAs}
+        <textarea id="replyText" rows="2" maxlength="4000" placeholder="Write a message" aria-label="Message"></textarea>
+        <label class="btn btn-quiet btn-sm reply-attach" title="Add photos or PDFs">📎<input type="file" id="replyFiles" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden></label>
         <button type="submit" class="btn btn-primary" id="replySend">Send</button>
-      </form>`;
+      </form>` : '<p class="muted" style="padding: 12px 16px;">This chat is read-only.</p>'}`;
     const list = $('threadMessages');
     list.scrollTop = list.scrollHeight;
-    $('replyForm').addEventListener('submit', sendReply);
-    const row = state.conversations.find(x => x._id === id);
-    if (row && row.unread) {
-      row.unread = 0;
+    if ($('replyForm')) $('replyForm').addEventListener('submit', sendReply);
+    if (chat.unread) {
+      chat.unread = 0;
       renderConversationList();
       refreshMessagesBadge();
     }
+    startChatPolling();
   } catch (err) {
     box.innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
   }
 }
 
+// Messages arrive over the socket; while it's down, ask for new ones every few seconds instead
+function startChatPolling() {
+  clearInterval(state.chatPoll);
+  state.chatPoll = setInterval(async () => {
+    const open = state.openChat;
+    if (!open || $('view-messages').hidden || document.hidden || (state.socket && state.socket.connected)) return;
+    try {
+      const { data } = await api(`${CHAT_API}/${open.chat._id}/messages${open.latestId ? `?after=${open.latestId}` : ''}`);
+      if (!data.messages.length || state.openChat !== open) return;
+      const list = $('threadMessages');
+      const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+      data.messages.filter(m => !list.querySelector(`[data-message-id="${m._id}"]`)).forEach(m => list.insertAdjacentHTML('beforeend', bubbleHTML(m)));
+      open.latestId = data.latestId;
+      if (atBottom) list.scrollTop = list.scrollHeight;
+      loadConversations();
+    } catch (e) { /* try again next time */ }
+  }, 8000);
+}
+
 async function sendReply(e) {
   e.preventDefault();
   const text = $('replyText').value.trim();
-  if (!text) return;
+  const files = $('replyFiles').files;
+  if (!text && !files.length) return;
+  const form = new FormData();
+  form.append('text', text);
+  [...files].slice(0, 4).forEach(f => form.append('files', f));
+  if ($('replyAs') && $('replyAs').value) form.append('asGuide', $('replyAs').value);
   const btn = $('replySend');
   setBusy(btn, true);
   try {
-    await api(`/api/v1/agency/me/conversations/${state.openConversation}/messages`, { method: 'POST', body: { text } });
-    toast('Reply sent. The traveler gets a notification.');
-    await openConversation(state.openConversation);
+    const { data } = await api(`${CHAT_API}/${state.openChat.chat._id}/messages`, { method: 'POST', form });
+    $('threadMessages').insertAdjacentHTML('beforeend', bubbleHTML(data.message));
+    $('threadMessages').scrollTop = $('threadMessages').scrollHeight;
+    state.openChat.latestId = data.message._id;
+    $('replyText').value = '';
+    $('replyFiles').value = '';
     loadConversations();
   } catch (err) {
     toast(err.message, 'error');
@@ -1956,10 +2014,10 @@ async function sendReply(e) {
 }
 
 async function toggleConversation(id) {
-  const row = state.conversations.find(c => c._id === id);
-  const status = row && row.status === 'closed' ? 'open' : 'closed';
+  const row = state.chats.find(c => c._id === id);
+  const status = row && row.status === 'closed' ? 'active' : 'closed';
   try {
-    await api(`/api/v1/agency/me/conversations/${id}`, { method: 'PATCH', body: { status } });
+    await api(`${CHAT_API}/${id}`, { method: 'PATCH', body: { status } });
     await loadConversations();
     openConversation(id);
   } catch (err) {
@@ -1967,5 +2025,100 @@ async function toggleConversation(id) {
   }
 }
 
+
+// ---------- Live chat (Socket.IO) ----------
+
+function appendMessage(message) {
+  const list = $('threadMessages');
+  if (!list || list.querySelector(`[data-message-id="${message._id}"]`)) return;
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  list.insertAdjacentHTML('beforeend', bubbleHTML(message));
+  if (atBottom || message.mine) list.scrollTop = list.scrollHeight;
+}
+
+let typingTimer = null;
+function showTyping(name, typing) {
+  const head = document.querySelector('#conversationThread .thread-head .muted');
+  if (!head) return;
+  if (!head.dataset.base) head.dataset.base = head.textContent;
+  head.textContent = typing ? `${name} is typing…` : head.dataset.base;
+  clearTimeout(typingTimer);
+  if (typing) typingTimer = setTimeout(() => showTyping(name, false), 5000);
+}
+
+// Fill the gap after a reconnect: anything sent while the socket was down
+async function catchUpOpenChat() {
+  const open = state.openChat;
+  if (!open || !open.latestId) return;
+  try {
+    const { data } = await api(`${CHAT_API}/${open.chat._id}/messages?after=${open.latestId}`);
+    if (state.openChat !== open) return;
+    data.messages.forEach(appendMessage);
+    open.latestId = data.latestId;
+  } catch (e) { /* the next event or poll catches up */ }
+}
+
+function connectChatSocket() {
+  if (typeof io !== 'function' || state.socket) return; // socket script missing: polling keeps working
+  const socket = io({ auth: { token: state.token || undefined }, withCredentials: true });
+  state.socket = socket;
+  socket.on('connect', () => {
+    catchUpOpenChat();
+    if (!$('view-messages').hidden) loadConversations();
+  });
+  socket.on('connect_error', err => {
+    if (/Sign in/.test(err.message)) socket.disconnect(); // an expired login: polling until they sign in again
+  });
+  socket.on('chat:message', ({ chatId, message, chat }) => {
+    const open = state.openChat;
+    if (open && open.chat._id === chatId) {
+      appendMessage(message);
+      open.latestId = message._id;
+      showTyping('', false);
+      // Reading it here counts as read
+      if (!message.mine && !$('view-messages').hidden && !document.hidden) api(`${CHAT_API}/${chatId}/read`, { method: 'POST' }).catch(() => {});
+    }
+    if ($('view-messages').hidden) return;
+    // With a filter on, let the server decide what belongs in the list
+    if (state.messageFilter) return loadConversations();
+    const i = state.chats.findIndex(c => c._id === chatId);
+    if (i >= 0) state.chats.splice(i, 1);
+    state.chats.unshift(open && open.chat._id === chatId ? { ...chat, unread: 0 } : chat);
+    renderConversationList();
+  });
+  socket.on('chat:unread', ({ chats }) => {
+    $('messagesBadge').textContent = chats;
+    $('messagesBadge').hidden = !chats;
+  });
+  socket.on('chat:updated', ({ chat }) => {
+    const i = state.chats.findIndex(c => c._id === chat._id);
+    if (i >= 0) state.chats[i] = chat;
+    if (state.openChat && state.openChat.chat._id === chat._id) state.openChat.chat = chat;
+    if (!$('view-messages').hidden) renderConversationList();
+  });
+  socket.on('chat:deleted', ({ chatId, messageId }) => {
+    if (!state.openChat || state.openChat.chat._id !== chatId) return;
+    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (el) el.outerHTML = bubbleHTML({ _id: messageId, type: 'text', deleted: true, text: 'This message was deleted.', mine: el.classList.contains('is-agency'), attachments: [], createdAt: new Date() });
+  });
+  socket.on('chat:read', ({ chatId }) => {
+    if (!state.openChat || state.openChat.chat._id !== chatId || state.openChat.chat.type !== 'direct') return;
+    document.querySelectorAll('#threadMessages .bubble.is-agency > .muted').forEach(el => {
+      if (!/Seen$/.test(el.textContent)) el.textContent += ' · Seen';
+    });
+  });
+  socket.on('chat:typing', ({ chatId, name, typing }) => {
+    if (state.openChat && state.openChat.chat._id === chatId) showTyping(name, typing);
+  });
+}
+
+// Tell the traveler we're typing (at most once a second; the server checks it too)
+let typingSentAt = 0;
+document.addEventListener('input', e => {
+  if (e.target.id !== 'replyText' || !state.socket || !state.socket.connected || !state.openChat) return;
+  if (Date.now() - typingSentAt < 1500) return;
+  typingSentAt = Date.now();
+  state.socket.emit('chat:typing', { chatId: state.openChat.chat._id, typing: true });
+});
 
 boot();

@@ -204,19 +204,20 @@
         <div class="page-head">
           <div>
             <h1>Messages</h1>
-            <p>Questions travelers send from a tour page in the app ("Message Tour Guide"). They get a notification when you reply.</p>
+            <p>Your tours' group chats, and travelers' messages to your guides and your agency ("Message Tour Guide" in the app). Travelers get a notification when you reply in a direct chat.</p>
           </div>
         </div>
-        <div class="filter-row" role="group" aria-label="Show conversations">
+        <div class="filter-row" role="group" aria-label="Show chats">
           <button class="chip active" data-msg-filter="">All</button>
           <button class="chip" data-msg-filter="unread">Unread</button>
-          <button class="chip" data-msg-filter="open">Open</button>
+          <button class="chip" data-msg-filter="group">Group chats</button>
+          <button class="chip" data-msg-filter="direct">Direct</button>
           <button class="chip" data-msg-filter="closed">Closed</button>
         </div>
         <div class="inbox">
           <div class="inbox-list" id="conversationList"></div>
           <div class="inbox-thread" id="conversationThread">
-            <div class="empty"><strong>Choose a conversation</strong>Pick a traveler's question on the left to read and reply.</div>
+            <div class="empty"><strong>Choose a chat</strong>Pick a group chat or a traveler's message on the left to read and reply.</div>
           </div>
         </div>
       </section>
@@ -817,6 +818,7 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script src="/js/google-auth.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script src="/js/agent.js"></script>
 </body>
 </html>

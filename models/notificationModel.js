@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const KINDS = [
   // From vendors and tours
   'vendor_message', 'announcement', 'event_cancelled', 'event_changed', 'tour_message',
+  // Chat: a new message in a direct chat
+  'chat_message',
   // About the traveler's own bookings
   'booking_requested', 'booking_confirmed', 'booking_cancelled', 'booking_completed', 'trip_reminder', 'points_earned', 'referral_reward',
   // From other travelers
@@ -33,6 +35,8 @@ const notificationSchema = new mongoose.Schema(
     comment: { type: mongoose.Schema.ObjectId, ref: 'Comment' },
     // A reply from an agency to the traveler's question (tour_message)
     conversation: { type: mongoose.Schema.ObjectId, ref: 'Conversation' },
+    // A chat message (an agency, guide or Plejar Support answering, or another traveler)
+    chat: { type: mongoose.Schema.ObjectId, ref: 'ChatRoom' },
     // The booking an update is about
     booking: { type: mongoose.Schema.ObjectId, ref: 'Booking' },
     readAt: Date
@@ -45,6 +49,13 @@ notificationSchema.index({ user: 1, createdAt: -1 });
 notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 60 * 60 });
 
 notificationSchema.index({ actor: 1, kind: 1, post: 1, comment: 1 });
+
+// Which app screen a push opens
+const pushRoute = doc => {
+  if (doc.chat) return '/chats';
+  if (doc.event) return '/event-details';
+  return doc.conversation ? '/conversations' : '/notifications';
+};
 
 // Automatically dispatch push notification via Firebase Cloud Messaging
 notificationSchema.post('save', function (doc) {
@@ -61,7 +72,8 @@ notificationSchema.post('save', function (doc) {
         bookingId: doc.booking ? String(doc.booking) : '',
         postId: doc.post ? String(doc.post) : '',
         conversationId: doc.conversation ? String(doc.conversation) : '',
-        route: doc.event ? '/event-details' : (doc.conversation ? '/conversations' : '/notifications')
+        chatId: doc.chat ? String(doc.chat) : '',
+        route: pushRoute(doc)
       }
     }).catch(err => {
       if (process.env.NODE_ENV === 'development') {

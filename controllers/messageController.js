@@ -10,8 +10,9 @@ const { hasRole } = require('../utils/roles');
 const { pageParams, paged } = require('../utils/query');
 const { userCard, snippet } = require('../utils/social');
 
-// "Message Tour Guide": a traveler asks an agency about a tour; the agency's team replies
-// in the vendor panel. One thread per traveler, agency and tour.
+// NO LONGER ROUTED: "Message Tour Guide" now goes into the chat (controllers/chatController.js), and old
+// threads move over with scripts/migrate-conversations-to-chat.js. Kept until the old data is moved.
+// (Was: a traveler asks an agency about a tour; the agency's team replies in the vendor panel.)
 
 const validId = id => mongoose.isValidObjectId(id);
 const PAGE = 30;

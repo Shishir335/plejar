@@ -3,7 +3,7 @@ const { protect, optionalAuth } = require('../controllers/authController');
 const tours = require('../controllers/toursController');
 const hotels = require('../controllers/hotelController');
 const promotions = require('../controllers/promotionController');
-const messages = require('../controllers/messageController');
+const chat = require('../controllers/chatController');
 const guides = require('../controllers/guideController');
 
 // The app's Tours tab (anyone can browse; hearts, searches and recently viewed need sign-in)
@@ -18,7 +18,7 @@ tourRouter.route('/recently-viewed').get(protect, tours.listRecentlyViewed).post
 tourRouter.get('/', optionalAuth, tours.listTours);
 tourRouter.get('/:id', optionalAuth, tours.getTour);
 tourRouter.get('/:id/reviews', tours.tourReviews);
-tourRouter.post('/:id/messages', protect, messages.messageAboutTour);
+tourRouter.post('/:id/messages', protect, chat.askAboutTour);
 tourRouter.route('/:id/save').post(protect, tours.save('tour')).delete(protect, tours.unsave('tour'));
 
 // "Hotels Near You" and the hotel pages
@@ -37,12 +37,4 @@ const guideRouter = express.Router();
 guideRouter.get('/', guides.listBookable);
 guideRouter.get('/:id', guides.getBookable);
 
-// The traveler's questions to agencies ("Message Tour Guide") and their replies
-const conversationRouter = express.Router();
-conversationRouter.use(protect);
-conversationRouter.get('/', messages.myConversations);
-conversationRouter.get('/unread-count', messages.myUnreadCount);
-conversationRouter.get('/:id', messages.myConversation);
-conversationRouter.post('/:id/messages', messages.replyAsTraveler);
-
-module.exports = { tours: tourRouter, hotels: hotelRouter, promotions: promotionRouter, conversations: conversationRouter, guides: guideRouter };
+module.exports = { tours: tourRouter, hotels: hotelRouter, promotions: promotionRouter, guides: guideRouter };
