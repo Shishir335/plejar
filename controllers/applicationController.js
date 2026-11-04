@@ -107,8 +107,14 @@ exports.createApplication = catchAsync(async (req, res, next) => {
   if (open) {
     return next(new AppError('We already have an application for this agency that is being reviewed. Check it with the reference number we emailed you.', 409));
   }
-  if (await User.exists({ email: values.email })) {
-    return next(new AppError('This email already has a Plejar account. Sign in to the Plejar app and apply from My Account > Agency Application to use the same account, or apply here with a different email.', 409));
+  // One person, one login: someone who already uses Plejar applies with the same email, and the
+  // vendor role is added to that account when an admin accepts. Only one agency per account, though.
+  const account = await User.findOne({ email: values.email }).setOptions({ includeInactive: true }).select('agency status deletedAt active');
+  if (account && account.agency) {
+    return next(new AppError('This email already belongs to an agency on Plejar. Apply with a different email, or contact us if you want to change agencies.', 409));
+  }
+  if (account && (account.deletedAt || account.active === false || account.status !== 'active')) {
+    return next(new AppError("The Plejar account with this email isn't active. Contact Plejar support, or apply with a different email.", 409));
   }
 
   // Only categories the admin has switched on

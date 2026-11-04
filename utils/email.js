@@ -103,6 +103,11 @@ module.exports = class Email {
         await this.send('applicationRejected', `Your application to ${process.env.APP_NAME || 'Plejar'} (${this.data.reference})`);
     }
 
+    // Accepted onto an account the person already has: no new password to send
+    async sendVendorAccepted() {
+        await this.send('vendorAccepted', `${this.data.agencyName} is now a ${process.env.APP_NAME || 'Plejar'} member agency`);
+    }
+
     async sendVendorLogin(subject) {
         await this.send('vendorLogin', subject);
     }

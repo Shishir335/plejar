@@ -309,10 +309,23 @@ exports.approve = catchAsync(async (req, res, next) => {
       emailSent = false;
     }
   }
+  // An existing account keeps its password, so the email only says the vendor panel is open
+  if (existing && (req.body.send === true || req.body.send === 'true')) {
+    try {
+      await new Email(owner, `${req.protocol}://${req.get('host')}/agent`, { agencyName: agency.name, email: owner.email }).sendVendorAccepted();
+      emailSent = true;
+    } catch (err) {
+      console.warn(`[MAIL WARNING] Acceptance email to ${owner.email} not sent:`, err.message);
+      emailSent = false;
+    }
+  }
   let message = `${agency.name} is now a member. Email the sign-in details below to ${owner.name}; this is the only time the password is shown.`;
   if (emailSent === true) message = `${agency.name} is now a member, and the sign-in details were emailed to ${owner.email}.`;
   if (emailSent === false) message = `${agency.name} is now a member, but the email couldn't be sent (email isn't set up on the server). Send the details below to ${owner.name} yourself.`;
-  if (existing) message = `${agency.name} is now a member. ${owner.name} already has a Plejar account, so they sign in to the vendor panel with their usual email and password.`;
+  if (existing) {
+    const told = { true: ` They were emailed at ${owner.email}.`, false: " The email couldn't be sent, so let them know yourself." }[emailSent] || '';
+    message = `${agency.name} is now a member. ${owner.name} already has a Plejar account, so they sign in to the vendor panel with their usual email and password.${told}`;
+  }
 
   res.status(201).json({
     status: 'success',
