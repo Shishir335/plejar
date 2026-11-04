@@ -2,6 +2,7 @@ const express = require('express');
 const authController = require('../controllers/authController');
 const hotels = require('../controllers/hotelController');
 const promotions = require('../controllers/promotionController');
+const ads = require('../controllers/adController');
 const vouchers = require('../controllers/voucherController');
 const help = require('../controllers/helpController');
 const pages = require('../controllers/pageController');
@@ -16,6 +17,11 @@ router.route('/hotels/:id').get(hotels.adminGet).patch(imageUpload.array('photos
 
 router.route('/promotions').get(promotions.adminList).post(imageUpload.single('image'), promotions.adminCreate);
 router.route('/promotions/:id').patch(imageUpload.single('image'), promotions.adminUpdate).delete(adminOnly, promotions.adminDelete);
+
+// Vendors' ad applications
+router.get('/ad-requests', ads.adminAdRequests);
+router.post('/ad-requests/:id/approve', ads.adminApprove);
+router.post('/ad-requests/:id/reject', ads.adminReject);
 
 router.route('/vouchers').get(vouchers.adminList).post(imageUpload.single('image'), vouchers.adminCreate);
 router.route('/vouchers/:id').patch(imageUpload.single('image'), vouchers.adminUpdate).delete(adminOnly, vouchers.adminDelete);

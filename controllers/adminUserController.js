@@ -11,6 +11,7 @@ const AppError = require('../utils/appError');
 const { ROLES, STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, roleFilter, setRoles } = require('../utils/roles');
 const { logActivity } = require('../utils/activity');
 const { privateDocumentPath, removePrivateDocument } = require('../utils/uploads');
+const { linkVendorAgency } = require('../utils/vendorLink');
 
 const ALL = { includeInactive: true }; // admin screens also see deleted accounts
 const NOT_DELETED = { active: { $ne: false }, deletedAt: null };
@@ -294,6 +295,11 @@ exports.setRoles = catchAsync(async (req, res, next) => {
   if (roleCalc.error) return next(new AppError(roleCalc.error, 400));
   if (!roleCalc.roles) return next(new AppError('No valid roles provided.', 400));
 
+  if (roleCalc.roles.includes('agent')) {
+    const problem = await linkVendorAgency(user, req.body);
+    if (problem) return next(new AppError(problem, 400));
+  }
+
   const currentRoles = rolesOf(user);
   setRoles(user, roleCalc.roles);
   if (!roleCalc.roles.includes('agent')) {
@@ -316,7 +322,7 @@ exports.addRole = catchAsync(async (req, res, next) => {
   if (!role || !ROLES.includes(role)) {
     return next(new AppError(`Please provide a valid role from: ${ROLES.join(', ')}.`, 400));
   }
-  req.body = { addRole: role };
+  req.body = { addRole: role, agency: req.body.agency, agencyRole: req.body.agencyRole };
   return exports.setRoles(req, res, next);
 });
 

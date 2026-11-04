@@ -1,0 +1,10 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  if accepted
+    p Your ad "#{adTitle}" for #{agencyName} was accepted. It shows on the Tours screen of the Plejar app during the dates you chose.
+  else
+    p Your ad "#{adTitle}" for #{agencyName} wasn't accepted.
+    p Reason: #{reason}
+    p You can change it and send it again from Tour ads in your vendor panel.

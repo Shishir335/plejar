@@ -8,6 +8,7 @@ const Email = require("../utils/email");
 const { savePrivateDocument, removePrivateDocument } = require('../utils/uploads');
 const { logActivity } = require('../utils/activity');
 const { STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, setRoles } = require('../utils/roles');
+const { linkVendorAgency } = require('../utils/vendorLink');
 
 const multerStorage = multer.memoryStorage();
 
@@ -207,6 +208,10 @@ exports.createUser = catchAsync(async (req, res, next) => {
         password,
         confirmPassword: confirmPassword || password
     }), targetRoles);
+    if (targetRoles.includes('agent')) {
+        const problem = await linkVendorAgency(newUser, req.body);
+        if (problem) return next(new AppError(problem, 400));
+    }
     await newUser.save();
     const targetRole = targetRoles.map(r => LABELS[r] || r).join(' + ');
 
@@ -265,6 +270,10 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     const filteredBody = filterObj(req.body, 'name', 'email', 'phone', 'address', 'photo');
     Object.assign(targetUser, filteredBody);
     if (nextRoles) {
+        if (nextRoles.includes('agent')) {
+            const problem = await linkVendorAgency(targetUser, req.body);
+            if (problem) return next(new AppError(problem, 400));
+        }
         setRoles(targetUser, nextRoles);
         if (!nextRoles.includes('agent')) {
             targetUser.agency = null;

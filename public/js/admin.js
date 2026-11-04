@@ -86,6 +86,7 @@ async function checkAdminAuth() {
       loadSubscribers();
       loadVendorSummary();
       loadApplicationSummary();
+      loadAdRequestCount();
       loadAgencies();
       loadPendingAgencies();
       loadDashboard();
@@ -143,6 +144,7 @@ async function handleAdminGoogleResponse(response) {
       loadSubscribers();
       loadVendorSummary();
       loadApplicationSummary();
+      loadAdRequestCount();
       loadAgencies();
       loadPendingAgencies();
       loadDashboard();
@@ -203,6 +205,7 @@ async function handleAdminLogin(e) {
       loadSubscribers();
       loadVendorSummary();
       loadApplicationSummary();
+      loadAdRequestCount();
       loadAgencies();
       loadPendingAgencies();
       loadDashboard();
@@ -401,15 +404,27 @@ async function handleCreateUser(e) {
 }
 
 // Edit Roles Modal (one person can have several roles)
-function openEditRoleModal(userId, name, currentRoles) {
+function syncEditRoleVendor() {
+  const vendor = document.querySelector('input[name="editRoles"][value="agent"]');
+  document.getElementById('editRoleVendorNote').hidden = !vendor.checked;
+}
+document.querySelector('input[name="editRoles"][value="agent"]').addEventListener('change', syncEditRoleVendor);
+
+async function openEditRoleModal(userId, name, currentRoles) {
   const roles = [].concat(currentRoles || []);
   document.getElementById('editRoleId').value = userId;
   document.getElementById('editRoleUserName').textContent = name;
   document.querySelectorAll('input[name="editRoles"]').forEach(box => {
     box.checked = roles.includes(box.value);
   });
-  const vendorNote = document.getElementById('editRoleVendorNote');
-  if (vendorNote) vendorNote.hidden = !roles.includes('agent');
+  syncEditRoleVendor();
+  // The agencies to choose from, and the one this person is in now
+  const select = document.getElementById('editRoleAgency');
+  const [options, details] = await Promise.all([ensureVendorOptions(), adminFetch(`/api/v1/admin/users/${userId}`)]);
+  const user = details.ok && details.data.data.user ? details.data.data.user : {};
+  select.innerHTML = `<option value="">Choose an agency</option>${options.map(v => `<option value="${escapeHTML(v.id)}">${escapeHTML(v.name)}</option>`).join('')}`;
+  select.value = user.agency ? String(user.agency._id || user.agency) : '';
+  document.getElementById('editRoleAgencyRole').value = user.agencyRole || '';
   openModal('editRoleModal');
 }
 
@@ -421,6 +436,11 @@ async function handleUpdateRole(e) {
     showAdminToast('Please select at least one role for this account.', 'error');
     return;
   }
+  const agency = document.getElementById('editRoleAgency').value;
+  if (roles.includes('agent') && !agency) {
+    showAdminToast('Choose which agency this vendor belongs to.', 'error');
+    return;
+  }
 
   const btn = e.target.querySelector('button[type="submit"]');
   if (btn) btn.disabled = true;
@@ -428,7 +448,7 @@ async function handleUpdateRole(e) {
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/users/${userId}/roles`, {
       method: 'PATCH',
-      body: JSON.stringify({ roles })
+      body: JSON.stringify(roles.includes('agent') ? { roles, agency, agencyRole: document.getElementById('editRoleAgencyRole').value } : { roles })
     });
 
     if (ok) {
@@ -448,6 +468,11 @@ async function handleUpdateRole(e) {
 
 async function quickAddRole(userId, role) {
   const roleName = (typeof ROLE_NAMES !== 'undefined' && ROLE_NAMES[role]) ? ROLE_NAMES[role] : role;
+  // The Vendor role needs an agency, which the roles dialog asks for
+  if (role === 'agent') {
+    const u = U.detail.user;
+    return openEditRoleModal(u.id, u.name, [...rolesOf(u), 'agent']);
+  }
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/users/${userId}/roles/add`, {
       method: 'POST',
@@ -905,7 +930,7 @@ async function handleInviteAgency(e) {
     result.hidden = false;
     result.innerHTML = `
       <p style="margin-bottom: 12px;">${escapeHTML(data.message)}</p>
-      ${data.data.emailSent ? '' : inviteLinkBox(data.data.inviteURL, 'Invite link (works for 7 days):')}
+      ${data.data.emailSent || data.data.existingAccount ? '' : inviteLinkBox(data.data.inviteURL, 'Invite link (works for 7 days):')}
       <div style="display:flex; gap:8px; margin-top: 16px;">
         <button class="btn btn-primary" onclick="closeModal('inviteAgencyModal'); openAgency('${escapeHTML(data.data.agency._id)}')">Open agency</button>
         <button class="btn btn-secondary" onclick="closeModal('inviteAgencyModal')">Done</button>

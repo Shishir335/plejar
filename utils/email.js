@@ -121,6 +121,11 @@ module.exports = class Email {
         await this.send('verifyCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plejar'} email code`);
     }
 
+    // A Plejar admin accepted or rejected a vendor's ad (this.data: accepted, adTitle, reason)
+    async sendAdDecision() {
+        await this.send('adDecision', this.data.accepted ? `Your ad "${this.data.adTitle}" was accepted` : `Your ad "${this.data.adTitle}" needs changes`);
+    }
+
     // Whether any mail account is set up in config.env (otherwise sending fails)
     static isConfigured() {
         if (process.env.GMAIL_USER && process.env.GMAIL_PASS) return true;

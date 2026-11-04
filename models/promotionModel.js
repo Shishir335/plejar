@@ -3,8 +3,11 @@ const mongoose = require('mongoose');
 /**
  * Banners at the top of the app's Tours screen, such as "Summer Adventure Sale - Up to 30% Off
  * on selected tours". "Explore Now" opens the tours the promotion points at.
+ * Plejar adds banners itself; vendors apply for an ad for one of their tours (source: 'vendor'),
+ * which shows only after a Plejar admin accepts it (controllers/adController.js).
  */
 const TARGETS = ['sale_tours', 'tours', 'destination', 'agency', 'tour_type'];
+const REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
 
 const promotionSchema = new mongoose.Schema(
   {
@@ -29,16 +32,29 @@ const promotionSchema = new mongoose.Schema(
     active: { type: Boolean, default: true },
     order: { type: Number, default: 0 },
     clicks: { type: Number, default: 0 },
-    createdBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
+    createdBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
+
+    // Vendor ads: the tour advertised, and the admin's decision
+    source: { type: String, enum: ['admin', 'vendor'], default: 'admin' },
+    tour: { type: mongoose.Schema.ObjectId, ref: 'Package' },
+    reviewStatus: { type: String, enum: REVIEW_STATUSES, default: 'approved' },
+    rejectedReason: { type: String, trim: true, maxlength: 500, default: '' },
+    reviewedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
+    reviewedAt: Date,
+    // The vendor took an accepted ad down, or its tour was cancelled
+    stoppedAt: Date
   },
   { timestamps: true }
 );
 
 promotionSchema.index({ active: 1, order: 1 });
+promotionSchema.index({ source: 1, reviewStatus: 1, createdAt: -1 });
+promotionSchema.index({ agency: 1, source: 1, createdAt: -1 });
 
-// Live now: switched on and inside its dates
+// Live now: switched on, accepted and inside its dates (banners from before reviews have no status)
 promotionSchema.statics.liveFilter = (now = new Date()) => ({
   active: true,
+  reviewStatus: { $in: ['approved', null] },
   $and: [
     { $or: [{ startsAt: null }, { startsAt: { $exists: false } }, { startsAt: { $lte: now } }] },
     { $or: [{ endsAt: null }, { endsAt: { $exists: false } }, { endsAt: { $gte: now } }] }
@@ -47,4 +63,5 @@ promotionSchema.statics.liveFilter = (now = new Date()) => ({
 
 const Promotion = mongoose.model('Promotion', promotionSchema);
 Promotion.TARGETS = TARGETS;
+Promotion.REVIEW_STATUSES = REVIEW_STATUSES;
 module.exports = Promotion;

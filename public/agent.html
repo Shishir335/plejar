@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="/css/agent.css">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -31,10 +30,6 @@
         <input id="loginPassword" name="password" type="password" required autocomplete="current-password">
       </div>
       <button type="submit" class="btn btn-primary btn-block" id="loginSubmit">Sign in</button>
-      <div class="auth-divider"><span>or sign in with</span></div>
-      <div id="agentGoogleBtnWrap" class="google-btn-wrapper">
-        <div id="agentGoogleBtn"></div>
-      </div>
       <p style="margin-top: 14px; font-size: 0.88rem; text-align: center;">
         <a href="#" id="forgotLink">Forgot your password?</a>
       </p>
@@ -81,6 +76,7 @@
         <button data-view="messages">Messages <span class="nav-badge" id="messagesBadge" hidden>0</span></button>
         <button data-view="guides">Guides</button>
         <button data-view="announcements">Announcements</button>
+        <button data-view="ads">Tour ads</button>
         <button data-view="notifications">Notifications</button>
         <button data-view="profile">Agency profile</button>
         <button data-view="team" data-owner-only>Team</button>
@@ -281,6 +277,18 @@
           <button class="btn btn-primary" data-action="new-announcement">Write an announcement</button>
         </div>
         <div id="announcementList"></div>
+      </section>
+
+      <!-- Tour ads -->
+      <section id="view-ads" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Tour ads</h1>
+            <p>Advertise a tour as a slide at the top of the app's Tours screen. Plejar reviews each ad, and it shows once it's accepted.</p>
+          </div>
+          <button class="btn btn-primary" data-action="new-ad">Apply for an ad</button>
+        </div>
+        <div id="adList"></div>
       </section>
 
       <!-- Notifications -->
@@ -755,6 +763,59 @@
     </form>
   </div>
 
+  <div class="drawer-bg" id="adDrawer" hidden>
+    <form class="drawer" id="adForm" role="dialog" aria-modal="true" aria-labelledby="adFormTitle" novalidate>
+      <div class="drawer-head">
+        <h2 id="adFormTitle">Apply for an ad</h2>
+        <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
+      </div>
+      <div class="field">
+        <label for="adTour">Tour to advertise *</label>
+        <select id="adTour"></select>
+      </div>
+      <div class="field">
+        <label for="adTitle">Title *</label>
+        <input id="adTitle" type="text" maxlength="60" placeholder="Summer Adventure Sale">
+      </div>
+      <div class="field">
+        <label for="adSubtitle">Subtitle</label>
+        <input id="adSubtitle" type="text" maxlength="100" placeholder="Up to 30% Off on selected tours">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="adHighlight">Words to highlight</label>
+          <input id="adHighlight" type="text" maxlength="30" placeholder="30% Off">
+        </div>
+        <div class="field">
+          <label for="adCta">Button text</label>
+          <input id="adCta" type="text" maxlength="24" placeholder="Explore Now">
+        </div>
+      </div>
+      <div class="field">
+        <label for="adImage" id="adImageLabel">Picture *</label>
+        <input id="adImage" type="file" accept="image/jpeg,image/png,image/webp">
+        <p class="hint">A wide picture works best, for example 1600 × 640. Up to 5 MB.</p>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="adStarts">Show from</label>
+          <input id="adStarts" type="date">
+        </div>
+        <div class="field">
+          <label for="adEnds">Show until</label>
+          <input id="adEnds" type="date">
+        </div>
+      </div>
+      <p class="muted" style="font-size: 0.8rem; margin: -6px 0 14px;">Leave the dates empty to show it from when it's accepted until the tour leaves.</p>
+      <div class="field">
+        <label>Preview</label>
+        <div id="adPreview"></div>
+      </div>
+      <div class="alert alert-error" id="adError" hidden></div>
+      <button type="submit" class="btn btn-primary btn-block" id="adSubmit">Send for review</button>
+    </form>
+  </div>
+
   <div class="drawer-bg" id="announcementDrawer" hidden>
     <form class="drawer" id="announcementForm" role="dialog" aria-modal="true" aria-labelledby="announcementFormTitle" novalidate>
       <div class="drawer-head">
@@ -817,7 +878,6 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="/js/google-auth.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/agent.js"></script>
 </body>

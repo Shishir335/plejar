@@ -24,6 +24,7 @@ function switchContentSub(name) {
   });
   document.querySelectorAll('#tab-content .subpane').forEach(p => p.classList.toggle('active', p.id === `csub-${name}`));
   if (name === 'hotels') loadHotels(1);
+  else if (name === 'ads') loadAdRequests();
   else if (name === 'vouchers') loadVouchers();
   else if (name === 'help') loadHelp();
   else if (name === 'pages') loadPages();
@@ -47,7 +48,7 @@ async function loadBanners() {
   document.getElementById('bannersTableBody').innerHTML = C.banners.map(b => {
     const opens = {
       sale_tours: `${TARGET_TEXT.sale_tours}${b.minDiscount ? `, ${b.minDiscount}%+ off` : ''}`,
-      tours: `${(b.tours || []).length} chosen tour(s)`,
+      tours: b.source === 'vendor' ? `Tour ad by ${E((b.agency && b.agency.name) || 'a vendor')}` : `${(b.tours || []).length} chosen tour(s)`,
       destination: `Tours at ${E((b.destination && b.destination.name) || 'a destination')}`,
       agency: `${E((b.agency && b.agency.name) || 'A vendor')}'s tours`,
       tour_type: `${E(b.tourType)} tours`
@@ -159,6 +160,80 @@ function deleteBanner(id) {
       if (!ok) throw new Error(data.message || 'Could not delete the banner.');
       showAdminToast('Banner deleted.', 'info');
       loadBanners();
+    }
+  });
+}
+
+// ---------- Vendors' ad requests ----------
+
+const AD_FILTERS = [['pending', 'Waiting'], ['approved', 'Accepted'], ['rejected', 'Rejected']];
+const AD_STATE_BADGE = { live: 'badge-active', scheduled: 'badge-manager', ended: 'badge-inactive', stopped: 'badge-inactive', pending: 'badge-manager', rejected: 'badge-inactive' };
+
+function setAdCounts(pending) {
+  ['csubAdCount', 'contentAttentionCount'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = pending; el.hidden = !pending; }
+  });
+}
+
+// The waiting count on the sidebar, shown from the moment the console opens
+async function loadAdRequestCount() {
+  const { ok, data } = await adminFetch('/api/v1/admin/ad-requests?status=pending');
+  if (ok) setAdCounts(data.data.counts.pending);
+}
+
+function adSlidePreview(a) {
+  const sub = E(a.subtitle || '');
+  const mark = E(a.highlight || '');
+  return `<div style="width: 220px; min-height: 104px; padding: 12px; border-radius: 8px; color: #fff; background-color: rgba(0,0,0,.45); background-blend-mode: multiply; background-size: cover; background-position: center; ${a.image ? `background-image: url('${E(a.image)}');` : ''}">
+    <strong style="display:block; font-size: 1rem;">${E(a.title)}</strong>
+    <span style="font-size: .78rem;">${mark && sub.includes(mark) ? sub.replace(mark, `<b style="color:#4ade80">${mark}</b>`) : sub}</span>
+    <span style="display:block; width: fit-content; margin-top: 8px; padding: 3px 10px; border-radius: 999px; background: #007aff; font-size: .74rem;">${E(a.ctaLabel)}</span>
+  </div>`;
+}
+
+async function loadAdRequests(status = C.adStatus || 'pending') {
+  C.adStatus = status;
+  tableMessage('adRequestsTableBody', 6, 'Loading...');
+  const { ok, data } = await adminFetch(`/api/v1/admin/ad-requests?status=${status}`);
+  if (!ok) return tableMessage('adRequestsTableBody', 6, data.message || 'Could not load ad requests.', true);
+  const { ads, counts } = data.data;
+  C.adRequests = ads;
+  setAdCounts(counts.pending);
+  document.getElementById('adRequestChips').innerHTML = AD_FILTERS.map(([key, text]) => `<button type="button" class="chip ${status === key ? 'chip-active' : ''}" aria-pressed="${status === key}" onclick="loadAdRequests('${key}')"><strong>${counts[key]}</strong> ${E(text)}</button>`).join('');
+  if (!ads.length) return tableMessage('adRequestsTableBody', 6, { pending: 'No ads waiting for review.', approved: 'No accepted ads yet.', rejected: 'No rejected ads.' }[status]);
+  document.getElementById('adRequestsTableBody').innerHTML = ads.map(a => `
+    <tr>
+      <td>${adSlidePreview(a)}</td>
+      <td><strong>${E(a.agency ? a.agency.name : 'Vendor')}</strong><span class="lead-sub">${E(a.submittedBy ? a.submittedBy.name : '')}</span></td>
+      <td>${E(a.tour && a.tour.title ? a.tour.title : 'Tour')}${a.tour && a.tour.startDate ? `<span class="lead-sub">Leaves ${E(fmtDate(a.tour.startDate))}</span>` : ''}</td>
+      <td style="white-space:nowrap;">${a.startsAt ? E(fmtDate(a.startsAt)) : 'When accepted'} to ${E(fmtDate(a.endsAt))}${status === 'approved' ? `<span class="lead-sub">${Number(a.clicks)} taps</span>` : ''}</td>
+      <td style="white-space:nowrap;">${E(fmtDate(a.createdAt))}${a.reviewedBy ? `<span class="lead-sub">By ${E(a.reviewedBy)}</span>` : ''}</td>
+      <td style="text-align:right; white-space:nowrap;">
+        ${a.state === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="approveAd('${E(a._id)}')">Accept</button>
+        <button class="btn btn-danger btn-sm" onclick="rejectAd('${E(a._id)}')">Reject</button>` : `<span class="badge ${AD_STATE_BADGE[a.state] || 'badge-inactive'}">${E(a.state)}</span>${a.rejectedReason ? `<span class="lead-sub" style="white-space:normal;">${E(a.rejectedReason)}</span>` : ''}`}
+      </td>
+    </tr>`).join('');
+}
+
+async function approveAd(id) {
+  const a = C.adRequests.find(x => x._id === id);
+  if (!a || !confirm(`Accept "${a.title}" from ${a.agency ? a.agency.name : 'this vendor'}? It will show on the app's Tours screen during its dates.`)) return;
+  const { ok, data } = await adminFetch(`/api/v1/admin/ad-requests/${id}/approve`, { method: 'POST', body: JSON.stringify({}) });
+  if (!ok) return showAdminToast(data.message || 'Could not accept the ad.', 'error');
+  showAdminToast('Ad accepted.', 'success');
+  loadAdRequests();
+}
+
+function rejectAd(id) {
+  const a = C.adRequests.find(x => x._id === id);
+  askReason({
+    title: 'Reject this ad', lead: `Tell ${a && a.agency ? a.agency.name : 'the vendor'} what to change. They see this note and can send the ad again.`, label: 'Note to the vendor', confirmLabel: 'Reject ad', maxLength: 500,
+    onSubmit: async reason => {
+      const { ok, data } = await adminFetch(`/api/v1/admin/ad-requests/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+      if (!ok) throw new Error(data.message || 'Could not reject the ad.');
+      showAdminToast('Ad rejected. The vendor can see your note.', 'info');
+      loadAdRequests();
     }
   });
 }

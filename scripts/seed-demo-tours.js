@@ -265,6 +265,13 @@ const addDemo = async () => {
     title: 'Summer Adventure Sale', subtitle: 'Up to 30% Off on selected tours', highlight: '30% Off',
     image: '/img/places/ratargul-boat.jpg', target: 'sale_tours', minDiscount: 5, order: 0, createdBy: owner
   });
+  // A vendor's accepted ad, so the slides have a sponsored one that opens its tour
+  const adTour = tours.find(t => t.title === "Cox's Bazar 3 Night Tour");
+  await Promotion.create({
+    title: "Cox's Bazar Getaway", subtitle: 'Save 10% on 3 nights by the sea', highlight: '10%', ctaLabel: 'View Tour',
+    image: '/img/places/coxs-bazar-sunset.jpg', target: 'tours', tours: [adTour._id], order: 1, createdBy: owner,
+    source: 'vendor', tour: adTour._id, agency: agency._id, reviewStatus: 'approved', reviewedAt: new Date()
+  });
 
   // My Bookings for the first demo traveler: a tour, a hotel and a guide
   const coxsTour = tours.find(t => t.title === "Cox's Bazar 3 Night Tour");
@@ -317,7 +324,7 @@ const addDemo = async () => {
     { user: me, kind: 'points_earned', title: 'You earned 1,440 points', body: 'Thanks for travelling with Plejar. Your points are in Voucher & Rewards.', createdAt: hoursAgo(72), readAt: hoursAgo(70) }
   ]);
 
-  console.log(`Added ${tours.length} tours, 3 hotels, 1 banner, 1 guide and ${travelers.length} reviews for agency "${agency.name}".`);
+  console.log(`Added ${tours.length} tours, 3 hotels, 2 banners, 1 guide and ${travelers.length} reviews for agency "${agency.name}".`);
   console.log('demo.traveler.1@example.com also has bookings, a wishlist and notifications.');
   console.log('Demo travelers sign in as demo.traveler.1@example.com ... demo.traveler.5@example.com, password DemoPass123.');
 };

@@ -120,6 +120,7 @@
         <button class="nav-link-btn" data-tab="content" onclick="switchTab('content'); loadContent();">
           <span>📱</span>
           <span class="sidebar-text">App content</span>
+          <span id="contentAttentionCount" class="nav-count" hidden>0</span>
         </button>
 
         <button class="nav-link-btn" data-tab="notifications" onclick="switchTab('notifications'); loadAdminNotifications();">
@@ -417,6 +418,7 @@
         <section id="tab-content" class="tab-pane">
           <div class="subtabs" role="tablist" aria-label="App content">
             <button type="button" role="tab" class="subtab active" data-csub="banners" aria-selected="true">Tours banners</button>
+            <button type="button" role="tab" class="subtab" data-csub="ads" aria-selected="false">Ad requests <span class="mini-count" id="csubAdCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-csub="hotels" aria-selected="false">Hotels</button>
             <button type="button" role="tab" class="subtab" data-csub="vouchers" aria-selected="false">Vouchers &amp; rewards</button>
             <button type="button" role="tab" class="subtab" data-csub="help" aria-selected="false">Help center</button>
@@ -436,6 +438,20 @@
               <table class="admin-table lead-table">
                 <thead><tr><th>Banner</th><th>Opens</th><th>When</th><th>Taps</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="bannersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="subpane" id="csub-ads">
+            <p class="lead-sub" style="margin: 0 0 12px;">Vendors apply here to advertise a tour. An accepted ad becomes a slide on the app's Tours screen during its dates, and joins the Tours banners list.</p>
+            <div class="control-bar">
+              <div class="filters" id="adRequestChips"></div>
+              <div class="actions"><button class="btn btn-secondary" onclick="loadAdRequests()">↻ Refresh</button></div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Ad</th><th>Vendor</th><th>Tour</th><th>Shows</th><th>Sent</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="adRequestsTableBody"></tbody>
               </table>
             </div>
           </div>
@@ -1200,7 +1216,15 @@
             <label class="check"><input type="checkbox" name="editRoles" value="admin"><span><strong>Administrator</strong> &mdash; Full administrative access to Admin Console</span></label>
             <label class="check"><input type="checkbox" name="editRoles" value="dev"><span><strong>Developer</strong> &mdash; System engineer and superadmin access</span></label>
           </div>
-          <p class="lead-sub" id="editRoleVendorNote" style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted);" hidden>Note: Vendor (agent) access also connects to an agency profile under Vendors.</p>
+          <div id="editRoleVendorNote" style="margin-top: 12px;" hidden>
+            <p class="lead-sub" style="margin: 0 0 10px; font-size: 0.8rem; color: var(--text-muted);">The vendor panel opens one agency's data, so the Vendor role needs an agency.</p>
+            <div class="field-row">
+              <div class="form-group" style="margin-bottom: 0;"><label class="form-label" for="editRoleAgency">Agency *</label><select id="editRoleAgency" class="form-select"></select></div>
+              <div class="form-group" style="margin-bottom: 0;"><label class="form-label" for="editRoleAgencyRole">Role in the agency</label>
+                <select id="editRoleAgencyRole" class="form-select"><option value="">Automatic</option><option value="owner">Owner</option><option value="staff">Staff</option></select>
+              </div>
+            </div>
+          </div>
         </div>
         <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 14px;">Save Roles</button>
       </form>

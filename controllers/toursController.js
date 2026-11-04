@@ -18,7 +18,7 @@ const { registrationStats } = require('../utils/events');
 const { AGENCY_CARD, PLACE_POPULATE, placeView, tourContext, popularityScore, tourCard, hotelCard, savedSet } = require('../utils/tourCards');
 const { publicEvent } = require('./travelerController');
 const { nearbyHotels } = require('./hotelController');
-const { bannerView } = require('./promotionController');
+const { bannerView, liveBanners } = require('./promotionController');
 const { publicGuide } = require('./guideController');
 const { userCard } = require('../utils/social');
 const { HOLDS_SEAT } = require('../utils/events');
@@ -464,6 +464,8 @@ exports.getTour = catchAsync(async (req, res, next) => {
       .populate('guide')
     : null;
   if (!tour || !tour.agency || tour.agency.status !== 'active') return next(new AppError('This tour is not available.', 404));
+  // Opened from a vendor's ad: count the tap
+  if (validId(req.query.promotion)) await Promotion.updateOne({ _id: req.query.promotion, source: 'vendor', tour: tour._id }, { $inc: { clicks: 1 } });
   const [ctx, stats, reviews, latest, myBooking, chat] = await Promise.all([
     tourContext([tour], req.user),
     registrationStats([tour._id]),
@@ -669,7 +671,7 @@ exports.home = catchAsync(async (req, res) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   const [banners, searches, recent, hotels, types, unread] = await Promise.all([
-    Promotion.find(Promotion.liveFilter()).sort({ order: 1, createdAt: -1 }).limit(5).lean(),
+    liveBanners(),
     req.user ? recentSearches(req.user, 5) : [],
     req.user ? recentlyViewed(req.user, 10) : [],
     nearbyHotels({ lat, lng, user: req.user, limit: 10 }),

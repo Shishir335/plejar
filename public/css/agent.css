@@ -73,61 +73,6 @@ img { display: block; max-width: 100%; }
 .auth-card h1 { font-size: 1.45rem; letter-spacing: -0.02em; line-height: 1.2; }
 .auth-card .sub { color: var(--ink-soft); margin: 6px 0 22px; }
 
-/* Auth divider & Google button */
-.auth-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 18px 0;
-  color: var(--ink-faint);
-  font-size: 0.82rem;
-}
-.auth-divider::before,
-.auth-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid var(--line);
-}
-.auth-divider span {
-  padding: 0 10px;
-}
-.google-btn-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  width: 100%;
-}
-.google-btn-wrapper iframe {
-  margin: 0 auto !important;
-}
-.google-auth-unconfigured {
-  text-align: center;
-  width: 100%;
-}
-.btn-google-disabled {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: 1px dashed var(--line);
-  background: var(--paper);
-  color: var(--ink-faint);
-  font-size: 0.86rem;
-  font-weight: 500;
-  cursor: not-allowed;
-  opacity: 0.85;
-}
-.google-auth-hint {
-  font-size: 0.75rem;
-  color: var(--ink-faint);
-  margin-top: 6px;
-}
-
 /* Panel layout */
 .panel { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; }
 .side { background: var(--white); border-right: 1px solid var(--line); padding: 22px 16px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: 0; height: 100vh; }
@@ -405,3 +350,13 @@ img { display: block; max-width: 100%; }
 .guide-hire { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 16px; }
 .guide-hire legend { font-weight: 700; font-size: 0.9rem; padding: 0 6px; }
 .section-title { font-size: 1.1rem; margin-bottom: 4px; }
+
+/* Tour ads: the slide as the app shows it */
+.ad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.ad-card { display: flex; flex-direction: column; background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+.ad-slide { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; min-height: 150px; padding: 18px; border-radius: 12px; color: #fff; background-color: var(--ink); background-size: cover; background-position: center; background-blend-mode: multiply; background-image: none; overflow-wrap: anywhere; }
+.ad-slide[style] { background-color: rgba(0, 0, 0, 0.45); }
+.ad-slide strong { font-size: 1.2rem; line-height: 1.25; }
+.ad-slide span { font-size: 0.82rem; }
+.ad-slide em { font-style: normal; font-weight: 700; color: #4ade80; }
+.ad-slide .ad-slide-cta { margin-top: 8px; padding: 6px 14px; border-radius: 999px; background: #007aff; font-weight: 600; }

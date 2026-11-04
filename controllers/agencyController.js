@@ -21,6 +21,7 @@ const { usableDestination } = require('./vendorDestinationController');
 const { releaseVoucher } = require('../utils/vouchers');
 const { hasRole, addRole, removeRole } = require('../utils/roles');
 const { closeTourGroup } = require('../utils/chats');
+const Promotion = require('../models/promotionModel');
 const {
   saveAgencyImage,
   removeAgencyImage,
@@ -54,6 +55,9 @@ exports.PROFILE_FIELDS = PROFILE_FIELDS;
 
 // Only people in an active agency can use the agent panel API (they may have other roles too)
 exports.requireAgent = catchAsync(async (req, res, next) => {
+  if (hasRole(req.user, 'agent') && !req.user.agency) {
+    return next(new AppError("Your account has the Vendor role but isn't linked to an agency yet. Ask a Plejar admin to choose your agency under Users > Change roles.", 403));
+  }
   if (!hasRole(req.user, 'agent') || !req.user.agency) {
     return next(new AppError('This area is for tour agency accounts only.', 403));
   }
@@ -330,6 +334,8 @@ exports.cancelMyPackage = catchAsync(async (req, res, next) => {
 
   await Promise.all(vouchers.map(releaseVoucher));
   await closeTourGroup(pkg._id, reason);
+  // Its ad stops too
+  await Promotion.updateMany({ source: 'vendor', tour: pkg._id, active: true }, { active: false, stoppedAt: new Date() });
 
   pkg.status = 'cancelled';
   pkg.cancelledAt = new Date();

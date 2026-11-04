@@ -4,6 +4,7 @@ const agencyController = require('../controllers/agencyController');
 const content = require('../controllers/vendorContentController');
 const places = require('../controllers/vendorDestinationController');
 const guides = require('../controllers/guideController');
+const ads = require('../controllers/adController');
 const { imageUpload, documentUpload } = require('../utils/uploads');
 
 const router = express.Router();
@@ -17,7 +18,10 @@ router.get('/me', agencyController.getMyAgency);
 router.route('/me/guides').get(guides.listGuides).post(imageUpload.single('photo'), guides.createGuide);
 router.route('/me/guides/:id').patch(imageUpload.single('photo'), guides.updateGuide).delete(guides.deleteGuide);
 
-// Travelers' questions ("Message Tour Guide" in the app)
+// Ads for a tour on the app's Tours screen (a Plejar admin reviews each one)
+router.route('/me/ads').get(ads.myAds).post(imageUpload.single('image'), ads.applyForAd);
+router.route('/me/ads/:id').patch(imageUpload.single('image'), ads.updateMyAd).delete(ads.removeMyAd);
+
 router.patch('/me', agencyController.requireOwner, imageUpload.single('logo'), agencyController.updateMyAgency);
 
 router

@@ -102,64 +102,11 @@ function setBusy(button, busy, label) {
 
 // ---------- Sign in / out ----------
 
-let agentGoogleInitialized = false;
-
-async function initAgentGoogleAuth() {
-  if (agentGoogleInitialized || !window.PlejarGoogleAuth) return;
-  const container = document.getElementById('agentGoogleBtn');
-  if (!container) return;
-  agentGoogleInitialized = true;
-
-  await window.PlejarGoogleAuth.renderButton({
-    target: 'agentGoogleBtn',
-    theme: 'outline',
-    text: 'continue_with',
-    shape: 'rectangular',
-    size: 'large',
-    width: 340,
-    onSuccess: handleAgentGoogleResponse,
-    onError: err => {
-      console.warn('[Plejar Agent] Google auth warning:', err);
-    }
-  });
-}
-
-async function handleAgentGoogleResponse(response) {
-  if (!response || !response.credential) return;
-  showAlert('loginError', '');
-  showAlert('loginNotice', 'Verifying Google account...');
-
-  try {
-    const { ok, data } = await window.PlejarGoogleAuth.loginWithGoogleCredential(response.credential);
-    if (ok && data.token) {
-      const roles = Array.isArray(data.data.roles) && data.data.roles.length ? data.data.roles : [data.data.role];
-      if (!roles.includes('agent') || !data.data.agency) {
-        showAlert('loginNotice', '');
-        showAlert('loginError', 'This Google account (' + (data.data.email || '') + ') is not linked to any registered tour agency. Use the Plejar mobile app or apply for vendor membership.');
-        await api('/api/v1/users/logout').catch(() => {});
-        return;
-      }
-      state.token = data.token;
-      try { localStorage.setItem('plezar_token', data.token); } catch (err) { /* cookie still works */ }
-      state.tempPassword = '';
-      showAlert('loginNotice', '');
-      await boot();
-    } else {
-      showAlert('loginNotice', '');
-      showAlert('loginError', data.message || 'Google sign-in failed.');
-    }
-  } catch (err) {
-    showAlert('loginNotice', '');
-    showAlert('loginError', 'Network connection failed.');
-  }
-}
-
 function showLogin(notice) {
   $('panelView').hidden = true;
   $('passwordView').hidden = true;
   $('loginView').hidden = false;
   showAlert('loginNotice', notice);
-  initAgentGoogleAuth();
 }
 
 // ---------- First sign-in: choose your own password ----------
@@ -220,7 +167,9 @@ $('loginForm').addEventListener('submit', async e => {
     const data = await api('/api/v1/users/login', { method: 'POST', body: { email, password } });
     const roles = Array.isArray(data.data.roles) && data.data.roles.length ? data.data.roles : [data.data.role];
     if (!roles.includes('agent') || !data.data.agency) {
-      showAlert('loginError', 'This sign in is for tour agencies. Plejar staff use the admin console at /admin.');
+      showAlert('loginError', roles.includes('agent')
+        ? "Your account has the Vendor role but isn't linked to an agency yet. Ask a Plejar admin to choose your agency under Users > Change roles."
+        : 'This sign in is for tour agencies. Plejar staff use the admin console at /admin.');
       await api('/api/v1/users/logout').catch(() => {});
       return;
     }
@@ -266,6 +215,7 @@ function showView(view) {
   if (view === 'events') loadEvents();
   if (view === 'registrations') loadRegistrationsView();
   if (view === 'announcements') loadAnnouncements();
+  if (view === 'ads') loadAds();
   if (view === 'messages') loadConversations();
   if (view === 'guides') loadGuides();
   if (view === 'notifications') loadNotificationsView();
@@ -293,6 +243,9 @@ document.addEventListener('click', e => {
   if (name === 'add-place') openPlaceDialog({ kind: 'event' }, $('evPlace').value ? '' : $('evPlaceSearch').value.trim());
   if (name === 'close-place') closePlaceDialog();
   if (name === 'new-announcement') openAnnouncementEditor(null);
+  if (name === 'new-ad') openAdEditor(null);
+  if (name === 'edit-ad') openAdEditor(state.ads.find(a => a._id === id));
+  if (name === 'remove-ad') removeAd(id);
   if (name === 'new-guide') openGuideEditor(null);
   if (name === 'edit-guide') openGuideEditor(state.guides.find(g => g._id === id));
   if (name === 'delete-guide') deleteGuide(id);
@@ -336,7 +289,7 @@ async function boot() {
   renderProfileForm();
 
   const start = (window.location.hash || '#overview').slice(1);
-  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'notifications', 'profile', 'team', 'verification'];
+  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'profile', 'team', 'verification'];
   refreshMessagesBadge();
   setInterval(refreshMessagesBadge, 60000);
   connectChatSocket();
@@ -1008,7 +961,8 @@ function openEventEditor(ev) {
 }
 
 function closeDrawers() {
-  ['eventDrawer', 'announcementDrawer', 'guideDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
+  ['eventDrawer', 'announcementDrawer', 'adDrawer', 'guideDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
+  state.editingAd = null;
   state.editingGuide = null;
   state.editing = null;
   state.editingAnnouncement = null;
@@ -1389,6 +1343,162 @@ async function deleteAnnouncement(id) {
     toast('Announcement deleted.');
     await loadAnnouncements();
     refreshStats();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ---------- Tour ads ----------
+
+state.ads = [];
+state.editingAd = null;
+
+const AD_STATES = {
+  pending: ['badge-pending', 'Waiting for review'],
+  live: ['badge-published', 'Showing in the app'],
+  scheduled: ['badge-confirmed', 'Accepted, starts soon'],
+  ended: ['badge-hidden', 'Ended'],
+  stopped: ['badge-hidden', 'Stopped'],
+  rejected: ['badge-rejected', 'Not accepted']
+};
+
+// The slide as travelers see it
+function adSlideHTML({ title, subtitle, highlight, ctaLabel, image }) {
+  const sub = escapeHTML(subtitle || '');
+  const mark = escapeHTML(highlight || '');
+  return `
+    <div class="ad-slide" ${image ? `style="background-image: url('${escapeHTML(image)}')"` : ''}>
+      <strong>${escapeHTML(title || 'Your ad title')}</strong>
+      <span>${mark && sub.includes(mark) ? sub.replace(mark, `<em>${mark}</em>`) : sub}</span>
+      <span class="ad-slide-cta">${escapeHTML(ctaLabel || 'Explore Now')}</span>
+    </div>`;
+}
+
+async function loadAds() {
+  $('adList').innerHTML = '<p class="muted">Loading ads...</p>';
+  try {
+    const { data } = await api('/api/v1/agency/me/ads');
+    state.ads = data.ads;
+    renderAds();
+  } catch (err) {
+    $('adList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+function renderAds() {
+  if (!state.ads.length) {
+    $('adList').innerHTML = `
+      <div class="empty">
+        <strong>No ads yet</strong>
+        Put one of your published tours in front of travelers on the Tours screen.
+        <div style="margin-top: 14px;"><button class="btn btn-primary" data-action="new-ad">Apply for an ad</button></div>
+      </div>`;
+    return;
+  }
+  $('adList').innerHTML = `<div class="ad-grid">${state.ads.map(a => {
+    const id = escapeHTML(a._id);
+    const [badge, label] = AD_STATES[a.state] || AD_STATES.pending;
+    const canEdit = a.state === 'pending' || a.state === 'rejected';
+    const canStop = a.state === 'live' || a.state === 'scheduled';
+    return `
+    <article class="ad-card">
+      ${adSlideHTML(a)}
+      <div class="ann-top" style="margin-top: 12px;">
+        <h3>${escapeHTML(a.tour && a.tour.title ? a.tour.title : 'Tour')}</h3>
+        <span class="badge ${badge}">${label}</span>
+      </div>
+      ${a.state === 'rejected' && a.rejectedReason ? `<div class="alert alert-error" style="margin-top: 10px;">Plejar's note: ${escapeHTML(a.rejectedReason)}</div>` : ''}
+      <div class="ann-meta">${a.startsAt ? `${escapeHTML(fmtDate(a.startsAt))} to ` : 'Until '}${escapeHTML(fmtDate(a.endsAt))}${a.state === 'pending' ? '' : ` · ${Number(a.clicks)} ${a.clicks === 1 ? 'tap' : 'taps'}`}</div>
+      <div class="pkg-actions">
+        ${canEdit ? `<button class="btn btn-quiet btn-sm" data-action="edit-ad" data-id="${id}">${a.state === 'rejected' ? 'Fix and send again' : 'Edit'}</button>` : ''}
+        ${canEdit ? `<button class="btn btn-quiet btn-sm" data-action="remove-ad" data-id="${id}">Delete</button>` : ''}
+        ${canStop ? `<button class="btn btn-quiet btn-sm" data-action="remove-ad" data-id="${id}">Stop ad</button>` : ''}
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+function renderAdPreview() {
+  const file = $('adImage').files[0];
+  const current = state.editingAd ? state.editingAd.image : '';
+  if (state.adPreviewUrl) URL.revokeObjectURL(state.adPreviewUrl);
+  state.adPreviewUrl = file ? URL.createObjectURL(file) : '';
+  $('adPreview').innerHTML = adSlideHTML({
+    title: $('adTitle').value.trim(),
+    subtitle: $('adSubtitle').value.trim(),
+    highlight: $('adHighlight').value.trim(),
+    ctaLabel: $('adCta').value.trim(),
+    image: state.adPreviewUrl || current
+  });
+}
+['adTitle', 'adSubtitle', 'adHighlight', 'adCta'].forEach(id => $(id).addEventListener('input', renderAdPreview));
+$('adImage').addEventListener('change', renderAdPreview);
+
+async function openAdEditor(ad) {
+  state.editingAd = ad || null;
+  $('adForm').reset();
+  showAlert('adError', '');
+  $('adFormTitle').textContent = ad ? 'Change your ad' : 'Apply for an ad';
+  $('adImageLabel').textContent = ad ? 'Picture (choose one to replace it)' : 'Picture *';
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const events = (await fetchEvents()).filter(e => e.status === 'published' && e.startDate && isoDay(e.startDate) >= today);
+    $('adTour').innerHTML = `<option value="">${events.length ? 'Choose a tour' : 'No published upcoming tours yet'}</option>${events.map(e => `<option value="${escapeHTML(e._id)}">${escapeHTML(e.title)}, ${escapeHTML(dateRange(e.startDate, e.endDate))}</option>`).join('')}`;
+  } catch (err) {
+    showAlert('adError', err.message);
+  }
+  if (ad) {
+    $('adTour').value = ad.tour && ad.tour._id ? ad.tour._id : '';
+    $('adTitle').value = ad.title;
+    $('adSubtitle').value = ad.subtitle || '';
+    $('adHighlight').value = ad.highlight || '';
+    $('adCta').value = ad.ctaLabel || '';
+    // Stored in Bangladesh time
+    const day = d => (d ? new Date(new Date(d).getTime() + 6 * 3600 * 1000).toISOString().slice(0, 10) : '');
+    $('adStarts').value = day(ad.startsAt);
+    $('adEnds').value = day(ad.endsAt);
+  }
+  $('adSubmit').textContent = ad && ad.state === 'pending' ? 'Save changes' : 'Send for review';
+  renderAdPreview();
+  $('adDrawer').hidden = false;
+}
+
+$('adForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('adError', '');
+  const form = new FormData();
+  form.append('tour', $('adTour').value);
+  form.append('title', $('adTitle').value.trim());
+  form.append('subtitle', $('adSubtitle').value.trim());
+  form.append('highlight', $('adHighlight').value.trim());
+  form.append('ctaLabel', $('adCta').value.trim());
+  form.append('startsAt', $('adStarts').value);
+  form.append('endsAt', $('adEnds').value);
+  if ($('adImage').files[0]) form.append('image', $('adImage').files[0]);
+  const btn = $('adSubmit');
+  setBusy(btn, true);
+  try {
+    const editing = state.editingAd;
+    const { message } = await api(editing ? `/api/v1/agency/me/ads/${editing._id}` : '/api/v1/agency/me/ads', { method: editing ? 'PATCH' : 'POST', form });
+    closeDrawers();
+    toast(message);
+    await loadAds();
+  } catch (err) {
+    showAlert('adError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
+
+async function removeAd(id) {
+  const ad = state.ads.find(a => a._id === id);
+  if (!ad) return;
+  const running = ad.state === 'live' || ad.state === 'scheduled';
+  if (!window.confirm(running ? `Stop "${ad.title}"? It leaves the app right away, and you'd need to apply again to bring it back.` : `Delete "${ad.title}"?`)) return;
+  try {
+    await api(`/api/v1/agency/me/ads/${id}`, { method: 'DELETE' });
+    toast(running ? 'Ad stopped.' : 'Ad deleted.');
+    await loadAds();
   } catch (err) {
     toast(err.message, 'error');
   }

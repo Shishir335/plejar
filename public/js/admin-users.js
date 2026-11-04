@@ -25,7 +25,7 @@ const isMoneyAdmin = () => rolesOf(adminState.currentUser).some(r => ['admin', '
 // A plain traveler: managers may only look after these
 const isTravelerOnly = u => rolesOf(u).every(r => r === 'user');
 // One badge per role, e.g. ADMIN, TRAVELER, VENDOR · OWNER
-const roleBadges = u => rolesOf(u).map(r => `<span class="badge badge-${E(r)}">${E(ROLE_NAMES[r] || r)}${r === 'agent' && u.agencyRole ? ` · ${E(u.agencyRole)}` : ''}</span>`).join(' ');
+const roleBadges = u => rolesOf(u).map(r => `<span class="badge badge-${E(r)}">${E(ROLE_NAMES[r] || r)}${r === 'agent' && u.agencyRole ? ` · ${E(u.agencyRole)}` : ''}${r === 'agent' && !u.agency ? ' · no agency' : ''}</span>`).join(' ');
 
 const makeDebounce = (fn, ms = 300) => {
   let t;

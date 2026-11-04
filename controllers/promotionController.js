@@ -23,12 +23,32 @@ const bannerView = p => ({
   target: p.target,
   // Open GET /tours with these to show the offer's tours
   params: { promotion: String(p._id) },
+  // A vendor's ad is for one tour: open GET /tours/:tourId?promotion=<id> straight away
+  sponsored: p.source === 'vendor',
+  tourId: p.source === 'vendor' && p.tour ? p.tour : null,
   endsAt: p.endsAt || null
 });
 
+/**
+ * The slides to show now, in the admin's order. A vendor's ad also needs its tour to still be
+ * bookable and its agency active, so an ad never leads to a tour travelers can't open.
+ */
+const liveBanners = async (limit = 10) => {
+  const rows = await Promotion.find(Promotion.liveFilter()).sort({ order: 1, createdAt: -1 }).limit(limit * 3).lean();
+  const ads = rows.filter(p => p.source === 'vendor');
+  const [tours, agencies] = await Promise.all([
+    ads.length ? Package.find({ _id: { $in: ads.map(p => p.tour) }, status: 'published', hiddenByAdmin: { $ne: true } }).select('_id').lean() : [],
+    ads.length ? Agency.find({ _id: { $in: ads.map(p => p.agency) }, status: 'active' }).select('_id').lean() : []
+  ]);
+  const openTours = new Set(tours.map(t => String(t._id)));
+  const openAgencies = new Set(agencies.map(a => String(a._id)));
+  return rows.filter(p => p.source !== 'vendor' || (openTours.has(String(p.tour)) && openAgencies.has(String(p.agency)))).slice(0, limit);
+};
+exports.liveBanners = liveBanners;
+
 // GET /promotions — live banners, in the admin's order
 exports.listLive = catchAsync(async (req, res) => {
-  const rows = await Promotion.find(Promotion.liveFilter()).sort({ order: 1, createdAt: -1 }).limit(10).lean();
+  const rows = await liveBanners();
   res.status(200).json({ status: 'success', data: { banners: rows.map(bannerView) } });
 });
 
@@ -104,6 +124,7 @@ const adminView = async p => {
     agency: p.agency || null,
     tourType: p.tourType,
     minDiscount: p.minDiscount,
+    source: p.source || 'admin',
     order: p.order,
     clicks: p.clicks,
     updatedAt: p.updatedAt
@@ -111,7 +132,8 @@ const adminView = async p => {
 };
 
 exports.adminList = catchAsync(async (req, res) => {
-  const rows = await Promotion.find().sort({ order: 1, createdAt: -1 }).populate('destination', 'name').populate('agency', 'name').populate('tours', 'title').lean();
+  // Vendor ads join this list once accepted; until then they wait under Ad requests
+  const rows = await Promotion.find({ $or: [{ source: { $ne: 'vendor' } }, { reviewStatus: 'approved' }] }).sort({ order: 1, createdAt: -1 }).populate('destination', 'name').populate('agency', 'name').populate('tours', 'title').lean();
   res.status(200).json({ status: 'success', data: { promotions: await Promise.all(rows.map(adminView)), targets: Promotion.TARGETS, tourTypes: Package.TOUR_TYPES } });
 });
 
