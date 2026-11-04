@@ -8,7 +8,7 @@ const { temporaryPassword, credentialsEmail, vendorCode } = require('../utils/cr
 const Email = require('../utils/email');
 const { logActivity } = require('../utils/activity');
 const { escapeRegex, pageParams, paged, validId } = require('../utils/query');
-const { privateDocumentPath, copyPrivateDocument, removePrivateFolder } = require('../utils/uploads');
+const { hasPrivateDocument, sendPrivateDocument, copyPrivateDocument, removePrivateFolder } = require('../utils/uploads');
 const { OPEN_STATUSES, folderFor, statusURL, mail } = require('./applicationController');
 const { addRole } = require('../utils/roles');
 
@@ -351,8 +351,7 @@ exports.getDocument = catchAsync(async (req, res, next) => {
   const lead = await findLead(req.params.id, next, '+documents.file');
   if (!lead) return;
   const doc = lead.documents.id(req.params.docId);
-  const filePath = doc && privateDocumentPath(doc.file);
-  if (!filePath) return next(new AppError('Document not found.', 404));
+  if (!doc || !hasPrivateDocument(doc.file)) return next(new AppError('Document not found.', 404));
 
   res.set({
     'Content-Type': doc.mimeType || 'application/octet-stream',
@@ -360,7 +359,5 @@ exports.getDocument = catchAsync(async (req, res, next) => {
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff'
   });
-  res.sendFile(filePath, err => {
-    if (err && !res.headersSent) next(new AppError('Document not found.', 404));
-  });
+  sendPrivateDocument(doc.file, res, next);
 });

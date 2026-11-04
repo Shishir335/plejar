@@ -4,8 +4,9 @@ const crypto = require('crypto');
 const multer = require('multer');
 const sharp = require('sharp');
 const AppError = require('./appError');
+const { isCloudinaryConfigured, isCloudinaryUrl, uploadBufferToCloudinary, deleteFromCloudinary } = require('./cloudinary');
 
-// Traveler profile photos and covers, stored in public/img/users
+// Traveler profile photos and covers: on Cloudinary, or in public/img/users without it
 
 const USER_IMG_DIR = path.join(__dirname, '..', 'public', 'img', 'users');
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -20,15 +21,21 @@ const profileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSi
   .fields([{ name: 'photo', maxCount: 1 }, { name: 'cover', maxCount: 1 }]);
 
 // Square-cropped (or banner for covers) and re-encoded, which also strips camera location data
+// Returns what to store: a full Cloudinary URL, or a file name in public/img/users
 const saveProfileImage = async (file, userId, kind) => {
+  const size = kind === 'cover' ? { width: 1500, height: 500 } : { width: 500, height: 500 };
+  const image = sharp(file.buffer).rotate().resize({ ...size, fit: 'cover' }).jpeg({ quality: 85 });
+  if (isCloudinaryConfigured()) {
+    return (await uploadBufferToCloudinary(await image.toBuffer(), { folder: `users/${userId}` })).secure_url;
+  }
   await fs.promises.mkdir(USER_IMG_DIR, { recursive: true });
   const name = `${kind}-${userId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.jpg`;
-  const size = kind === 'cover' ? { width: 1500, height: 500 } : { width: 500, height: 500 };
-  await sharp(file.buffer).rotate().resize({ ...size, fit: 'cover' }).jpeg({ quality: 85 }).toFile(path.join(USER_IMG_DIR, name));
+  await image.toFile(path.join(USER_IMG_DIR, name));
   return name;
 };
 
 const removeProfileImage = async name => {
+  if (isCloudinaryUrl(name)) return deleteFromCloudinary(name);
   if (!name || name === 'profile.png' || name.includes('/') || name.includes('..')) return;
   await fs.promises.unlink(path.join(USER_IMG_DIR, name)).catch(() => {});
 };

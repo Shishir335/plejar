@@ -1,11 +1,11 @@
 const multer = require('multer');
-const sharp = require('sharp');
 const User = require("../models/userModel");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const factory = require("./handlerFactory");
 const Email = require("../utils/email");
 const { savePrivateDocument, removePrivateDocument } = require('../utils/uploads');
+const { saveProfileImage } = require('../utils/userImages');
 const { logActivity } = require('../utils/activity');
 const { STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, setRoles } = require('../utils/roles');
 const { linkVendorAgency } = require('../utils/vendorLink');
@@ -30,13 +30,7 @@ exports.uploadUserPhoto = upload.single('photo');
 exports.resizeUserPhoto = catchAsync(async (req, res, next) => {
     if (!req.file) return next();
 
-    req.file.filename = `user-${req.user.id}-${Date.now()}.jpeg`;
-
-    await sharp(req.file.buffer)
-        .resize(500, 500)
-        .toFormat('jpeg')
-        .jpeg({ quality: 90 })
-        .toFile(`public/img/users/${req.file.filename}`);
+    req.file.filename = await saveProfileImage(req.file, req.user.id, 'user');
 
     next();
 });

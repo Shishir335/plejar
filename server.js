@@ -11,6 +11,7 @@ if (!process.env.JWT_SECRET) {
 
 const app = require('./app');
 const realtime = require('./utils/realtime');
+const { isCloudinaryConfigured } = require('./utils/cloudinary');
 const { startReportScheduler } = require('./utils/reportScheduler');
 
 // Handle uncaught exceptions gracefully
@@ -100,6 +101,11 @@ const server = app.listen(port, () => {
   console.log(`  - Admin Panel:  http://localhost:${port}/admin`);
   console.log(`  - API Testing:  http://localhost:${port}/api-docs`);
 });
+
+// On a host like Render the disk is wiped on every deploy, taking local uploads with it
+if (!isCloudinaryConfigured()) {
+  console.warn(`[MEDIA] Cloudinary isn't set up: uploads are saved to this server's disk${process.env.NODE_ENV === 'production' ? ' and will be lost on the next deploy' : ''}.`);
+}
 
 // Live chat over Socket.IO on the same port (utils/realtime.js)
 realtime.init(server);

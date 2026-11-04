@@ -13,7 +13,7 @@ const { logActivity } = require('../utils/activity');
 const { earningsFor, monthlyEarnings, round, PAID } = require('../utils/earnings');
 const { getDefaultRate, isCustom } = require('../utils/commission');
 const { escapeRegex, pageParams, paged, validId, toId } = require('../utils/query');
-const { savePrivateDocument, removePrivateDocument, privateDocumentPath } = require('../utils/uploads');
+const { savePrivateDocument, removePrivateDocument, hasPrivateDocument, sendPrivateDocument } = require('../utils/uploads');
 const { teamView, verificationView, packageCounts } = require('./agencyController');
 const { temporaryPassword, credentialsEmail, vendorCode } = require('../utils/credentials');
 const Email = require('../utils/email');
@@ -351,13 +351,10 @@ exports.getContractDocument = catchAsync(async (req, res, next) => {
   const agency = await findVendor(req.params.id, next, '+contract.document.file');
   if (!agency) return;
   const doc = agency.contract && agency.contract.document;
-  const filePath = doc && doc.file && privateDocumentPath(doc.file);
-  if (!filePath) return next(new AppError('No contract document has been uploaded.', 404));
+  if (!doc || !hasPrivateDocument(doc.file)) return next(new AppError('No contract document has been uploaded.', 404));
 
   res.set({ 'Content-Type': doc.mimeType || 'application/octet-stream', 'Content-Disposition': 'inline', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
-  res.sendFile(filePath, err => {
-    if (err && !res.headersSent) next(new AppError('Document not found.', 404));
-  });
+  sendPrivateDocument(doc.file, res, next);
 });
 
 // ---------- Performance, ratings, earnings ----------

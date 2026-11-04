@@ -100,11 +100,14 @@ exports.updateProfile = catchAsync(async (req, res, next) => {
   const oldPhoto = user.photo;
   const oldCover = user.coverPhoto;
   if (files.photo && files.photo[0]) user.photo = await saveProfileImage(files.photo[0], user._id, 'user');
-  if (files.cover && files.cover[0]) user.coverPhoto = `/img/users/${await saveProfileImage(files.cover[0], user._id, 'cover')}`;
+  if (files.cover && files.cover[0]) {
+    const cover = await saveProfileImage(files.cover[0], user._id, 'cover');
+    user.coverPhoto = cover.startsWith('http') ? cover : `/img/users/${cover}`;
+  }
   if (b.removeCover === 'true' || b.removeCover === true) user.coverPhoto = '';
   await user.save({ validateBeforeSave: false });
   if (user.photo !== oldPhoto) await removeProfileImage(oldPhoto);
-  if (user.coverPhoto !== oldCover && oldCover) await removeProfileImage(path.basename(oldCover));
+  if (user.coverPhoto !== oldCover && oldCover) await removeProfileImage(oldCover.startsWith('http') ? oldCover : path.basename(oldCover));
   res.status(200).json({ status: 'success', message: 'Profile saved.', data: { profile: await profileView(user) } });
 });
 

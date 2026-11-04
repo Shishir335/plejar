@@ -10,7 +10,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { ROLES, STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, roleFilter, setRoles } = require('../utils/roles');
 const { logActivity } = require('../utils/activity');
-const { privateDocumentPath, removePrivateDocument } = require('../utils/uploads');
+const { hasPrivateDocument, sendPrivateDocument, removePrivateDocument } = require('../utils/uploads');
 const { linkVendorAgency } = require('../utils/vendorLink');
 
 const ALL = { includeInactive: true }; // admin screens also see deleted accounts
@@ -522,8 +522,7 @@ exports.getDocument = catchAsync(async (req, res, next) => {
   const user = await findUser(req.params.id, next, '+verification.documents.file');
   if (!user) return;
   const doc = user.verification.documents.id(req.params.docId);
-  const filePath = doc && privateDocumentPath(doc.file);
-  if (!filePath) return next(new AppError('Document not found.', 404));
+  if (!doc || !hasPrivateDocument(doc.file)) return next(new AppError('Document not found.', 404));
 
   await logActivity(req, { action: 'document.viewed', summary: `Admin viewed ${doc.kind.replace('_', ' ')} document`, user: user._id });
 
@@ -533,9 +532,7 @@ exports.getDocument = catchAsync(async (req, res, next) => {
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff'
   });
-  res.sendFile(filePath, err => {
-    if (err && !res.headersSent) next(new AppError('Document not found.', 404));
-  });
+  sendPrivateDocument(doc.file, res, next);
 });
 
 // ---------- Per-user history ----------

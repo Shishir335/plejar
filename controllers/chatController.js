@@ -1,4 +1,3 @@
-const fs = require('fs');
 const mongoose = require('mongoose');
 const { ChatRoom, ChatMessage } = require('../models/chatModel');
 const User = require('../models/userModel');
@@ -12,7 +11,7 @@ const AppError = require('../utils/appError');
 const { hasRole } = require('../utils/roles');
 const { photoURL, snippet } = require('../utils/social');
 const { escapeRegex } = require('../utils/query');
-const { saveChatFile, chatFilePath, removeChatFiles } = require('../utils/chatFiles');
+const { saveChatFile, hasChatFile, sendChatFile, removeChatFiles } = require('../utils/chatFiles');
 const realtime = require('../utils/realtime');
 const { IN_GROUP, ensureTourGroup, joinTourGroup, findOrCreateRoom, guideRoom, agencyRoom, roomForTourQuestion, guideSenderName, loadGuide } = require('../utils/chats');
 
@@ -635,12 +634,15 @@ exports.attachment = catchAsync(async (req, res, next) => {
   const room = await findRoom(req, viewer);
   const message = validId(req.params.attachmentId) ? await ChatMessage.findOne({ room: room._id, 'attachments._id': req.params.attachmentId, deletedAt: null }).lean() : null;
   const att = message && message.attachments.find(a => String(a._id) === String(req.params.attachmentId));
-  const file = att && chatFilePath(att.file);
-  if (!file || !fs.existsSync(file)) return next(new AppError('That file is no longer available.', 404));
+  if (!att || !hasChatFile(att.file)) return next(new AppError('That file is no longer available.', 404));
   res.setHeader('Content-Type', att.mimeType);
   res.setHeader('Cache-Control', 'private, max-age=86400');
   res.setHeader('Content-Disposition', `${att.kind === 'image' ? 'inline' : 'attachment'}; filename="${encodeURIComponent(att.name || 'file')}"`);
-  fs.createReadStream(file).pipe(res);
+  await sendChatFile(att.file, res).catch(err => {
+    console.error('[CHAT] File read failed:', err.message);
+    if (res.headersSent) res.destroy();
+    else next(new AppError('That file is no longer available.', 404));
+  });
 });
 
 // PATCH /chats/:id { muted } — a traveler's own setting for the chat

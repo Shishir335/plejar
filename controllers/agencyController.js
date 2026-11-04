@@ -26,7 +26,8 @@ const {
   saveAgencyImage,
   removeAgencyImage,
   savePrivateDocument,
-  privateDocumentPath,
+  hasPrivateDocument,
+  sendPrivateDocument,
   removePrivateDocument
 } = require('../utils/uploads');
 
@@ -599,8 +600,7 @@ exports.submitVerification = catchAsync(async (req, res, next) => {
 const streamDocument = async (agencyId, docId, res, next) => {
   const agency = await Agency.findById(agencyId).select('+verification.documents.file');
   const doc = agency && agency.verification.documents.id(docId);
-  const filePath = doc && privateDocumentPath(doc.file);
-  if (!filePath) {
+  if (!doc || !hasPrivateDocument(doc.file)) {
     return next(new AppError('Document not found.', 404));
   }
 
@@ -610,9 +610,7 @@ const streamDocument = async (agencyId, docId, res, next) => {
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff'
   });
-  res.sendFile(filePath, err => {
-    if (err && !res.headersSent) next(new AppError('Document not found.', 404));
-  });
+  sendPrivateDocument(doc.file, res, next);
 };
 exports.streamDocument = streamDocument;
 

@@ -26,7 +26,7 @@ const Review = require('../models/reviewModel');
 const Wishlist = require('../models/wishlistModel');
 const Notification = require('../models/notificationModel');
 const { ChatRoom, ChatMessage } = require('../models/chatModel');
-const fs = require('fs');
+const { removeChatFolder } = require('../utils/chatFiles');
 
 const DEMO_MARK = 'plejar-demo-seed';
 const DEMO_EMAIL = /^demo\.traveler\.\d+@example\.com$/;
@@ -65,7 +65,7 @@ const removeDemo = async () => {
   const roomIds = rooms.map(r => r._id);
   await ChatMessage.deleteMany({ room: { $in: roomIds } });
   await ChatRoom.deleteMany({ _id: { $in: roomIds } });
-  roomIds.forEach(id => fs.rmSync(path.join(__dirname, '..', 'uploads', 'private', 'chat', String(id)), { recursive: true, force: true }));
+  await Promise.all(roomIds.map(removeChatFolder));
   const counts = await Promise.all([
     Review.deleteMany({ $or: [{ user: { $in: ids } }, { package: { $in: tourIds } }] }),
     Booking.deleteMany({ $or: [{ user: { $in: ids } }, { package: { $in: tourIds } }] }),

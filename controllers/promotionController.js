@@ -36,13 +36,12 @@ const bannerView = p => ({
 const liveBanners = async (limit = 10) => {
   const rows = await Promotion.find(Promotion.liveFilter()).sort({ order: 1, createdAt: -1 }).limit(limit * 3).lean();
   const ads = rows.filter(p => p.source === 'vendor');
-  const [tours, agencies] = await Promise.all([
-    ads.length ? Package.find({ _id: { $in: ads.map(p => p.tour) }, status: 'published', hiddenByAdmin: { $ne: true } }).select('_id').lean() : [],
-    ads.length ? Agency.find({ _id: { $in: ads.map(p => p.agency) }, status: 'active' }).select('_id').lean() : []
-  ]);
-  const openTours = new Set(tours.map(t => String(t._id)));
+  // The agency that owns the tour decides, not a copy on the ad
+  const tours = ads.length ? await Package.find({ _id: { $in: ads.map(p => p.tour) }, status: 'published', hiddenByAdmin: { $ne: true } }).select('agency').lean() : [];
+  const agencies = tours.length ? await Agency.find({ _id: { $in: tours.map(t => t.agency) }, status: 'active' }).select('_id').lean() : [];
   const openAgencies = new Set(agencies.map(a => String(a._id)));
-  return rows.filter(p => p.source !== 'vendor' || (openTours.has(String(p.tour)) && openAgencies.has(String(p.agency)))).slice(0, limit);
+  const openTours = new Set(tours.filter(t => openAgencies.has(String(t.agency))).map(t => String(t._id)));
+  return rows.filter(p => p.source !== 'vendor' || openTours.has(String(p.tour))).slice(0, limit);
 };
 exports.liveBanners = liveBanners;
 
@@ -79,7 +78,8 @@ const applyForm = async (promo, b) => {
     if (b.destination && (!validId(b.destination) || !(await Destination.exists({ _id: b.destination })))) throw new AppError('Choose a destination from the list.', 400);
     promo.destination = b.destination || undefined;
   }
-  if (b.agency !== undefined) {
+  // A vendor's ad belongs to its agency; the banner form only sends a vendor for "A vendor's tours"
+  if (b.agency !== undefined && promo.source !== 'vendor') {
     if (b.agency && (!validId(b.agency) || !(await Agency.exists({ _id: b.agency })))) throw new AppError('Choose a vendor from the list.', 400);
     promo.agency = b.agency || undefined;
   }

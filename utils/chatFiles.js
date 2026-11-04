@@ -4,8 +4,9 @@ const crypto = require('crypto');
 const multer = require('multer');
 const sharp = require('sharp');
 const AppError = require('./appError');
+const { isCloudinaryConfigured, isPrivateRef, uploadPrivateFile, streamPrivateFile, deletePrivateFile, deletePrivateFolder } = require('./cloudinary');
 
-// Photos and documents sent in chats. Kept outside /public: only people in the chat can open them.
+// Photos and documents sent in chats. Authenticated on Cloudinary, or outside /public without it: only people in the chat can open them.
 
 const CHAT_DIR = path.join(__dirname, '..', 'uploads', 'private', 'chat');
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -26,14 +27,24 @@ const roomDir = roomId => path.join(CHAT_DIR, String(roomId));
 
 /** Save one upload for a room. Photos are resized; PDFs are kept as they are. */
 const saveChatFile = async (file, roomId) => {
+  const name = String(file.originalname || '').slice(0, 150);
+  const isImage = IMAGE_TYPES.includes(file.mimetype);
+  const photo = isImage && sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 });
+  if (isCloudinaryConfigured()) {
+    if (!isImage) {
+      const saved = await uploadPrivateFile(file.buffer, { folder: `chat/${roomId}`, mimeType: file.mimetype });
+      return { kind: 'file', file: saved.ref, name, mimeType: file.mimetype, size: file.size };
+    }
+    const { data, info } = await photo.toBuffer({ resolveWithObject: true });
+    const saved = await uploadPrivateFile(data, { folder: `chat/${roomId}`, mimeType: 'image/jpeg' });
+    return { kind: 'image', file: saved.ref, name, mimeType: 'image/jpeg', size: info.size, width: info.width, height: info.height };
+  }
   const dir = roomDir(roomId);
   await fs.promises.mkdir(dir, { recursive: true });
   const base = crypto.randomBytes(12).toString('hex');
-  const name = String(file.originalname || '').slice(0, 150);
-  if (IMAGE_TYPES.includes(file.mimetype)) {
+  if (isImage) {
     const filename = `${base}.jpg`;
-    const info = await sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 })
-      .toFile(path.join(dir, filename));
+    const info = await photo.toFile(path.join(dir, filename));
     return { kind: 'image', file: `${roomId}/${filename}`, name, mimeType: 'image/jpeg', size: info.size, width: info.width, height: info.height };
   }
   const filename = `${base}.pdf`;
@@ -47,9 +58,29 @@ const chatFilePath = relative => {
   return target.startsWith(CHAT_DIR + path.sep) ? target : null;
 };
 
+const hasChatFile = stored => {
+  if (isPrivateRef(stored)) return true;
+  const target = chatFilePath(stored);
+  return Boolean(target && fs.existsSync(target));
+};
+
+/** Send a chat file to someone the route has already checked, with its headers already set */
+const sendChatFile = async (stored, res) => {
+  if (isPrivateRef(stored)) return streamPrivateFile(stored, res);
+  fs.createReadStream(chatFilePath(stored)).pipe(res);
+};
+
 const removeChatFiles = files => Promise.all(files.map(f => {
+  if (isPrivateRef(f.file)) return deletePrivateFile(f.file);
   const target = chatFilePath(f.file);
   return target ? fs.promises.unlink(target).catch(() => {}) : null;
 }));
 
-module.exports = { chatUpload, saveChatFile, chatFilePath, removeChatFiles, CHAT_DIR };
+/** Everything sent in a chat, when the chat itself is deleted */
+const removeChatFolder = async roomId => {
+  await deletePrivateFolder(`chat/${roomId}`);
+  const target = roomDir(roomId);
+  if (target.startsWith(CHAT_DIR + path.sep)) await fs.promises.rm(target, { recursive: true, force: true });
+};
+
+module.exports = { chatUpload, saveChatFile, hasChatFile, sendChatFile, removeChatFiles, removeChatFolder, CHAT_DIR };

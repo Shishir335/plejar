@@ -9,6 +9,7 @@ const Reaction = require('../models/reactionModel');
 const SavedPost = require('../models/savedPostModel');
 const Notification = require('../models/notificationModel');
 const AppError = require('./appError');
+const { isCloudinaryConfigured, isCloudinaryUrl, uploadBufferToCloudinary, deleteFromCloudinary } = require('./cloudinary');
 const { hasRole } = require('./roles');
 
 // Shared rules for the traveler side of the app: who sees what, who can comment, notifications, media.
@@ -247,9 +248,19 @@ const randomName = () => `${Date.now()}-${crypto.randomBytes(8).toString('hex')}
 
 // Photos are resized and re-encoded (which also strips location data from the camera); videos are stored as sent
 const savePostMedia = async (file, userId) => {
+  const isImage = IMAGE_TYPES.includes(file.mimetype);
+  if (isCloudinaryConfigured()) {
+    const buffer = isImage
+      ? await sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer()
+      : file.buffer;
+    const saved = await uploadBufferToCloudinary(buffer, { folder: `posts/${userId}`, resourceType: isImage ? 'image' : 'video' });
+    return isImage
+      ? { type: 'image', url: saved.secure_url, width: saved.width, height: saved.height, size: saved.bytes }
+      : { type: 'video', url: saved.secure_url, size: saved.bytes };
+  }
   const dir = path.join(POST_MEDIA_DIR, String(userId));
   await fs.promises.mkdir(dir, { recursive: true });
-  if (IMAGE_TYPES.includes(file.mimetype)) {
+  if (isImage) {
     const name = `${randomName()}.jpg`;
     const info = await sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toFile(path.join(dir, name));
     return { type: 'image', url: `/media/posts/${userId}/${name}`, width: info.width, height: info.height, size: info.size };
@@ -261,6 +272,7 @@ const savePostMedia = async (file, userId) => {
 };
 
 const removePostMedia = async urls => Promise.all(urls.map(async url => {
+  if (isCloudinaryUrl(url)) return deleteFromCloudinary(url);
   if (!url || !url.startsWith('/media/posts/')) return;
   const target = path.join(__dirname, '..', 'public', url);
   if (!target.startsWith(POST_MEDIA_DIR + path.sep)) return;
