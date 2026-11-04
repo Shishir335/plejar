@@ -332,16 +332,30 @@ async function deleteApplication() {
 
 // ---------- Accept ----------
 
+// Accepting onto an existing account waits for the admin's tick
+function syncApproveSubmit() {
+  const row = document.getElementById('apUseExistingRow');
+  document.getElementById('approveSubmit').disabled = !row.hidden && !document.getElementById('apUseExisting').checked;
+}
+
 async function openApproveModal() {
   const a = AP.detail.application;
-  document.getElementById('approveLead').textContent =
-    `${a.agencyName} becomes a vendor and ${a.contactName} (${a.email}) gets an owner account with a temporary password. You'll see the sign-in details next, ready to email to them.`;
-  document.getElementById('apVerify').checked = true;
-  // Someone who already has a Plejar account can be made the owner with the login they have
+  // Someone who already has a Plejar account becomes the owner with the login they have.
+  // From the website nobody proved they own that email, so the admin confirms it's the same person.
   const acct = AP.detail.checks && AP.detail.checks.account;
   const own = acct && a.applicant && String(a.applicant._id || a.applicant) === String(acct._id);
-  document.getElementById('apUseExistingRow').hidden = !acct || Boolean(acct.agency) || own;
+  const confirmAccount = acct && !acct.agency && !own;
+  document.getElementById('approveLead').innerHTML = `<strong>${E(a.agencyName)}</strong><br>Owner: ${E(a.contactName)} (${E(a.email)})${acct ? '' : '<br>A new account with a temporary password is created.'}`;
+  AP.approveLabel = acct ? 'Accept agency' : 'Accept and create account';
+  document.getElementById('apVerify').checked = true;
+  document.getElementById('apUseExistingRow').hidden = !confirmAccount;
   document.getElementById('apUseExisting').checked = false;
+  if (confirmAccount) {
+    const roles = (acct.roles && acct.roles.length ? acct.roles : [acct.role]).map(r => ROLE_NAMES[r] || r).join(', ');
+    document.getElementById('apUseExistingText').textContent = `Same person as the existing account (${roles})`;
+  }
+  document.getElementById('approveSubmit').textContent = AP.approveLabel;
+  syncApproveSubmit();
   document.getElementById('approveForm').hidden = false;
   document.getElementById('approveResult').hidden = true;
   formError('approveError');
@@ -359,7 +373,7 @@ async function submitApprove(e) {
   const btn = document.getElementById('approveSubmit');
   const categories = [...document.querySelectorAll('input[name="apCategory"]:checked')].map(box => box.value);
   btn.disabled = true;
-  btn.textContent = 'Creating account...';
+  btn.textContent = 'Accepting...';
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/applications/${AP.detail.application._id}/approve`, {
       method: 'POST',
@@ -382,8 +396,8 @@ async function submitApprove(e) {
   } catch (err) {
     formError('approveError', 'Could not reach the server.');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Accept and create account';
+    btn.textContent = AP.approveLabel;
+    syncApproveSubmit();
   }
 }
 
