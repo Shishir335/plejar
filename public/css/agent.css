@@ -316,7 +316,10 @@ img { display: block; max-width: 100%; }
 .nav-badge { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--tea); color: #fff; font-size: 0.72rem; font-weight: 700; text-align: center; margin-left: 6px; }
 .inbox { display: grid; grid-template-columns: minmax(240px, 340px) 1fr; gap: 14px; align-items: start; }
 .inbox-list { background: var(--white); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; max-height: 70vh; overflow-y: auto; }
-.inbox-item { position: relative; display: grid; gap: 2px; width: 100%; text-align: left; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--line); background: transparent; cursor: pointer; font: inherit; color: inherit; }
+.chat-pic { flex: none; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; font-size: 0.78rem; }
+.inbox-item { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; width: 100%; text-align: left; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--line); background: transparent; cursor: pointer; font: inherit; color: inherit; }
+.inbox-item .chat-pic { width: 40px; height: 40px; }
+.inbox-body { display: grid; gap: 2px; min-width: 0; }
 .inbox-item:hover, .inbox-item.is-open { background: color-mix(in srgb, var(--tea) 7%, var(--white)); }
 .inbox-item.is-unread strong { font-weight: 800; }
 .inbox-item .nav-badge { position: absolute; right: 12px; bottom: 12px; }
@@ -326,8 +329,14 @@ img { display: block; max-width: 100%; }
 .inbox-thread { background: var(--white); border: 1px solid var(--line); border-radius: 16px; min-height: 320px; display: flex; flex-direction: column; }
 .inbox-thread .empty { border: 0; }
 .thread-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.thread-who { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.thread-who .chat-pic { width: 40px; height: 40px; }
 .thread-messages { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; }
+.bubble-row { display: flex; gap: 8px; align-items: flex-start; max-width: 85%; }
+.bubble-row.is-traveler { align-self: flex-start; }
+.bubble-row.is-agency { align-self: flex-end; flex-direction: row-reverse; }
 .bubble { max-width: 80%; padding: 10px 12px; border-radius: 14px; }
+.bubble-row .bubble { max-width: none; min-width: 0; }
 .bubble p { margin: 0 0 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bubble .muted { font-size: 0.75rem; }
 .bubble.is-traveler { align-self: flex-start; background: var(--paper); border: 1px solid var(--line); }

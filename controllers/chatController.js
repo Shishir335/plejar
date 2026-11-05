@@ -201,6 +201,12 @@ const messageView = (m, viewer, room, ctx) => {
     } else readAt = (room.members[0] || {}).lastReadAt;
     seen = Boolean(readAt && readAt >= m.createdAt);
   }
+  // The picture as it is now: a traveler's own photo, the agency's logo, or the guide's saved with the
+  // message. Agency and support messages never fall back to the staff member's personal photo.
+  const agency = room.agency && ctx.agencies && ctx.agencies.get(String(room.agency));
+  let photo = m.senderPhoto || '';
+  if (m.side === 'traveler' && u) photo = photoURL(u.photo);
+  if (m.side === 'agency' && !m.asGuide && agency) photo = agency.logo || '';
   return {
     _id: m._id,
     type: m.type,
@@ -209,7 +215,7 @@ const messageView = (m, viewer, room, ctx) => {
     sender: m.side === 'system' ? null : {
       _id: m.sender || null,
       name: m.senderName || (u && u.name) || '',
-      photo: m.senderPhoto || (u ? photoURL(u.photo) : '')
+      photo
     },
     text: m.deletedAt ? 'This message was deleted.' : m.text,
     deleted: Boolean(m.deletedAt),

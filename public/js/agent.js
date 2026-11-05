@@ -2011,24 +2011,44 @@ function renderConversationList() {
   const openId = state.openChat && state.openChat.chat._id;
   $('conversationList').innerHTML = state.chats.map(c => `
     <button type="button" class="inbox-item ${openId === c._id ? 'is-open' : ''} ${c.unread ? 'is-unread' : ''}" data-action="open-conversation" data-id="${escapeHTML(c._id)}">
-      <span class="inbox-top"><strong>${escapeHTML(c.title)}</strong><span class="muted">${escapeHTML(fmtDateTime(c.lastMessageAt))}</span></span>
-      <span class="inbox-tour">${escapeHTML(c.subtitle || '')}${c.kind === 'tour_group' ? ` · ${Number(c.participantCount)} participants` : ''}${c.status === 'closed' ? ' · Closed' : ''}</span>
-      <span class="inbox-preview">${c.lastMessage ? `${c.lastMessage.mine ? 'You: ' : ''}${escapeHTML(c.lastMessage.text)}` : ''}</span>
+      ${chatPicHTML(c.title, c.photo)}
+      <span class="inbox-body">
+        <span class="inbox-top"><strong>${escapeHTML(c.title)}</strong><span class="muted">${escapeHTML(fmtDateTime(c.lastMessageAt))}</span></span>
+        <span class="inbox-tour">${escapeHTML(c.subtitle || '')}${c.kind === 'tour_group' ? ` · ${Number(c.participantCount)} participants` : ''}${c.status === 'closed' ? ' · Closed' : ''}</span>
+        <span class="inbox-preview">${c.lastMessage ? `${c.lastMessage.mine ? 'You: ' : ''}${escapeHTML(c.lastMessage.text)}` : ''}</span>
+      </span>
       ${c.unread ? `<span class="nav-badge">${Number(c.unread)}</span>` : ''}
     </button>`).join('');
 }
+
+// A round picture in chat, or the person's initials when there is none (the server's default photo counts as none)
+function chatPicHTML(name, photo) {
+  const letters = escapeHTML(initials(name));
+  if (!photo || photo.endsWith('/img/users/profile.png')) return `<span class="avatar chat-pic">${letters}</span>`;
+  return `<img class="chat-pic" src="${escapeHTML(photo)}" alt="" loading="lazy" data-initials="${letters}">`;
+}
+
+// A picture that no longer loads shows the initials instead (error events don't bubble, so listen on the way down)
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (img.tagName === 'IMG' && img.classList.contains('chat-pic')) img.outerHTML = `<span class="avatar chat-pic">${escapeHTML(img.dataset.initials || '?')}</span>`;
+}, true);
 
 function bubbleHTML(m) {
   if (m.type === 'system') return `<div class="bubble is-system"><p>${escapeHTML(m.text)}</p></div>`;
   const files = (m.attachments || []).map(a => (a.kind === 'image'
     ? `<a href="${escapeHTML(a.url)}" target="_blank" rel="noopener"><img class="bubble-photo" src="${escapeHTML(a.url)}" alt="${escapeHTML(a.name || 'Photo')}" loading="lazy"></a>`
     : `<a class="bubble-file" href="${escapeHTML(a.url)}" target="_blank" rel="noopener">📄 ${escapeHTML(a.name || 'File')}</a>`)).join('');
+  const side = m.mine ? 'is-agency' : 'is-traveler';
   return `
-    <div class="bubble ${m.mine ? 'is-agency' : 'is-traveler'}" data-message-id="${escapeHTML(m._id)}">
-      ${m.about ? `<span class="bubble-about">About: ${escapeHTML(m.about.title)}</span>` : ''}
-      ${m.text ? `<p class="${m.deleted ? 'muted' : ''}">${escapeHTML(m.text)}</p>` : ''}
-      ${files}
-      <span class="muted">${m.sender ? `${escapeHTML(m.sender.name)}, ` : ''}${escapeHTML(fmtDateTime(m.createdAt))}${m.mine && m.seen ? ' · Seen' : ''}</span>
+    <div class="bubble-row ${side}" data-message-id="${escapeHTML(m._id)}">
+      ${chatPicHTML(m.sender && m.sender.name, m.sender && m.sender.photo)}
+      <div class="bubble ${side}">
+        ${m.about ? `<span class="bubble-about">About: ${escapeHTML(m.about.title)}</span>` : ''}
+        ${m.text ? `<p class="${m.deleted ? 'muted' : ''}">${escapeHTML(m.text)}</p>` : ''}
+        ${files}
+        <span class="muted">${m.sender ? `${escapeHTML(m.sender.name)}, ` : ''}${escapeHTML(fmtDateTime(m.createdAt))}${m.mine && m.seen ? ' · Seen' : ''}</span>
+      </div>
     </div>`;
 }
 
@@ -2053,8 +2073,9 @@ async function openConversation(id) {
       </select>` : '';
     box.innerHTML = `
       <header class="thread-head">
-        <div><strong>${escapeHTML(chat.title)}</strong>
-          <div class="muted">${escapeHTML(chat.subtitle || '')}${chat.kind === 'tour_group' ? ` · ${Number(chat.participantCount)} participants` : ''}</div></div>
+        <div class="thread-who">${chatPicHTML(chat.title, chat.photo)}
+          <div><strong>${escapeHTML(chat.title)}</strong>
+            <div class="muted">${escapeHTML(chat.subtitle || '')}${chat.kind === 'tour_group' ? ` · ${Number(chat.participantCount)} participants` : ''}</div></div></div>
         ${direct ? `<button type="button" class="btn btn-quiet btn-sm" data-action="toggle-conversation" data-id="${escapeHTML(chat._id)}">${chat.status === 'closed' ? 'Reopen' : 'Mark done'}</button>` : ''}
       </header>
       <div class="thread-messages" id="threadMessages">${data.messages.map(bubbleHTML).join('')}</div>
@@ -2217,8 +2238,13 @@ function connectChatSocket() {
   });
   socket.on('chat:deleted', ({ chatId, messageId }) => {
     if (!state.openChat || state.openChat.chat._id !== chatId) return;
-    const el = document.querySelector(`[data-message-id="${messageId}"]`);
-    if (el) el.outerHTML = bubbleHTML({ _id: messageId, type: 'text', deleted: true, text: 'This message was deleted.', mine: el.classList.contains('is-agency'), attachments: [], createdAt: new Date() });
+    // Keeps who sent it and when; only what it said goes
+    const bubble = document.querySelector(`[data-message-id="${messageId}"] .bubble`);
+    if (bubble) {
+      const stamp = bubble.querySelector(':scope > .muted');
+      bubble.innerHTML = '<p class="muted">This message was deleted.</p>';
+      if (stamp) bubble.append(stamp);
+    }
   });
   socket.on('chat:read', ({ chatId }) => {
     if (!state.openChat || state.openChat.chat._id !== chatId || state.openChat.chat.type !== 'direct') return;
