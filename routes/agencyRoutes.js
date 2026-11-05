@@ -27,6 +27,7 @@ router.route('/me/ads/:id').patch(imageUpload.single('image'), ads.updateMyAd).d
 router.patch('/me', agencyController.requireOwner, imageUpload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), agencyController.updateMyAgency);
 
 // The agency's wall: posts with text, photos or a video (multipart field "media"), and the comments on them
+router.get('/me/followers', wall.listFollowers);
 router.route('/me/posts').get(wall.listPosts).post(postMediaUpload, wall.createPost);
 router.route('/me/posts/:id').get(wall.getPost).patch(postMediaUpload, wall.updatePost).delete(wall.deletePost);
 router.route('/me/posts/:id/pin').post(wall.pinPost).delete(wall.unpinPost);

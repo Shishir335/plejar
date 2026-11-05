@@ -79,6 +79,7 @@
         <button data-view="ads">Tour ads</button>
         <button data-view="notifications">Notifications</button>
         <button data-view="wall">Wall</button>
+        <button data-view="followers">Followers</button>
         <button data-view="profile">Agency profile</button>
         <button data-view="team" data-owner-only>Team</button>
         <button data-view="verification" data-owner-only>Verification</button>
@@ -164,6 +165,19 @@
           <div id="wallList"></div>
           <button class="btn btn-quiet" id="wallMore" hidden>Show more</button>
         </div>
+      </section>
+
+      <!-- Who follows the agency -->
+      <section id="view-followers" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Followers</h1>
+            <p id="followersLead">Travelers who follow your agency in the Plejar app.</p>
+          </div>
+          <button class="btn btn-quiet" data-action="go" data-view="notifications">Send a notification</button>
+        </div>
+        <div id="followerList"></div>
+        <button class="btn btn-quiet" id="followersMore" hidden>Show more</button>
       </section>
 
       <!-- Profile -->

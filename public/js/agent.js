@@ -220,6 +220,7 @@ function showView(view) {
   if (view === 'guides') loadGuides();
   if (view === 'notifications') loadNotificationsView();
   if (view === 'wall') loadWall();
+  if (view === 'followers') loadFollowers();
   if (view === 'team') loadTeam();
   if (view === 'verification') loadVerification();
   try { history.replaceState(null, '', `#${view}`); } catch (e) { /* ignore */ }
@@ -291,7 +292,7 @@ async function boot() {
   renderProfileForm();
 
   const start = (window.location.hash || '#overview').slice(1);
-  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'wall', 'profile', 'team', 'verification'];
+  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'wall', 'followers', 'profile', 'team', 'verification'];
   refreshMessagesBadge();
   setInterval(refreshMessagesBadge, 60000);
   connectChatSocket();
@@ -2375,7 +2376,7 @@ async function renderWallProfile() {
   try { pub = (await api(`/api/v1/agencies/${a._id}`)).data.agency; } catch (e) { /* the numbers are left out */ }
   const links = Object.entries(a.socialLinks || {}).filter(([, url]) => url);
   const siteName = { facebook: 'Facebook', instagram: 'Instagram', youtube: 'YouTube', tiktok: 'TikTok' };
-  const numbers = pub ? [plural(pub.counts.posts, 'post'), plural(pub.counts.photos, 'photo'), plural(pub.counts.videos, 'video'), plural(pub.followers, 'follower')] : [];
+  const numbers = pub ? [plural(pub.counts.posts, 'post'), plural(pub.counts.photos, 'photo'), plural(pub.counts.videos, 'video')] : [];
   $('wallProfile').innerHTML = `
     <div class="wall-cover">${a.cover ? `<img src="${escapeHTML(a.cover)}" alt="">` : ''}</div>
     <div class="wall-identity">
@@ -2386,7 +2387,7 @@ async function renderWallProfile() {
       </div>
       ${isOwner() ? '<button class="btn btn-quiet btn-sm" data-action="go" data-view="profile">Edit profile</button>' : ''}
     </div>
-    ${numbers.length ? `<p class="wall-numbers">${numbers.map(escapeHTML).join(' · ')}</p>` : ''}
+    ${numbers.length ? `<p class="wall-numbers">${numbers.map(escapeHTML).join(' · ')} · <button type="button" class="link-btn" data-action="go" data-view="followers">${escapeHTML(plural(pub.followers, 'follower'))}</button></p>` : ''}
     ${a.address ? `<p class="wall-about">${escapeHTML(a.address)}</p>` : ''}
     ${links.length ? `<p class="wall-links">${links.map(([site, url]) => `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(siteName[site] || site)}</a>`).join('')}</p>` : ''}`;
 }
@@ -2769,5 +2770,49 @@ $('wallEditForm').addEventListener('submit', async e => {
     setBusy(btn, false);
   }
 });
+
+// ---------- Followers ----------
+
+state.followers = { cursor: null, loadId: 0 };
+
+const followerHTML = f => `
+  <li class="follower">
+    ${chatPicHTML(f.name, f.photo)}
+    <div class="follower-who">
+      <strong>${escapeHTML(f.name)}${f.verified ? ' <span class="badge badge-published">Verified</span>' : ''}</strong>
+      <span class="muted">Followed on ${escapeHTML(fmtDate(f.followedAt))}</span>
+    </div>
+  </li>`;
+
+async function loadFollowers(more) {
+  const loadId = ++state.followers.loadId;
+  const list = $('followerList');
+  if (!more) {
+    state.followers.cursor = null;
+    list.innerHTML = '<p class="muted">Loading followers...</p>';
+  }
+  $('followersMore').hidden = true;
+  const cursor = more && state.followers.cursor ? `&cursor=${encodeURIComponent(state.followers.cursor)}` : '';
+  try {
+    const { data } = await api(`/api/v1/agency/me/followers?limit=30${cursor}`);
+    if (loadId !== state.followers.loadId) return;
+    state.followers.cursor = data.nextCursor;
+    $('followersMore').hidden = !data.nextCursor;
+    $('followersLead').textContent = data.total
+      ? `${plural(data.total, 'traveler follows', 'travelers follow')} your agency in the Plejar app.`
+      : 'Travelers who follow your agency in the Plejar app.';
+    if (!more && !data.total) {
+      list.innerHTML = '<div class="empty"><strong>No followers yet</strong>When travelers tap Follow on your agency page in the app, they appear here.</div>';
+      return;
+    }
+    const html = data.followers.map(followerHTML).join('');
+    if (more) list.querySelector('.follower-list').insertAdjacentHTML('beforeend', html);
+    else list.innerHTML = `<ul class="follower-list">${html}</ul>`;
+  } catch (err) {
+    if (loadId === state.followers.loadId) list.innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+$('followersMore').addEventListener('click', () => loadFollowers(true));
 
 boot();

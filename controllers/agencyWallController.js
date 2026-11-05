@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const Post = require('../models/postModel');
 const Comment = require('../models/commentModel');
 const Agency = require('../models/agencyModel');
+const Follow = require('../models/followModel');
+const User = require('../models/userModel');
 const Package = require('../models/packageModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
@@ -9,7 +11,7 @@ const { logActivity } = require('../utils/activity');
 const { originalImageUrl } = require('../utils/cache');
 const { readTags, listComments, commentView, removeComment, COMMENT_POPULATE } = require('./postController');
 const {
-  viewerContext, POPULATE, hydratePosts, pageSize, cursorFilter, nextCursor, snippet,
+  viewerContext, userCard, USER_CARD_FIELDS, POPULATE, hydratePosts, pageSize, cursorFilter, nextCursor, snippet,
   notifySocial, unnotifySocial, checkMedia, savePostMedia, removePostMedia
 } = require('../utils/social');
 
@@ -135,6 +137,24 @@ exports.unpinPost = catchAsync(async (req, res) => {
   await Agency.updateOne({ _id: req.agency._id, pinnedPost: post._id }, { $unset: { pinnedPost: 1 } });
   if (String(req.agency.pinnedPost) === String(post._id)) req.agency.pinnedPost = undefined;
   await sendWallPost(res, 200, post, req, 'Unpinned.');
+});
+
+// ---------- Followers ----------
+
+// GET /agency/me/followers?cursor&limit
+// Newest first. Only what a public profile shows: a follower's email and phone stay private.
+exports.listFollowers = catchAsync(async (req, res) => {
+  const limit = pageSize(req.query);
+  const filter = { targetType: 'agency', target: req.agency._id };
+  const rows = await Follow.find({ ...filter, ...cursorFilter(req.query.cursor) }).sort({ createdAt: -1, _id: -1 }).limit(limit).lean();
+  const [users, allIds] = await Promise.all([
+    User.find({ _id: { $in: rows.map(r => r.follower) }, status: 'active' }).select(USER_CARD_FIELDS).lean(),
+    Follow.distinct('follower', filter)
+  ]);
+  const byId = new Map(users.map(u => [String(u._id), u]));
+  const followers = rows.filter(r => byId.has(String(r.follower))).map(r => ({ ...userCard(byId.get(String(r.follower))), followedAt: r.createdAt }));
+  const total = await User.countDocuments({ _id: { $in: allIds }, status: 'active' });
+  res.status(200).json({ status: 'success', data: { followers, total, nextCursor: nextCursor(rows, limit) } });
 });
 
 // ---------- Comments on the wall ----------
