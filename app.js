@@ -42,6 +42,7 @@ const adminSocialRouter = require('./routes/adminSocialRoutes');
 const adminNotificationRouter = require('./routes/adminNotificationRoutes');
 
 const AppError = require('./utils/appError');
+const { sendPage, staticHeaders, privateByDefault, publicCache, clearAfterWrite, smallerImages } = require('./utils/cache');
 const authController = require('./controllers/authController');
 const globalErrorHandler = require('./controllers/errorController');
 const swaggerUi = require('swagger-ui-express');
@@ -53,6 +54,9 @@ const app = express();
 app.enable('trust proxy');
 
 // 1) GLOBAL MIDDLEWARES
+
+// COMPRESS RESPONSES (first, so pages, scripts and styles are compressed as well as the API)
+app.use(compression());
 
 // ENABLE CORS WITH CREDENTIALS (only for origins listed in CORS_ORIGINS; same-origin requests need no CORS)
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
@@ -167,9 +171,7 @@ app.use((req, res, next) => {
 });
 
 // SERVING STATIC FILES
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.use(compression());
+app.use(express.static(path.join(__dirname, 'public'), { index: false, setHeaders: staticHeaders }));
 
 // REQUEST TIMESTAMP MIDDLEWARE
 app.use((req, res, next) => {
@@ -188,29 +190,12 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 // UI FRONTEND ROUTES
-app.get(['/', '/home'], (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.get(['/admin', '/admin/dashboard'], (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-
-app.get('/reset-password', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
-});
-
-app.get(['/agent', '/agent/dashboard', '/vendor', '/vendor/dashboard'], (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'agent.html'));
-});
-
-app.get(['/apply', '/apply/status'], (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'apply.html'));
-});
-
-app.get('/accept-invite', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'accept-invite.html'));
-});
+app.get(['/', '/home'], sendPage('index.html'));
+app.get(['/admin', '/admin/dashboard'], sendPage('admin.html'));
+app.get('/reset-password', sendPage('reset-password.html'));
+app.get(['/agent', '/agent/dashboard', '/vendor', '/vendor/dashboard'], sendPage('agent.html'));
+app.get(['/apply', '/apply/status'], sendPage('apply.html'));
+app.get('/accept-invite', sendPage('accept-invite.html'));
 
 // SWAGGER UI INTERACTIVE API TESTING DASHBOARD
 app.use(
@@ -234,6 +219,26 @@ app.use(
 app.get('/api-docs.json', (req, res) => {
     res.status(200).json(getSwaggerSpec(req.app));
 });
+
+// API CACHING (see utils/cache.js)
+app.use('/api', privateByDefault);
+app.use(['/api/v1/admin', '/api/v1/agency'], clearAfterWrite);
+
+// Read routes get smaller images. Not /admin, /agency or /users, whose panels send photo URLs back.
+app.use([
+    '/api/v1/tours', '/api/v1/hotels', '/api/v1/promotions', '/api/v1/guides', '/api/v1/destinations',
+    '/api/v1/events', '/api/v1/announcements', '/api/v1/notifications', '/api/v1/feed', '/api/v1/posts',
+    '/api/v1/comments', '/api/v1/people', '/api/v1/agencies', '/api/v1/me', '/api/v1/vouchers',
+    '/api/v1/help', '/api/v1/bookings', '/api/v1/reviews', '/api/v1/chats'
+], smallerImages);
+
+// Public answers that are the same for everyone. Left out on purpose: anything with seats left
+// (events, destination pages), counts views (destination pages) or knows who is asking (tours, hotels).
+app.get(['/api/v1/app/config', '/api/v1/app/live'], publicCache({ server: 3600, browser: 3600 }));
+app.get(['/api/v1/pages', '/api/v1/pages/:key', '/api/v1/help', '/api/v1/help/articles', '/api/v1/help/articles/:id'], publicCache({ server: 600, browser: 300 }));
+app.get(['/api/v1/tours/types', '/api/v1/tours/tags', '/api/v1/tours/filters', '/api/v1/agencies/filters', '/api/v1/destination-categories'], publicCache({ server: 300, browser: 60 }));
+app.get('/api/v1/destinations', publicCache({ server: 120, browser: 60 }));
+app.get('/api/v1/promotions', publicCache({ server: 60, browser: 60 }));
 
 // API ROUTES
 app.use('/api/v1/users', userRouter);

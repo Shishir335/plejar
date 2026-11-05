@@ -9,6 +9,7 @@ const Agency = require('../models/agencyModel');
 const Package = require('../models/packageModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const { originalImageUrl } = require('../utils/cache');
 const {
   viewerContext, visibleFilter, canView, canComment, assertCanPost, userCard, USER_CARD_FIELDS, POPULATE, hydratePosts,
   pageSize, cursorFilter, nextCursor, snippet, notifySocial, unnotifySocial, checkMedia, savePostMedia, removePostMedia
@@ -132,7 +133,8 @@ exports.updatePost = catchAsync(async (req, res, next) => {
   const post = await loadOwnPost(req.params.id, req.user);
   if (post.status === 'hidden') return next(new AppError('Plejar has hidden this post, so it can\'t be edited.', 403));
   const files = req.files || [];
-  const remove = [].concat(req.body.removeMedia || []).flatMap(v => String(v).split(',')).map(s => s.trim()).filter(Boolean);
+  // The app has the smaller image's URL, which itself contains commas: back to the stored URL first
+  const remove = [].concat(req.body.removeMedia || []).flatMap(v => originalImageUrl(v).split(',')).map(s => s.trim()).filter(Boolean);
   const kept = post.media.filter(m => !remove.includes(m.url));
   checkMedia(files, kept);
   await readTags(req.body, post);
