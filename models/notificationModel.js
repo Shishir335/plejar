@@ -87,4 +87,7 @@ notificationSchema.post('save', function (doc) {
 
 const Notification = mongoose.model('Notification', notificationSchema);
 Notification.KINDS = KINDS;
+// Chat messages still alert the phone, through the save above, but belong in Messages. The Notifications
+// list and every unread count on it use this filter. An agency's broadcast (vendor_message) isn't chat.
+Notification.NOT_CHAT = { kind: { $nin: ['tour_message', 'chat_message'] } };
 module.exports = Notification;

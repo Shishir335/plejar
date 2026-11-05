@@ -676,7 +676,7 @@ exports.home = catchAsync(async (req, res) => {
     req.user ? recentlyViewed(req.user, 10) : [],
     nearbyHotels({ lat, lng, user: req.user, limit: 10 }),
     typeCounts(),
-    req.user ? Notification.countDocuments({ user: req.user._id, readAt: null }) : 0
+    req.user ? Notification.countDocuments({ user: req.user._id, readAt: null, ...Notification.NOT_CHAT }) : 0
   ]);
 
   res.status(200).json({

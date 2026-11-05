@@ -136,14 +136,14 @@ exports.listAnnouncements = catchAsync(async (req, res, next) => {
 // Notifications tab: newest first, with who did it and a peek at the post it's about
 const NOTE_GROUPS = {
   social: ['post_reaction', 'post_comment', 'comment_reply', 'comment_reaction', 'post_share', 'new_follower'],
-  tours: ['vendor_message', 'announcement', 'event_cancelled', 'event_changed', 'tour_message', 'chat_message', 'booking_requested', 'booking_confirmed', 'booking_cancelled', 'booking_completed', 'trip_reminder', 'points_earned'],
+  tours: ['vendor_message', 'announcement', 'event_cancelled', 'event_changed', 'booking_requested', 'booking_confirmed', 'booking_cancelled', 'booking_completed', 'trip_reminder', 'points_earned'],
   plezar: ['post_hidden', 'admin_broadcast', 'system_announcement']
 };
 
 // The chips on "Notification & Trip Updates": what kind of update each notification is
 const NOTE_CATEGORIES = {
   alerts: ['event_cancelled', 'event_changed', 'booking_cancelled'],
-  info: ['announcement', 'vendor_message', 'tour_message', 'chat_message', 'trip_reminder', 'post_hidden', 'admin_broadcast', 'system_announcement'],
+  info: ['announcement', 'vendor_message', 'trip_reminder', 'post_hidden', 'admin_broadcast', 'system_announcement'],
   confirmation: ['booking_requested', 'booking_confirmed', 'booking_completed', 'points_earned', 'referral_reward'],
   social: NOTE_GROUPS.social
 };
@@ -151,7 +151,8 @@ const CATEGORY_LABELS = { all: 'All', unread: 'Unread', alerts: 'Alerts', info: 
 const categoryOf = kind => Object.keys(NOTE_CATEGORIES).find(c => NOTE_CATEGORIES[c].includes(kind)) || 'info';
 
 exports.myNotifications = catchAsync(async (req, res) => {
-  const filter = { user: req.user._id };
+  const mine = { user: req.user._id, ...Notification.NOT_CHAT };
+  const filter = { ...mine };
   if (req.query.unread === 'true') filter.readAt = null;
   if (NOTE_GROUPS[req.query.group]) filter.kind = { $in: NOTE_GROUPS[req.query.group] };
   // ?category=unread|alerts|info|confirmation|social
@@ -167,8 +168,8 @@ exports.myNotifications = catchAsync(async (req, res) => {
       .populate('event', 'title startDate')
       .lean(),
     Notification.countDocuments(filter),
-    Notification.countDocuments({ user: req.user._id, readAt: null }),
-    Notification.aggregate([{ $match: { user: req.user._id } }, { $group: { _id: '$kind', total: { $sum: 1 }, unread: { $sum: { $cond: [{ $eq: [{ $ifNull: ['$readAt', null] }, null] }, 1, 0] } } } }])
+    Notification.countDocuments({ ...mine, readAt: null }),
+    Notification.aggregate([{ $match: mine }, { $group: { _id: '$kind', total: { $sum: 1 }, unread: { $sum: { $cond: [{ $eq: [{ $ifNull: ['$readAt', null] }, null] }, 1, 0] } } } }])
   ]);
   const notifications = rows.map(n => ({
     ...n,
@@ -191,7 +192,7 @@ exports.myNotifications = catchAsync(async (req, res) => {
 
 // The number on the Notifications tab
 exports.unreadCount = catchAsync(async (req, res) => {
-  const unread = await Notification.countDocuments({ user: req.user._id, readAt: null });
+  const unread = await Notification.countDocuments({ user: req.user._id, readAt: null, ...Notification.NOT_CHAT });
   res.status(200).json({ status: 'success', data: { unread } });
 });
 

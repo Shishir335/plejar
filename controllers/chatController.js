@@ -393,9 +393,10 @@ exports.broadcastMessage = broadcastMessage;
 exports.broadcastRoom = broadcastRoom;
 
 /**
- * A notification for travelers who get a new direct message, the first one since they last read
- * the chat (so a burst of messages makes one notification). Replies from agencies and guides are
+ * A phone alert for travelers who get a new direct message, the first one since they last read
+ * the chat (so a burst of messages makes one alert). Replies from agencies and guides are
  * "tour_message" like before; everything else is "chat_message". Group chats don't notify.
+ * Saving the notification sends the alert. It stays out of the app's Notifications list.
  */
 const notifyDirect = async (room, viewer, message, preview) => {
   if (room.type !== 'direct') return;
