@@ -2033,7 +2033,7 @@ function bubbleHTML(m) {
 }
 
 async function openConversation(id) {
-  const chat = state.chats.find(c => c._id === id);
+  const chat = state.chats.find(c => c._id === id) || (state.openChat && state.openChat.chat._id === id ? state.openChat.chat : null);
   if (!chat) return;
   state.openChat = { chat, latestId: null };
   renderConversationList();
@@ -2110,7 +2110,8 @@ async function sendReply(e) {
   setBusy(btn, true);
   try {
     const { data } = await api(`${CHAT_API}/${state.openChat.chat._id}/messages`, { method: 'POST', form });
-    $('threadMessages').insertAdjacentHTML('beforeend', bubbleHTML(data.message));
+    // The live connection often delivers it before this answer arrives: never show it twice
+    appendMessage(data.message);
     $('threadMessages').scrollTop = $('threadMessages').scrollHeight;
     state.openChat.latestId = data.message._id;
     $('replyText').value = '';
@@ -2124,10 +2125,12 @@ async function sendReply(e) {
 }
 
 async function toggleConversation(id) {
-  const row = state.chats.find(c => c._id === id);
+  const row = state.chats.find(c => c._id === id) || (state.openChat && state.openChat.chat);
   const status = row && row.status === 'closed' ? 'active' : 'closed';
   try {
-    await api(`${CHAT_API}/${id}`, { method: 'PATCH', body: { status } });
+    const { data } = await api(`${CHAT_API}/${id}`, { method: 'PATCH', body: { status } });
+    // With a filter on, the chat may have just left the list; it stays open with its new state
+    if (state.openChat && state.openChat.chat._id === id) state.openChat.chat = data.chat;
     await loadConversations();
     openConversation(id);
   } catch (err) {
@@ -2170,7 +2173,8 @@ async function catchUpOpenChat() {
 
 function connectChatSocket() {
   if (typeof io !== 'function' || state.socket) return; // socket script missing: polling keeps working
-  const socket = io({ auth: { token: state.token || undefined }, withCredentials: true });
+  // This panel is the agency's inbox: the same person's own traveler chats belong in the app
+  const socket = io({ auth: { token: state.token || undefined, side: 'agency' }, withCredentials: true });
   state.socket = socket;
   socket.on('connect', () => {
     catchUpOpenChat();
@@ -2203,7 +2207,12 @@ function connectChatSocket() {
   socket.on('chat:updated', ({ chat }) => {
     const i = state.chats.findIndex(c => c._id === chat._id);
     if (i >= 0) state.chats[i] = chat;
-    if (state.openChat && state.openChat.chat._id === chat._id) state.openChat.chat = chat;
+    if (state.openChat && state.openChat.chat._id === chat._id) {
+      state.openChat.chat = chat;
+      // A traveler's message can reopen a chat while it's on screen
+      const toggle = document.querySelector('#conversationThread [data-action="toggle-conversation"]');
+      if (toggle) toggle.textContent = chat.status === 'closed' ? 'Reopen' : 'Mark done';
+    }
     if (!$('view-messages').hidden) renderConversationList();
   });
   socket.on('chat:deleted', ({ chatId, messageId }) => {

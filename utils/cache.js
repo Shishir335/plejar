@@ -4,7 +4,7 @@ const crypto = require('crypto');
 
 /**
  * Caching, to send fewer bytes:
- * - Pages: script and style links carry a hash of the file (/js/app.js?v=ab12cd34), so browsers keep
+ * - Pages: script, style and tab icon links carry a hash of the file (/js/app.js?v=ab12cd34), so browsers keep
  *   those files for a year and still get the new one right after a deploy.
  * - Public API data: kept in this server's memory for a few minutes, and browsers may reuse it briefly.
  *   Only for routes whose answer is the same for everyone; never for anything signed-in.
@@ -26,7 +26,7 @@ const shortHash = async file => {
   }
 };
 
-const ASSET_LINK = /\b(src|href)="(\/?(?:js|css)\/[^"?#]+\.(?:js|css))"/g;
+const ASSET_LINK = /\b(src|href)="(\/?(?:js\/[^"?#]+\.js|css\/[^"?#]+\.css|assets\/favicon[^"?#]*))"/g;
 
 const renderPage = async file => {
   const html = await fs.promises.readFile(path.join(PUBLIC_DIR, file), 'utf8');
@@ -51,7 +51,7 @@ const sendPage = file => (req, res, next) => {
 /** Cache-Control for express.static */
 const staticHeaders = (res, filePath) => {
   const ext = path.extname(filePath).toLowerCase();
-  if ((ext === '.js' || ext === '.css') && res.req.query.v) res.set('Cache-Control', `public, max-age=${YEAR}, immutable`);
+  if (res.req.query.v) res.set('Cache-Control', `public, max-age=${YEAR}, immutable`);
   else if (/^\.(jpe?g|png|webp|gif|svg|ico|mp4|woff2?)$/.test(ext)) res.set('Cache-Control', `public, max-age=${DAY}`);
   else res.set('Cache-Control', 'no-cache');
 };

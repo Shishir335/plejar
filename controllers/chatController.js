@@ -16,13 +16,15 @@ const realtime = require('../utils/realtime');
 const { IN_GROUP, ensureTourGroup, joinTourGroup, findOrCreateRoom, guideRoom, agencyRoom, roomForTourQuestion, guideSenderName, loadGuide } = require('../utils/chats');
 
 /**
- * Chat ("Messages"): tour group chats and direct chats, without sockets for now.
- * The app polls: GET /chats/unread for the badge, GET /chats/:id/messages?after=<last id> inside a
- * chat (every few seconds), and GET /chats?since=<time> for the list.
+ * Chat ("Messages"): tour group chats and direct chats. Everything is saved through these routes;
+ * Socket.IO pushes the changes live. While the socket is down, clients poll instead:
+ * GET /chats/unread for the badge, GET /chats/:id/messages?after=<last id> inside a chat, and GET /chats.
  * Three kinds of people take part, each through their own routes:
  *   travelers  /api/v1/chats                   (members, one by one)
  *   agencies   /api/v1/agency/me/chats         (the agency side of tour groups and guide chats)
  *   support    /api/v1/admin/support-chats     (Plejar staff answering Customer Support)
+ * One account can be on several sides, even of the same chat (a vendor messaging their own agency
+ * from the app), so "mine" always means this side sent it, never only this account did.
  */
 
 const validId = id => mongoose.isValidObjectId(id);
@@ -37,6 +39,11 @@ const restricted = (user, flag) => {
 
 const activeMember = (room, userId) => room.members.find(m => String(m.user) === String(userId) && !m.leftAt);
 const anyMember = (room, userId) => room.members.find(m => String(m.user) === String(userId));
+
+// Did this viewer send it, on the side they're looking from? `m` is a message or a room's lastMessage.
+const sentBy = (m, viewer) => (viewer.side === 'traveler'
+  ? m.side === 'traveler' && String(m.sender) === String(viewer.user._id)
+  : m.side === viewer.side);
 
 // Who is looking: { side: 'traveler' | 'agency' | 'support', user, agency? }
 const viewerOf = req => {
@@ -133,7 +140,7 @@ const roomView = (room, viewer, ctx) => {
       text: room.lastMessage.text,
       type: room.lastMessage.type,
       senderName: room.lastMessage.senderName,
-      mine: viewer.side === 'traveler' ? String(room.lastMessage.sender) === String(viewer.user._id) : room.lastMessage.side === viewer.side
+      mine: sentBy(room.lastMessage, viewer)
     } : null,
     lastMessageAt: room.lastMessageAt,
     unread: unreadFor(room, viewer),
@@ -181,10 +188,8 @@ const findRoom = async (req, viewer) => {
 };
 
 const messageView = (m, viewer, room, ctx) => {
-  let mine;
-  if (viewer.side === 'traveler') mine = String(m.sender) === String(viewer.user._id);
-  else mine = m.side === viewer.side;
-  const base = `/api/v1/${{ traveler: 'chats', agency: 'agency/me/chats', support: 'admin/support-chats' }[viewer.side]}/${room._id}/attachments`;
+  const mine = sentBy(m, viewer);
+  const base =`/api/v1/${{ traveler: 'chats', agency: 'agency/me/chats', support: 'admin/support-chats' }[viewer.side]}/${room._id}/attachments`;
   const u = m.sender && ctx.users.get(String(m.sender));
   // In a direct chat, my message is "seen" once the other side has read past it
   let seen = null;
@@ -367,9 +372,10 @@ realtime.onClientEvent('chat:typing', async (socket, { chatId, typing }) => {
   if (!room || room.status !== 'active') throw new Error('No chat with that ID.');
   const { user } = socket;
   let from = null;
-  if (activeMember(room, user._id)) from = { side: 'traveler', name: user.name, userId: user._id };
-  else if (room.agency && hasRole(user, 'agent') && String(user.agency) === String(room.agency)) from = { side: 'agency', name: (await Agency.findById(room.agency).select('name').lean() || {}).name || 'Agency' };
-  else if (room.kind === 'support' && hasRole(user, 'admin', 'manager', 'dev')) from = { side: 'support', name: SUPPORT_NAME };
+  // The inbox this connection signed in for decides who is typing
+  if (socket.side === 'traveler' && activeMember(room, user._id)) from = { side: 'traveler', name: user.name, userId: user._id };
+  else if (socket.side === 'agency' && room.agency && String(user.agency) === String(room.agency)) from = { side: 'agency', name: (await Agency.findById(room.agency).select('name').lean() || {}).name || 'Agency' };
+  else if (socket.side === 'support' && room.kind === 'support') from = { side: 'support', name: SUPPORT_NAME };
   if (!from) throw new Error('No chat with that ID.');
   audienceOf(room)
     .filter(v => (from.side === 'traveler' ? String(v.userId) !== String(from.userId) : v.side !== from.side))
@@ -388,7 +394,8 @@ exports.broadcastRoom = broadcastRoom;
 const notifyDirect = async (room, viewer, message, preview) => {
   if (room.type !== 'direct') return;
   try {
-    const waiting = room.members.filter(m => !m.leftAt && !m.muted && String(m.user) !== String(viewer.user._id) && !m.unread);
+    const isSender = m => viewer.side === 'traveler' && String(m.user) === String(viewer.user._id);
+    const waiting = room.members.filter(m => !m.leftAt && !m.muted && !isSender(m) && !m.unread);
     if (!waiting.length) return;
     const users = await User.find({ _id: { $in: waiting.map(m => m.user) }, status: 'active' }).select('settings').lean();
     const fromAgency = viewer.side === 'agency';
@@ -478,7 +485,9 @@ const sendMessage = async (room, viewer, req, { tour } = {}) => {
   if (viewer.side === 'agency') Object.assign(set, { agencyUnread: 0, agencyLastReadAt: message.createdAt });
   if (viewer.side === 'support') Object.assign(set, { supportUnread: 0, supportLastReadAt: message.createdAt });
   if (viewer.side === 'traveler') Object.assign(set, { 'members.$[me].unread': 0, 'members.$[me].lastReadAt': message.createdAt });
-  const arrayFilters = [{ 'other.user': { $ne: viewer.user._id }, 'other.leftAt': null }];
+  // Only a traveler leaves themselves out: a vendor's reply is unread for every traveler in the chat,
+  // even when the vendor's own account is one of them
+  const arrayFilters = [viewer.side === 'traveler' ? { 'other.user': { $ne: viewer.user._id }, 'other.leftAt': null } : { 'other.leftAt': null }];
   if (viewer.side === 'traveler') arrayFilters.push({ 'me.user': viewer.user._id });
   await ChatRoom.updateOne({ _id: room._id }, { $inc: inc, $set: set }, { arrayFilters });
   await notifyDirect(room, viewer, message, preview);
@@ -613,7 +622,7 @@ exports.read = catchAsync(async (req, res) => {
 exports.deleteMessage = catchAsync(async (req, res, next) => {
   const viewer = viewerOf(req);
   const room = await findRoom(req, viewer);
-  const mine = viewer.side === 'traveler' ? { sender: viewer.user._id } : { side: viewer.side };
+  const mine = viewer.side === 'traveler' ? { sender: viewer.user._id, side: 'traveler' } : { side: viewer.side };
   const message = validId(req.params.messageId) ? await ChatMessage.findOne({ _id: req.params.messageId, room: room._id, ...mine, deletedAt: null }) : null;
   if (!message) return next(new AppError('No message of yours with that ID.', 404));
   await removeChatFiles(message.attachments);

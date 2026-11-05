@@ -8,7 +8,6 @@ const mongoose = require('mongoose');
  *   or with Plejar customer support (staff answer in the admin panel)
  * Travelers are members one by one. The agency and support take part as a "side": any of the
  * agency's team or any Plejar staff member can answer, and they share one unread count.
- * No sockets yet: the app polls (see controllers/chatController.js).
  */
 
 const KINDS = ['tour_group', 'traveler', 'guide', 'agency', 'support'];

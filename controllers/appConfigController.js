@@ -58,7 +58,7 @@ exports.config = (req, res) => {
       realtime: {
         transport: 'socket.io',
         path: '/socket.io',
-        auth: 'Pass the sign-in token: io(url, { auth: { token } }). Wait for "ready" before using it.',
+        auth: 'Pass the sign-in token: io(url, { auth: { token } }). Wait for "ready" before using it. This is the traveler\'s own inbox; the panels add side: "agency" or "support".',
         events: {
           ready: '{ userId, serverTime } after signing in',
           'chat:message': '{ chatId, message, chat } a new message in one of your chats (mine: true for your own other devices)',

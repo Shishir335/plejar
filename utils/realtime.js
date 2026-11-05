@@ -9,10 +9,11 @@ const { agencyBlockedReason } = require('./agencyStanding');
 /**
  * Live updates over Socket.IO (path /socket.io, same port as the API).
  * Sending, history and reading stay on the REST API; the socket only pushes what changed.
- * Every connection signs in with the same JWT as the API and joins its own rooms:
- *   user:<id>      the person (all their devices)       — chat messages, unread counts, "seen"
- *   agency:<id>    everyone on a vendor's team          — their tours' groups, guide and agency chats
- *   support        Plejar staff                         — Customer Support chats
+ * Every connection signs in with the same JWT as the API and says which inbox it is for (auth.side).
+ * One person can be a traveler, a vendor and staff, so a connection only ever joins one room:
+ *   user:<id>      the app, the default                 — the person's own chats, on all their devices
+ *   agency:<id>    the vendor panel (side: 'agency')    — their tours' groups, guide and agency chats
+ *   support        an admin panel (side: 'support')     — Customer Support chats
  * When sockets aren't running (tests, scripts) every emit here quietly does nothing.
  */
 
@@ -45,6 +46,21 @@ const signIn = async socket => {
   return user;
 };
 
+// The room for the inbox this connection asked for, if the person may hear it (same rules as the routes)
+const roomFor = async (user, side) => {
+  if (side === 'agency') {
+    if (!hasRole(user, 'agent') || !user.agency) throw new Error('This account is not on a vendor team.');
+    const blocked = await agencyBlockedReason(await Agency.findById(user.agency));
+    if (blocked) throw new Error(blocked);
+    return `agency:${user.agency}`;
+  }
+  if (side === 'support') {
+    if (!hasRole(user, 'admin', 'manager', 'dev')) throw new Error('This account is not Plejar staff.');
+    return 'support';
+  }
+  return `user:${user._id}`;
+};
+
 /** Start Socket.IO on the HTTP server (server.js) */
 const init = httpServer => {
   io = new Server(httpServer, {
@@ -57,19 +73,19 @@ const init = httpServer => {
   io.use(async (socket, next) => {
     try {
       socket.user = await signIn(socket);
+      const { side } = socket.handshake.auth || {};
+      socket.side = side === 'agency' || side === 'support' ? side : 'traveler';
+      socket.inbox = await roomFor(socket.user, socket.side);
       next();
     } catch (err) {
       next(new Error(err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError' ? 'Sign in again.' : err.message));
     }
   });
 
-  io.on('connection', async socket => {
+  io.on('connection', socket => {
     const { user } = socket;
-    socket.join(`user:${user._id}`);
-    // Only a team member of an active agency hears the agency's chats (same rule as the vendor panel)
-    if (hasRole(user, 'agent') && user.agency && !(await agencyBlockedReason(await Agency.findById(user.agency)))) socket.join(`agency:${user.agency}`);
-    if (hasRole(user, 'admin', 'manager', 'dev')) socket.join('support');
-    socket.emit('ready', { userId: String(user._id), agency: socket.rooms.has(`agency:${user.agency}`) ? String(user.agency) : null, serverTime: new Date() });
+    socket.join(socket.inbox);
+    socket.emit('ready', { userId: String(user._id), side: socket.side, agency: socket.side === 'agency' ? String(user.agency) : null, serverTime: new Date() });
     clientHandlers.forEach(([event, handler]) => socket.on(event, (payload, ack) => {
       Promise.resolve(handler(socket, payload || {}))
         .then(result => typeof ack === 'function' && ack({ ok: true, ...(result || {}) }))
