@@ -59,11 +59,17 @@ const readWallFields = async (req, post) => {
 };
 
 // GET /agency/me/posts?status=active|hidden&cursor&limit
+// Newest first, with the pinned post at the top of the first page, as travelers see it
 exports.listPosts = catchAsync(async (req, res) => {
   const limit = pageSize(req.query);
   const status = ['active', 'hidden'].includes(req.query.status) ? req.query.status : { $ne: 'removed' };
-  const rows = await Post.find({ byAgency: req.agency._id, status, ...cursorFilter(req.query.cursor) }).sort({ createdAt: -1, _id: -1 }).limit(limit).populate(POPULATE);
-  res.status(200).json({ status: 'success', data: { posts: await wallViews(rows, req), nextCursor: nextCursor(rows, limit) } });
+  const filter = { byAgency: req.agency._id, status };
+  const pinnedId = req.agency.pinnedPost;
+  const [rows, pinned] = await Promise.all([
+    Post.find({ ...filter, ...cursorFilter(req.query.cursor), ...(pinnedId ? { _id: { $ne: pinnedId } } : {}) }).sort({ createdAt: -1, _id: -1 }).limit(limit).populate(POPULATE),
+    pinnedId && !req.query.cursor ? Post.findOne({ ...filter, _id: pinnedId }).populate(POPULATE) : null
+  ]);
+  res.status(200).json({ status: 'success', data: { posts: await wallViews(pinned ? [pinned, ...rows] : rows, req), nextCursor: nextCursor(rows, limit) } });
 });
 
 exports.getPost = catchAsync(async (req, res) => {

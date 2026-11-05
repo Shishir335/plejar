@@ -26,7 +26,7 @@ Signed-in agency staff, under `/api/v1/agency`.
 | --- | --- |
 | `GET /me` | The agency, including the new profile fields, and `stats` |
 | `PATCH /me` | Owner only. Adds `tagline`, `address`, `socialLinks`, `cover` (file), `removeCover=true` |
-| `GET /me/posts?status=active\|hidden&cursor&limit` | The wall as staff see it, including posts Plejar has hidden |
+| `GET /me/posts?status=active\|hidden&cursor&limit` | The wall as staff see it, with the pinned post first and including posts Plejar has hidden |
 | `POST /me/posts` | Multipart. `text`, `media` (repeat for each file), `place` or `placeName`, `event` (own tour), `allowComments` |
 | `GET /me/posts/:id` | One post |
 | `PATCH /me/posts/:id` | The same fields, plus `removeMedia` (repeat for each URL to remove) |

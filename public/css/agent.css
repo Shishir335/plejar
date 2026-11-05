@@ -369,3 +369,72 @@ img { display: block; max-width: 100%; }
 .ad-slide span { font-size: 0.82rem; }
 .ad-slide em { font-style: normal; font-weight: 700; color: #4ade80; }
 .ad-slide .ad-slide-cta { margin-top: 8px; padding: 6px 14px; border-radius: 999px; background: #007aff; font-weight: 600; }
+
+/* Wall */
+.wall-profile { background: var(--white); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-bottom: 16px; padding-bottom: 16px; }
+.wall-cover { aspect-ratio: 8 / 3; max-height: 240px; width: 100%; background: var(--tea-wash); }
+.wall-cover img { width: 100%; height: 100%; object-fit: cover; }
+.wall-identity { display: flex; align-items: flex-end; gap: 14px; padding: 0 20px; margin-top: -32px; flex-wrap: wrap; }
+.wall-logo { flex: none; padding: 4px; background: var(--white); border-radius: 18px; }
+.wall-logo img, .wall-logo .avatar { width: 80px; height: 80px; border-radius: 14px; object-fit: cover; font-size: 1.5rem; }
+.wall-names { flex: 1 1 200px; min-width: 0; padding-top: 36px; }
+@media (max-width: 560px) { .wall-names { flex-basis: 100%; padding-top: 0; } }
+.wall-names h2 { font-size: 1.2rem; line-height: 1.25; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.wall-names p { color: var(--ink-soft); font-size: 0.92rem; overflow-wrap: anywhere; }
+.wall-numbers, .wall-about, .wall-links { padding: 0 20px; margin-top: 8px; font-size: 0.88rem; color: var(--ink-soft); overflow-wrap: anywhere; }
+.wall-links { display: flex; flex-wrap: wrap; gap: 12px; font-weight: 600; }
+.wall-feed { max-width: 680px; }
+.wall-box { margin-bottom: 16px; padding: 18px; }
+.wall-box .field { margin-bottom: 12px; }
+.wall-box-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.wall-box-foot .check { margin: 0; }
+.wall-attach { cursor: pointer; }
+.wall-files { margin-bottom: 12px; }
+.field .photo-thumb button { padding: 0; }
+.photo-thumb video { width: 100%; height: 100%; object-fit: cover; }
+.thumb-tag { position: absolute; left: 4px; bottom: 4px; padding: 0 6px; border-radius: 6px; background: rgba(16, 38, 31, 0.75); color: #fff; font-size: 0.7rem; }
+.wall-post-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.wall-post-head .chat-pic { width: 42px; height: 42px; border-radius: 10px; }
+.wall-post-who { flex: 1; min-width: 0; display: grid; line-height: 1.3; overflow-wrap: anywhere; }
+.wall-post-who .muted { font-size: 0.8rem; }
+.wall-hidden-note { margin-bottom: 10px; }
+.wall-text { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 8px; }
+.wall-tags { font-size: 0.84rem; color: var(--tea-deep); font-weight: 600; margin-bottom: 8px; overflow-wrap: anywhere; }
+.wall-media { display: grid; gap: 4px; border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+.wall-media-2 { grid-template-columns: 1fr 1fr; }
+.wall-media-3 { grid-template-columns: 1fr 1fr 1fr; }
+.wall-media a { display: block; min-width: 0; }
+.wall-media img { width: 100%; height: 100%; aspect-ratio: 1; object-fit: cover; background: var(--tea-wash); }
+.wall-media-1 img { aspect-ratio: auto; max-height: 520px; }
+.wall-media video, .wall-grid video { width: 100%; min-width: 0; aspect-ratio: 16 / 9; background: #000; object-fit: contain; display: block; }
+.wall-media-2 video, .wall-media-3 video { height: 100%; aspect-ratio: 1; }
+.wall-counts { margin-bottom: 2px; }
+.wall-comments { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); display: grid; gap: 10px; justify-items: start; }
+.wall-comments > *, .wall-c-list { width: 100%; }
+.wall-comments > .btn, .wall-replies > .btn { width: auto; }
+.wall-c-list { display: grid; gap: 10px; }
+.wall-comment { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+.wall-comment-body { flex: 1; min-width: 0; display: grid; gap: 4px; justify-items: start; }
+.wall-comment .bubble { max-width: 100%; }
+.wall-comment .bubble p { margin: 0; }
+.wall-comment .bubble strong { font-size: 0.86rem; }
+.wall-comment-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.8rem; padding-left: 4px; }
+.wall-comment-meta button { border: 0; background: none; padding: 0; font-weight: 600; color: var(--ink-soft); }
+.wall-comment-meta button:hover { color: var(--ink); text-decoration: underline; }
+.wall-comment-meta button.is-danger { color: var(--danger); }
+.wall-replies { width: 100%; display: grid; gap: 10px; justify-items: start; margin-top: 4px; }
+.wall-comment-form { display: flex; gap: 8px; width: 100%; }
+.wall-comment-form input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--white); font: inherit; font-size: 0.9rem; color: var(--ink); }
+.wall-comment-form input:focus { outline: none; border-color: var(--tea); box-shadow: 0 0 0 3px var(--tea-wash); }
+.wall-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.wall-grid a { display: block; }
+.wall-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--tea-wash); }
+.wall-grid video { border-radius: 10px; aspect-ratio: 1; }
+#wallMore { margin-top: 14px; }
+
+/* Agency profile: cover photo */
+.cover-preview { aspect-ratio: 8 / 3; max-width: 480px; border-radius: 12px; overflow: hidden; background: var(--tea-wash); margin-bottom: 8px; display: grid; place-items: center; color: var(--tea-deep); font-size: 0.86rem; }
+.cover-preview img { width: 100%; height: 100%; object-fit: cover; }
+.cover-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cover-actions input { flex: 1 1 220px; width: auto; }
+.form-section { font-size: 1rem; margin: 22px 0 12px; padding-top: 18px; border-top: 1px solid var(--line); }

@@ -78,6 +78,7 @@
         <button data-view="announcements">Announcements</button>
         <button data-view="ads">Tour ads</button>
         <button data-view="notifications">Notifications</button>
+        <button data-view="wall">Wall</button>
         <button data-view="profile">Agency profile</button>
         <button data-view="team" data-owner-only>Team</button>
         <button data-view="verification" data-owner-only>Verification</button>
@@ -118,6 +119,53 @@
         </div>
       </section>
 
+      <!-- The agency's wall -->
+      <section id="view-wall" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Wall</h1>
+            <p>Your agency's public page in the Plejar app. Posts go to all travelers, and appear under your agency's name.</p>
+          </div>
+        </div>
+        <div class="wall-profile" id="wallProfile"></div>
+        <div class="wall-feed">
+          <form class="card wall-box" id="wallForm" novalidate>
+            <div class="field">
+              <label class="sr-only" for="wallText">Write a post</label>
+              <textarea id="wallText" maxlength="5000" rows="3" placeholder="Share a trip, a photo or some news"></textarea>
+            </div>
+            <div class="photo-strip wall-files" id="wallFilesPreview" hidden></div>
+            <div class="field-row">
+              <div class="field">
+                <label for="wallTour">Tour (optional)</label>
+                <select id="wallTour"><option value="">No tour</option></select>
+              </div>
+              <div class="field">
+                <label for="wallPlace">Place (optional)</label>
+                <input id="wallPlace" type="text" maxlength="120" placeholder="Birishiri">
+              </div>
+            </div>
+            <div class="alert alert-error" id="wallError" role="alert" hidden></div>
+            <div class="wall-box-foot">
+              <label class="btn btn-quiet wall-attach">
+                Add photos or video
+                <input class="sr-only" id="wallFiles" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm">
+              </label>
+              <label class="check"><input id="wallAllowComments" type="checkbox" checked> Allow comments</label>
+              <button type="submit" class="btn btn-primary" id="wallPost">Post</button>
+            </div>
+          </form>
+          <div class="filter-row" role="group" aria-label="Show on the wall">
+            <button class="chip active" data-wall-filter="posts">Posts</button>
+            <button class="chip" data-wall-filter="image">Photos</button>
+            <button class="chip" data-wall-filter="video">Videos</button>
+            <button class="chip" data-wall-filter="hidden">Hidden by Plejar</button>
+          </div>
+          <div id="wallList"></div>
+          <button class="btn btn-quiet" id="wallMore" hidden>Show more</button>
+        </div>
+      </section>
+
       <!-- Profile -->
       <section id="view-profile" data-view-pane hidden>
         <div class="page-head">
@@ -125,6 +173,7 @@
             <h1>Agency profile</h1>
             <p>This is what travelers see on your agency page.</p>
           </div>
+          <button class="btn btn-quiet" data-action="go" data-view="wall">See your wall</button>
         </div>
         <div class="alert alert-warn" id="profileStaffNote" hidden>Only the agency owner can edit the profile.</div>
         <form class="card" id="profileForm" novalidate>
@@ -139,8 +188,22 @@
             </div>
           </div>
           <div class="field">
+            <span class="label">Cover photo</span>
+            <div class="cover-preview" id="coverPreview"></div>
+            <div class="cover-actions">
+              <input id="coverInput" name="cover" type="file" accept="image/jpeg,image/png,image/webp">
+              <button type="button" class="btn btn-danger btn-sm" id="coverRemove" hidden>Remove</button>
+            </div>
+            <span class="hint">A wide image goes best, at least 1600 × 600. JPG, PNG or WebP, up to 5 MB. It's cropped to fit.</span>
+          </div>
+          <div class="field">
             <label for="pfName">Agency name *</label>
             <input id="pfName" name="name" type="text" maxlength="120" required>
+          </div>
+          <div class="field">
+            <label for="pfTagline">Tagline</label>
+            <input id="pfTagline" name="tagline" type="text" maxlength="120" placeholder="Boat trips on the rivers of Netrokona">
+            <span class="hint">One line, shown under your name.</span>
           </div>
           <div class="field">
             <label for="pfDescription">About your agency</label>
@@ -150,6 +213,10 @@
             <label for="pfRegions">Where you run tours</label>
             <input id="pfRegions" name="regions" type="text" placeholder="Sajek, Bandarban, Cox's Bazar">
             <span class="hint">Separate places with commas.</span>
+          </div>
+          <div class="field">
+            <label for="pfAddress">Address</label>
+            <input id="pfAddress" name="address" type="text" maxlength="200">
           </div>
           <div class="field-row">
             <div class="field">
@@ -163,12 +230,33 @@
           </div>
           <div class="field-row">
             <div class="field">
-              <label for="pfWebsite">Facebook page or website</label>
+              <label for="pfWebsite">Website</label>
               <input id="pfWebsite" name="website" type="text" maxlength="200">
             </div>
             <div class="field">
               <label for="pfLicense">Trade license number</label>
               <input id="pfLicense" name="tradeLicenseNumber" type="text" maxlength="60">
+            </div>
+          </div>
+          <h3 class="form-section">Social links</h3>
+          <div class="field-row">
+            <div class="field">
+              <label for="pfFacebook">Facebook</label>
+              <input id="pfFacebook" data-social="facebook" type="url" maxlength="200" placeholder="https://facebook.com/yourpage">
+            </div>
+            <div class="field">
+              <label for="pfInstagram">Instagram</label>
+              <input id="pfInstagram" data-social="instagram" type="url" maxlength="200" placeholder="https://instagram.com/yourpage">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="pfYoutube">YouTube</label>
+              <input id="pfYoutube" data-social="youtube" type="url" maxlength="200" placeholder="https://youtube.com/@yourpage">
+            </div>
+            <div class="field">
+              <label for="pfTiktok">TikTok</label>
+              <input id="pfTiktok" data-social="tiktok" type="url" maxlength="200" placeholder="https://tiktok.com/@yourpage">
             </div>
           </div>
           <div class="alert alert-error" id="profileError" role="alert" hidden></div>
@@ -713,6 +801,43 @@
       <div class="drawer-foot">
         <button type="button" class="btn btn-quiet" data-action="close-place">Cancel</button>
         <button type="submit" class="btn btn-primary" id="placeSubmit">Save destination</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Editing a wall post -->
+  <div class="drawer-bg" id="wallDrawer" hidden>
+    <form class="drawer" id="wallEditForm" role="dialog" aria-modal="true" aria-labelledby="wallEditTitle" novalidate>
+      <div class="drawer-head">
+        <h2 id="wallEditTitle">Edit post</h2>
+        <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
+      </div>
+      <div class="field">
+        <label for="wallEditText">Text</label>
+        <textarea id="wallEditText" maxlength="5000" rows="5"></textarea>
+      </div>
+      <div class="field">
+        <span class="label">Photos and video</span>
+        <div class="photo-strip wall-files" id="wallEditMedia"></div>
+        <label class="btn btn-quiet btn-sm wall-attach">
+          Add more
+          <input class="sr-only" id="wallEditFiles" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm">
+        </label>
+        <span class="hint">Up to 10, with one video. Photos up to 10 MB, a video up to 100 MB.</span>
+      </div>
+      <div class="field">
+        <label for="wallEditTour">Tour</label>
+        <select id="wallEditTour"></select>
+      </div>
+      <div class="field">
+        <label for="wallEditPlace">Place</label>
+        <input id="wallEditPlace" type="text" maxlength="120">
+      </div>
+      <label class="check"><input id="wallEditComments" type="checkbox"> Allow comments</label>
+      <div class="alert alert-error" id="wallEditError" role="alert" hidden></div>
+      <div class="drawer-foot">
+        <button type="button" class="btn btn-quiet" data-action="close-drawer">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="wallEditSave">Save changes</button>
       </div>
     </form>
   </div>

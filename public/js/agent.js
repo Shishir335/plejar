@@ -219,6 +219,7 @@ function showView(view) {
   if (view === 'messages') loadConversations();
   if (view === 'guides') loadGuides();
   if (view === 'notifications') loadNotificationsView();
+  if (view === 'wall') loadWall();
   if (view === 'team') loadTeam();
   if (view === 'verification') loadVerification();
   try { history.replaceState(null, '', `#${view}`); } catch (e) { /* ignore */ }
@@ -259,6 +260,7 @@ document.addEventListener('click', e => {
   if (name === 'resend') resendInvite(id);
   if (name === 'remove-member') removeMember(id);
   if (name === 'copy') copyField(action.dataset.target);
+  if (name.startsWith('wall-')) wallAction(name, action);
 });
 
 // ---------- Boot ----------
@@ -289,7 +291,7 @@ async function boot() {
   renderProfileForm();
 
   const start = (window.location.hash || '#overview').slice(1);
-  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'profile', 'team', 'verification'];
+  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'wall', 'profile', 'team', 'verification'];
   refreshMessagesBadge();
   setInterval(refreshMessagesBadge, 60000);
   connectChatSocket();
@@ -339,6 +341,7 @@ function renderOverview() {
 
   const checks = [
     { done: Boolean(a.logo), label: 'Add a logo', view: 'profile' },
+    { done: Boolean(a.cover), label: 'Add a cover photo', view: 'profile' },
     { done: Boolean(a.description && a.description.length >= 40), label: 'Describe your agency', view: 'profile' },
     { done: a.regions && a.regions.length > 0, label: 'List the places you run tours', view: 'profile' },
     { done: Boolean(a.phone), label: 'Add a phone number', view: 'profile' },
@@ -357,7 +360,12 @@ function renderProfileForm() {
   const a = state.agency;
   const form = $('profileForm');
   form.name.value = a.name || '';
+  form.tagline.value = a.tagline || '';
+  form.address.value = a.address || '';
   form.description.value = a.description || '';
+  form.querySelectorAll('[data-social]').forEach(el => { el.value = (a.socialLinks && a.socialLinks[el.dataset.social]) || ''; });
+  state.removeCover = false;
+  renderCoverPreview(a.cover);
   form.regions.value = (a.regions || []).join(', ');
   form.phone.value = a.phone || '';
   form.email.value = a.email || '';
@@ -369,6 +377,24 @@ function renderProfileForm() {
   $('profileStaffNote').hidden = !readOnly;
   form.querySelectorAll('input, textarea, button').forEach(el => { el.disabled = readOnly; });
 }
+
+function renderCoverPreview(url) {
+  $('coverPreview').innerHTML = url ? `<img src="${escapeHTML(url)}" alt="">` : 'No cover photo yet';
+  $('coverRemove').hidden = !url;
+}
+
+$('coverInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  state.removeCover = false;
+  renderCoverPreview(URL.createObjectURL(file));
+});
+
+$('coverRemove').addEventListener('click', () => {
+  $('coverInput').value = '';
+  state.removeCover = true;
+  renderCoverPreview('');
+});
 
 $('logoInput').addEventListener('change', e => {
   const file = e.target.files[0];
@@ -385,6 +411,11 @@ $('profileForm').addEventListener('submit', async e => {
 
   const fd = new FormData(form);
   if (!form.logo.files.length) fd.delete('logo');
+  if (!form.cover.files.length) fd.delete('cover');
+  if (state.removeCover) fd.set('removeCover', 'true');
+  const links = {};
+  form.querySelectorAll('[data-social]').forEach(el => { links[el.dataset.social] = el.value.trim(); });
+  fd.set('socialLinks', JSON.stringify(links));
 
   const btn = $('profileSave');
   setBusy(btn, true);
@@ -392,6 +423,7 @@ $('profileForm').addEventListener('submit', async e => {
     const { data } = await api('/api/v1/agency/me', { method: 'PATCH', form: fd });
     state.agency = data.agency;
     form.logo.value = '';
+    form.cover.value = '';
     renderSide();
     renderOverview();
     renderProfileForm();
@@ -961,7 +993,8 @@ function openEventEditor(ev) {
 }
 
 function closeDrawers() {
-  ['eventDrawer', 'announcementDrawer', 'adDrawer', 'guideDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
+  ['eventDrawer', 'announcementDrawer', 'adDrawer', 'guideDrawer', 'wallDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
+  state.wall.editing = null;
   state.editingAd = null;
   state.editingGuide = null;
   state.editing = null;
@@ -969,7 +1002,7 @@ function closeDrawers() {
   state.cancelling = null;
 }
 
-['eventDrawer', 'announcementDrawer', 'cancelDialog'].forEach(id => $(id).addEventListener('click', e => {
+['eventDrawer', 'announcementDrawer', 'wallDrawer', 'cancelDialog'].forEach(id => $(id).addEventListener('click', e => {
   if (e.target === $(id)) closeDrawers();
 }));
 
@@ -2264,6 +2297,477 @@ document.addEventListener('input', e => {
   if (Date.now() - typingSentAt < 1500) return;
   typingSentAt = Date.now();
   state.socket.emit('chat:typing', { chatId: state.openChat.chat._id, typing: true });
+});
+
+// ---------- Wall ----------
+
+state.wall = { filter: 'posts', posts: [], cursor: null, loadId: 0, files: [], cursors: {}, editing: null, editFiles: [], editRemove: new Set() };
+
+const WALL_MAX_MEDIA = 10;
+const WALL_MAX_PHOTO = 10 * 1024 * 1024;
+const WALL_MAX_VIDEO = 100 * 1024 * 1024;
+const isVideoFile = file => file.type.startsWith('video/');
+
+// Fetch can't report upload progress, and a video can take minutes on a slow connection
+function uploadWithProgress(path, method, form, button) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, path);
+    xhr.withCredentials = true;
+    if (state.token) xhr.setRequestHeader('Authorization', `Bearer ${state.token}`);
+    xhr.upload.onprogress = e => {
+      if (!e.lengthComputable) return;
+      const percent = Math.round((e.loaded / e.total) * 100);
+      button.textContent = percent < 100 ? `Uploading ${percent}%` : 'Saving...';
+    };
+    xhr.onerror = () => reject(new Error('The upload stopped. Check your connection and try again.'));
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch (e) { /* the status below still decides */ }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else reject(new Error(data.message || `Request failed (${xhr.status}).`));
+    };
+    xhr.send(form);
+  });
+}
+
+// Adds what fits to `list`, or says why it can't. `kept` is what's already on the post.
+function addWallFiles(input, list, kept, errorId) {
+  const incoming = [...input.files];
+  input.value = '';
+  showAlert(errorId, '');
+  const videos = [...list.filter(isVideoFile), ...kept.filter(m => m.type === 'video'), ...incoming.filter(isVideoFile)];
+  if (kept.length + list.length + incoming.length > WALL_MAX_MEDIA) return showAlert(errorId, `A post can have up to ${WALL_MAX_MEDIA} photos or videos.`);
+  if (videos.length > 1) return showAlert(errorId, 'A post can have one video.');
+  if (incoming.some(f => !isVideoFile(f) && f.size > WALL_MAX_PHOTO)) return showAlert(errorId, 'Each photo must be under 10 MB.');
+  if (incoming.some(f => isVideoFile(f) && f.size > WALL_MAX_VIDEO)) return showAlert(errorId, 'A video can be up to 100 MB.');
+  incoming.forEach(file => { file.previewUrl = URL.createObjectURL(file); list.push(file); });
+}
+
+function clearWallFiles(list) {
+  list.forEach(file => URL.revokeObjectURL(file.previewUrl));
+  list.length = 0;
+}
+
+const thumbHTML = (kind, src, attrs) => `
+  <div class="photo-thumb">
+    ${kind === 'video' ? `<video src="${escapeHTML(src)}" preload="metadata" muted playsinline></video><span class="thumb-tag">Video</span>` : `<img src="${escapeHTML(src)}" alt="">`}
+    <button type="button" ${attrs} aria-label="Remove">&times;</button>
+  </div>`;
+
+const newFilesHTML = (list, attr) => list.map((file, i) => thumbHTML(isVideoFile(file) ? 'video' : 'image', file.previewUrl, `${attr}="${i}"`)).join('');
+
+async function fillWallTours(select, current) {
+  let tours = [];
+  try { tours = (await fetchEvents()).filter(e => e.status === 'published'); } catch (e) { /* the tour tag is optional */ }
+  const options = tours.map(e => `<option value="${escapeHTML(e._id)}">${escapeHTML(e.title)}</option>`);
+  // A tour that has since finished or closed stays selectable on the post it's tagged in
+  if (current && !tours.some(e => e._id === current._id)) options.push(`<option value="${escapeHTML(current._id)}">${escapeHTML(current.title)}</option>`);
+  select.innerHTML = `<option value="">No tour</option>${options.join('')}`;
+  select.value = current ? current._id : '';
+}
+
+// ----- The profile at the top of the page -----
+
+async function renderWallProfile() {
+  const a = state.agency;
+  let pub = null;
+  try { pub = (await api(`/api/v1/agencies/${a._id}`)).data.agency; } catch (e) { /* the numbers are left out */ }
+  const links = Object.entries(a.socialLinks || {}).filter(([, url]) => url);
+  const siteName = { facebook: 'Facebook', instagram: 'Instagram', youtube: 'YouTube', tiktok: 'TikTok' };
+  const numbers = pub ? [plural(pub.counts.posts, 'post'), plural(pub.counts.photos, 'photo'), plural(pub.counts.videos, 'video'), plural(pub.followers, 'follower')] : [];
+  $('wallProfile').innerHTML = `
+    <div class="wall-cover">${a.cover ? `<img src="${escapeHTML(a.cover)}" alt="">` : ''}</div>
+    <div class="wall-identity">
+      <div class="wall-logo">${logoHTML(a)}</div>
+      <div class="wall-names">
+        <h2>${escapeHTML(a.name)}${a.verified ? ' <span class="badge badge-published">Verified</span>' : ''}</h2>
+        ${a.tagline ? `<p>${escapeHTML(a.tagline)}</p>` : ''}
+      </div>
+      ${isOwner() ? '<button class="btn btn-quiet btn-sm" data-action="go" data-view="profile">Edit profile</button>' : ''}
+    </div>
+    ${numbers.length ? `<p class="wall-numbers">${numbers.map(escapeHTML).join(' · ')}</p>` : ''}
+    ${a.address ? `<p class="wall-about">${escapeHTML(a.address)}</p>` : ''}
+    ${links.length ? `<p class="wall-links">${links.map(([site, url]) => `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(siteName[site] || site)}</a>`).join('')}</p>` : ''}`;
+}
+
+// ----- The post box -----
+
+function renderComposerFiles() {
+  $('wallFilesPreview').innerHTML = newFilesHTML(state.wall.files, 'data-wall-file');
+  $('wallFilesPreview').hidden = !state.wall.files.length;
+}
+
+$('wallFiles').addEventListener('change', e => {
+  addWallFiles(e.target, state.wall.files, [], 'wallError');
+  renderComposerFiles();
+});
+
+$('wallFilesPreview').addEventListener('click', e => {
+  const btn = e.target.closest('[data-wall-file]');
+  if (!btn) return;
+  const [gone] = state.wall.files.splice(Number(btn.dataset.wallFile), 1);
+  URL.revokeObjectURL(gone.previewUrl);
+  renderComposerFiles();
+});
+
+$('wallForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('wallError', '');
+  const text = $('wallText').value.trim();
+  if (!text && !state.wall.files.length) return showAlert('wallError', 'Write something or add a photo or video.');
+  const fd = new FormData();
+  fd.append('text', text);
+  fd.append('placeName', $('wallPlace').value.trim());
+  fd.append('allowComments', String($('wallAllowComments').checked));
+  if ($('wallTour').value) fd.append('event', $('wallTour').value);
+  state.wall.files.forEach(file => fd.append('media', file));
+  const btn = $('wallPost');
+  setBusy(btn, true, 'Posting...');
+  try {
+    await uploadWithProgress('/api/v1/agency/me/posts', 'POST', fd, btn);
+    e.target.reset();
+    clearWallFiles(state.wall.files);
+    renderComposerFiles();
+    toast('Posted to your wall.');
+    setWallFilter('posts');
+    renderWallProfile();
+  } catch (err) {
+    showAlert('wallError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
+});
+
+// ----- The posts -----
+
+function wallMediaHTML(media) {
+  if (!media.length) return '';
+  const items = media.map(m => (m.type === 'video'
+    ? `<video src="${escapeHTML(m.url)}" controls playsinline preload="${m.poster ? 'none' : 'metadata'}"${m.poster ? ` poster="${escapeHTML(m.poster)}"` : ''}></video>`
+    : `<a href="${escapeHTML(m.url)}" target="_blank" rel="noopener"><img src="${escapeHTML(m.url)}" alt="" loading="lazy"></a>`));
+  return `<div class="wall-media wall-media-${Math.min(media.length, 3)}">${items.join('')}</div>`;
+}
+
+function wallPostHTML(p) {
+  const id = escapeHTML(p._id);
+  const tags = [p.event ? `Tour: ${p.event.title}` : '', p.place ? `At ${p.place.name}` : ''].filter(Boolean);
+  const counts = [plural(p.counts.reactions, 'reaction'), plural(p.counts.comments, 'comment'), plural(p.counts.shares, 'share')];
+  const live = p.status === 'active';
+  return `
+  <article class="ann wall-post ${p.pinned ? 'is-pinned' : ''}" id="wall-post-${id}">
+    <div class="wall-post-head">
+      ${chatPicHTML(p.author.name, p.author.photo)}
+      <div class="wall-post-who">
+        <strong>${escapeHTML(p.author.name)}</strong>
+        <span class="muted">${escapeHTML(fmtDateTime(p.createdAt))}${p.editedAt ? ', edited' : ''}${p.postedBy ? `, by ${escapeHTML(p.postedBy.name)}` : ''}</span>
+      </div>
+      <div class="ann-badges">${p.pinned ? '<span class="badge badge-pinned">Pinned</span>' : ''}${live ? '' : '<span class="badge badge-suspended">Hidden by Plejar</span>'}</div>
+    </div>
+    ${live ? '' : `<div class="alert alert-error wall-hidden-note">Travelers can't see this post.${p.moderationNote ? ` Reason: ${escapeHTML(p.moderationNote)}` : ''}</div>`}
+    ${p.text ? `<p class="wall-text">${escapeHTML(p.text)}</p>` : ''}
+    ${tags.length ? `<p class="wall-tags">${tags.map(escapeHTML).join(' · ')}</p>` : ''}
+    ${wallMediaHTML(p.media)}
+    <p class="ann-meta wall-counts" id="wall-counts-${id}">${counts.map(escapeHTML).join(' · ')}${p.allowComments ? '' : ' · Comments off'}</p>
+    <div class="pkg-actions">
+      <button class="btn btn-quiet btn-sm" data-action="wall-comments" data-id="${id}">Comments</button>
+      ${live ? `<button class="btn btn-quiet btn-sm" data-action="wall-edit" data-id="${id}">Edit</button>
+      <button class="btn btn-quiet btn-sm" data-action="wall-pin" data-id="${id}">${p.pinned ? 'Unpin' : 'Pin to top'}</button>` : ''}
+      <button class="btn btn-danger btn-sm" data-action="wall-delete" data-id="${id}">Delete</button>
+    </div>
+    <div class="wall-comments" id="wall-comments-${id}" hidden>
+      <div class="wall-c-list"></div>
+      <button class="btn btn-quiet btn-sm" data-action="wall-more" data-kind="comments" data-id="${id}" data-post="${id}" hidden>More comments</button>
+      ${live ? `<form class="wall-comment-form" data-post="${id}">
+        <input type="text" maxlength="2000" placeholder="Comment as ${escapeHTML(state.agency.name)}" aria-label="Write a comment">
+        <button class="btn btn-primary btn-sm" type="submit">Send</button>
+      </form>` : ''}
+    </div>
+  </article>`;
+}
+
+function setWallFilter(filter) {
+  state.wall.filter = filter;
+  document.querySelectorAll('[data-wall-filter]').forEach(c => c.classList.toggle('active', c.dataset.wallFilter === filter));
+  loadWallList();
+}
+
+const WALL_EMPTY = {
+  posts: ['No posts yet', 'Share your trips with travelers: a photo from your last tour, a video, or news about the next one.'],
+  hidden: ['Nothing hidden', "If Plejar hides one of your posts, it will show here with the reason."],
+  image: ['No photos yet', 'Photos you post will collect here.'],
+  video: ['No videos yet', 'Videos you post will collect here.']
+};
+
+async function loadWallList(more) {
+  const { filter } = state.wall;
+  const loadId = ++state.wall.loadId;
+  const list = $('wallList');
+  if (!more) {
+    state.wall.posts = [];
+    state.wall.cursor = null;
+    list.innerHTML = '<p class="muted">Loading...</p>';
+  }
+  $('wallMore').hidden = true;
+  const isGrid = filter === 'image' || filter === 'video';
+  const cursor = more && state.wall.cursor ? `&cursor=${encodeURIComponent(state.wall.cursor)}` : '';
+  const url = isGrid
+    ? `/api/v1/agencies/${state.agency._id}/media?type=${filter}&limit=20${cursor}`
+    : `/api/v1/agency/me/posts?limit=15${filter === 'hidden' ? '&status=hidden' : ''}${cursor}`;
+  try {
+    const { data } = await api(url);
+    if (loadId !== state.wall.loadId) return;
+    state.wall.cursor = data.nextCursor;
+    $('wallMore').hidden = !data.nextCursor;
+    const rows = isGrid ? data.media : data.posts;
+    if (!more && !rows.length) {
+      const [title, body] = WALL_EMPTY[filter];
+      list.innerHTML = `<div class="empty"><strong>${escapeHTML(title)}</strong>${escapeHTML(body)}</div>`;
+      return;
+    }
+    if (isGrid) {
+      const html = rows.map(wallGridItemHTML).join('');
+      if (more) list.querySelector('.wall-grid').insertAdjacentHTML('beforeend', html);
+      else list.innerHTML = `<div class="wall-grid">${html}</div>`;
+      return;
+    }
+    state.wall.posts.push(...rows);
+    const html = rows.map(wallPostHTML).join('');
+    if (more) list.querySelector('.wall-posts').insertAdjacentHTML('beforeend', html);
+    else list.innerHTML = `<div class="ann-list wall-posts">${html}</div>`;
+  } catch (err) {
+    if (loadId === state.wall.loadId) list.innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+const wallGridItemHTML = m => (m.type === 'video'
+  ? `<video src="${escapeHTML(m.url)}" controls playsinline preload="${m.poster ? 'none' : 'metadata'}"${m.poster ? ` poster="${escapeHTML(m.poster)}"` : ''}></video>`
+  : `<a href="${escapeHTML(m.url)}" target="_blank" rel="noopener" title="${escapeHTML(m.caption)}"><img src="${escapeHTML(m.url)}" alt="${escapeHTML(m.caption)}" loading="lazy"></a>`);
+
+function loadWall() {
+  renderWallProfile();
+  fillWallTours($('wallTour'), null);
+  setWallFilter(state.wall.filter);
+}
+
+document.querySelectorAll('[data-wall-filter]').forEach(chip => chip.addEventListener('click', () => setWallFilter(chip.dataset.wallFilter)));
+$('wallMore').addEventListener('click', () => loadWallList(true));
+
+async function refreshWallCounts(postId) {
+  try {
+    const { data } = await api(`/api/v1/agency/me/posts/${postId}`);
+    const p = data.post;
+    const counts = [plural(p.counts.reactions, 'reaction'), plural(p.counts.comments, 'comment'), plural(p.counts.shares, 'share')];
+    $(`wall-counts-${postId}`).textContent = `${counts.join(' · ')}${p.allowComments ? '' : ' · Comments off'}`;
+  } catch (e) { /* the numbers catch up on the next load */ }
+}
+
+async function wallPin(post) {
+  try {
+    await api(`/api/v1/agency/me/posts/${post._id}/pin`, { method: post.pinned ? 'DELETE' : 'POST' });
+    toast(post.pinned ? 'Unpinned.' : 'Pinned to the top of your wall.');
+    loadWallList();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function wallDelete(post) {
+  if (!window.confirm("Delete this post? Its photos and videos are deleted too, and this can't be undone.")) return;
+  try {
+    await api(`/api/v1/agency/me/posts/${post._id}`, { method: 'DELETE' });
+    toast('Post deleted.');
+    loadWallList();
+    renderWallProfile();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ----- Comments -----
+
+function wallCommentHTML(c, postId) {
+  const id = escapeHTML(c._id);
+  if (c.removed) return `<div class="wall-comment"><p class="muted">This comment was removed.</p></div>`;
+  const thread = escapeHTML(c.parent || c._id);
+  const post = escapeHTML(postId);
+  const name = c.author ? c.author.name : 'Plejar member';
+  return `
+  <div class="wall-comment">
+    ${chatPicHTML(name, c.author && c.author.photo)}
+    <div class="wall-comment-body">
+      <div class="bubble ${c.postedAs === 'agency' ? 'is-agency' : 'is-traveler'}">
+        <strong>${escapeHTML(name)}</strong>
+        <p>${c.replyTo ? `<span class="bubble-about">@${escapeHTML(c.replyTo.name)}</span> ` : ''}${escapeHTML(c.text)}</p>
+      </div>
+      <div class="wall-comment-meta">
+        <span class="muted">${escapeHTML(fmtDateTime(c.createdAt))}</span>
+        <button type="button" data-action="wall-reply" data-id="${id}">Reply</button>
+        ${!c.parent && c.counts.replies ? `<button type="button" data-action="wall-replies" data-id="${id}" data-post="${post}">${escapeHTML(plural(c.counts.replies, 'reply', 'replies'))}</button>` : ''}
+        <button type="button" class="is-danger" data-action="wall-remove-comment" data-id="${id}" data-post="${post}" ${c.parent ? `data-thread="${thread}"` : ''}>Remove</button>
+      </div>
+      <form class="wall-comment-form" id="wall-reply-${id}" data-post="${post}" data-parent="${id}" data-thread="${thread}" hidden>
+        <input type="text" maxlength="2000" placeholder="Reply as ${escapeHTML(state.agency.name)}" aria-label="Write a reply">
+        <button class="btn btn-primary btn-sm" type="submit">Send</button>
+      </form>
+      ${c.parent ? '' : `<div class="wall-replies" id="wall-replies-${id}" hidden>
+        <div class="wall-c-list"></div>
+        <button class="btn btn-quiet btn-sm" data-action="wall-more" data-kind="replies" data-id="${id}" data-post="${post}" hidden>More replies</button>
+      </div>`}
+    </div>
+  </div>`;
+}
+
+async function fillWallComments(kind, id, postId, more) {
+  const box = $(`wall-${kind}-${id}`);
+  if (!box) return;
+  box.hidden = false;
+  const list = box.querySelector('.wall-c-list');
+  const moreBtn = box.querySelector(':scope > [data-action="wall-more"]');
+  const base = kind === 'comments' ? `/api/v1/agency/me/posts/${id}/comments` : `/api/v1/agency/me/comments/${id}/replies`;
+  const cursor = more && state.wall.cursors[id] ? `&cursor=${encodeURIComponent(state.wall.cursors[id])}` : '';
+  try {
+    const { data } = await api(`${base}?limit=30${cursor}`);
+    const html = data.comments.map(c => wallCommentHTML(c, postId)).join('');
+    if (more) list.insertAdjacentHTML('beforeend', html);
+    else list.innerHTML = html || (kind === 'comments' ? '<p class="muted">No comments yet.</p>' : '');
+    state.wall.cursors[id] = data.nextCursor;
+    moreBtn.hidden = !data.nextCursor;
+  } catch (err) {
+    list.innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+document.addEventListener('submit', async e => {
+  const form = e.target.closest('.wall-comment-form');
+  if (!form) return;
+  e.preventDefault();
+  const input = form.querySelector('input');
+  const text = input.value.trim();
+  if (!text) return;
+  const { post, parent, thread } = form.dataset;
+  const btn = form.querySelector('button');
+  setBusy(btn, true, 'Sending...');
+  try {
+    await api(`/api/v1/agency/me/posts/${post}/comments`, { method: 'POST', body: { text, ...(parent ? { parent } : {}) } });
+    input.value = '';
+    if (parent) {
+      form.hidden = true;
+      await fillWallComments('replies', thread, post);
+    } else {
+      await fillWallComments('comments', post, post);
+    }
+    refreshWallCounts(post);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setBusy(btn, false);
+  }
+});
+
+async function wallRemoveComment({ id, post, thread }) {
+  if (!window.confirm('Remove this comment? Any replies to it are removed too.')) return;
+  try {
+    await api(`/api/v1/agency/me/comments/${id}`, { method: 'DELETE' });
+    toast('Comment removed.');
+    if (thread) await fillWallComments('replies', thread, post);
+    else await fillWallComments('comments', post, post);
+    refreshWallCounts(post);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function wallAction(name, action) {
+  const { id, kind, post: postId, thread } = action.dataset;
+  const post = state.wall.posts.find(p => p._id === id);
+  if (name === 'wall-comments') {
+    const box = $(`wall-comments-${id}`);
+    if (box.hidden) fillWallComments('comments', id, id);
+    else box.hidden = true;
+  }
+  if (name === 'wall-more') fillWallComments(kind, id, postId, true);
+  if (name === 'wall-replies') {
+    const box = $(`wall-replies-${id}`);
+    if (box.hidden) fillWallComments('replies', id, postId);
+    else box.hidden = true;
+  }
+  if (name === 'wall-reply') {
+    const form = $(`wall-reply-${id}`);
+    form.hidden = !form.hidden;
+    if (!form.hidden) form.querySelector('input').focus();
+  }
+  if (name === 'wall-remove-comment') wallRemoveComment({ id, post: postId, thread });
+  if (name === 'wall-edit' && post) openWallEditor(post);
+  if (name === 'wall-pin' && post) wallPin(post);
+  if (name === 'wall-delete' && post) wallDelete(post);
+}
+
+// ----- Editing a post -----
+
+const wallKept = () => state.wall.editing.media.filter(m => !state.wall.editRemove.has(m.url));
+
+function renderWallEditMedia() {
+  const kept = wallKept().map(m => thumbHTML(m.type, m.url, `data-wall-remove="${escapeHTML(m.url)}"`)).join('');
+  $('wallEditMedia').innerHTML = kept + newFilesHTML(state.wall.editFiles, 'data-wall-edit-file');
+  $('wallEditMedia').hidden = !$('wallEditMedia').innerHTML.trim();
+}
+
+async function openWallEditor(post) {
+  state.wall.editing = post;
+  state.wall.editRemove = new Set();
+  clearWallFiles(state.wall.editFiles);
+  showAlert('wallEditError', '');
+  $('wallEditText').value = post.text;
+  $('wallEditPlace').value = post.place ? post.place.name : '';
+  $('wallEditComments').checked = post.allowComments;
+  renderWallEditMedia();
+  $('wallDrawer').hidden = false;
+  await fillWallTours($('wallEditTour'), post.event);
+}
+
+$('wallEditFiles').addEventListener('change', e => {
+  addWallFiles(e.target, state.wall.editFiles, wallKept(), 'wallEditError');
+  renderWallEditMedia();
+});
+
+$('wallEditMedia').addEventListener('click', e => {
+  const kept = e.target.closest('[data-wall-remove]');
+  const added = e.target.closest('[data-wall-edit-file]');
+  if (kept) state.wall.editRemove.add(kept.dataset.wallRemove);
+  if (added) {
+    const [gone] = state.wall.editFiles.splice(Number(added.dataset.wallEditFile), 1);
+    URL.revokeObjectURL(gone.previewUrl);
+  }
+  if (kept || added) renderWallEditMedia();
+});
+
+$('wallEditForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showAlert('wallEditError', '');
+  const post = state.wall.editing;
+  const text = $('wallEditText').value.trim();
+  if (!text && !wallKept().length && !state.wall.editFiles.length) return showAlert('wallEditError', 'A post needs some text, a photo or a video.');
+  const fd = new FormData();
+  fd.append('text', text);
+  fd.append('placeName', $('wallEditPlace').value.trim());
+  fd.append('event', $('wallEditTour').value);
+  fd.append('allowComments', String($('wallEditComments').checked));
+  state.wall.editRemove.forEach(url => fd.append('removeMedia', url));
+  state.wall.editFiles.forEach(file => fd.append('media', file));
+  const btn = $('wallEditSave');
+  setBusy(btn, true);
+  try {
+    await uploadWithProgress(`/api/v1/agency/me/posts/${post._id}`, 'PATCH', fd, btn);
+    closeDrawers();
+    toast('Post updated.');
+    loadWallList();
+    renderWallProfile();
+  } catch (err) {
+    showAlert('wallEditError', err.message);
+  } finally {
+    setBusy(btn, false);
+  }
 });
 
 boot();
