@@ -20,7 +20,7 @@ const profileView = async user => {
   const [followers, following, posts, trips] = await Promise.all([
     Follow.countDocuments({ targetType: 'user', target: user._id }),
     Follow.countDocuments({ follower: user._id }),
-    Post.countDocuments({ author: user._id, status: 'active' }),
+    Post.countDocuments({ author: user._id, status: 'active', byAgency: null }),
     Booking.countDocuments({ user: user._id, status: 'completed' })
   ]);
   return {

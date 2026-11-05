@@ -31,6 +31,17 @@ const agencySchema = new mongoose.Schema(
       default: ''
     },
     logo: { type: String, default: '' },
+    // The public profile and wall
+    cover: { type: String, default: '' },
+    tagline: { type: String, trim: true, maxlength: [120, 'Tagline must be 120 characters or fewer'], default: '' },
+    address: { type: String, trim: true, maxlength: [200, 'Address must be 200 characters or fewer'], default: '' },
+    socialLinks: {
+      facebook: { type: String, trim: true, maxlength: 200, default: '' },
+      instagram: { type: String, trim: true, maxlength: 200, default: '' },
+      youtube: { type: String, trim: true, maxlength: 200, default: '' },
+      tiktok: { type: String, trim: true, maxlength: 200, default: '' }
+    },
+    pinnedPost: { type: mongoose.Schema.ObjectId, ref: 'Post' },
     regions: {
       type: [String],
       default: []

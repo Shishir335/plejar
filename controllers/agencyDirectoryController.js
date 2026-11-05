@@ -3,12 +3,13 @@ const Agency = require('../models/agencyModel');
 const Package = require('../models/packageModel');
 const Review = require('../models/reviewModel');
 const Follow = require('../models/followModel');
+const Post = require('../models/postModel');
 const Announcement = require('../models/announcementModel');
 const VendorCategory = require('../models/vendorCategoryModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { escapeRegex, pageParams, paged } = require('../utils/query');
-const { userCard } = require('../utils/social');
+const { userCard, viewerContext, hydratePosts, POPULATE, pageSize, cursorFilter, nextCursor, snippet, wallCounts } = require('../utils/social');
 const { registrationStats, withStats } = require('../utils/events');
 
 // The Agents tab in the app: browse tour agencies, open one, follow it
@@ -96,11 +97,12 @@ exports.getAgency = catchAsync(async (req, res, next) => {
   const agency = validId(req.params.id) ? await Agency.findOne({ _id: req.params.id, status: 'active' }).populate('categories', 'name').lean() : null;
   if (!agency) return next(new AppError('This agency is not available.', 404));
   const n = await agencyNumbers([agency._id], req.user);
-  const [events, reviews, announcements] = await Promise.all([
+  const [events, reviews, announcements, counts] = await Promise.all([
     Package.find({ agency: agency._id, status: 'published', startDate: { $gte: new Date() } }).sort({ startDate: 1 }).limit(10)
       .select('title destination startDate endDate priceFrom seats photos durationDays durationNights').lean(),
     Review.find({ agency: agency._id }).sort({ createdAt: -1 }).limit(5).populate('user', 'name photo verification.status').select('rating comment createdAt user').lean(),
-    Announcement.find({ agency: agency._id, status: 'published' }).sort({ pinned: -1, publishedAt: -1 }).limit(5).select('title body pinned publishedAt').lean()
+    Announcement.find({ agency: agency._id, status: 'published' }).sort({ pinned: -1, publishedAt: -1 }).limit(5).select('title body pinned publishedAt').lean(),
+    wallCounts(agency._id)
   ]);
   const stats = await registrationStats(events.map(e => e._id));
   res.status(200).json({
@@ -108,6 +110,11 @@ exports.getAgency = catchAsync(async (req, res, next) => {
     data: {
       agency: {
         ...agencyCardView(agency, n),
+        cover: agency.cover || '',
+        tagline: agency.tagline || '',
+        address: agency.address || '',
+        socialLinks: agency.socialLinks || {},
+        counts,
         description: agency.description,
         contact: { phone: agency.phone, email: agency.email, website: agency.website },
         memberSince: agency.createdAt
@@ -120,6 +127,52 @@ exports.getAgency = catchAsync(async (req, res, next) => {
       announcements
     }
   });
+});
+
+// ---------- The wall ----------
+
+const wallPostsOf = agencyId => ({ byAgency: agencyId, status: 'active', audience: 'public' });
+
+const findActiveAgency = async id => {
+  const agency = validId(id) ? await Agency.findOne({ _id: id, status: 'active' }).select('pinnedPost').lean() : null;
+  if (!agency) throw new AppError('This agency is not available.', 404);
+  return agency;
+};
+
+/**
+ * GET /agencies/:id/posts?cursor&limit
+ * Newest first, with the pinned post at the top of the first page.
+ */
+exports.wallPosts = catchAsync(async (req, res) => {
+  const agency = await findActiveAgency(req.params.id);
+  const ctx = await viewerContext(req.user);
+  const limit = pageSize(req.query);
+  const filter = { ...wallPostsOf(agency._id), ...cursorFilter(req.query.cursor) };
+  if (agency.pinnedPost) filter._id = { $ne: agency.pinnedPost };
+  const [rows, pinned] = await Promise.all([
+    Post.find(filter).sort({ createdAt: -1, _id: -1 }).limit(limit).populate(POPULATE),
+    agency.pinnedPost && !req.query.cursor ? Post.findOne({ ...wallPostsOf(agency._id), _id: agency.pinnedPost }).populate(POPULATE) : null
+  ]);
+  const posts = await hydratePosts(pinned ? [pinned, ...rows] : rows, ctx);
+  const pinnedId = String(agency.pinnedPost);
+  res.status(200).json({ status: 'success', data: { posts: posts.map(p => ({ ...p, pinned: String(p._id) === pinnedId })), nextCursor: nextCursor(rows, limit) } });
+});
+
+/**
+ * GET /agencies/:id/media?type=image|video&cursor&limit
+ * Every photo and video on the wall, for the profile's grid. A page holds the media of `limit` posts,
+ * and each item names its post, so tapping it can open /posts/:id.
+ */
+exports.wallMedia = catchAsync(async (req, res) => {
+  const agency = await findActiveAgency(req.params.id);
+  const type = ['image', 'video'].includes(req.query.type) ? req.query.type : null;
+  const limit = pageSize(req.query);
+  const rows = await Post.find({ ...wallPostsOf(agency._id), ...cursorFilter(req.query.cursor), ...(type ? { 'media.type': type } : { 'media.0': { $exists: true } }) })
+    .sort({ createdAt: -1, _id: -1 }).limit(limit).select('media text createdAt').lean();
+  const media = rows.flatMap(p => p.media
+    .filter(m => !type || m.type === type)
+    .map(m => ({ ...m, post: p._id, caption: snippet(p.text), postedAt: p.createdAt })));
+  res.status(200).json({ status: 'success', data: { media, nextCursor: nextCursor(rows, limit) } });
 });
 
 exports.follow = catchAsync(async (req, res, next) => {

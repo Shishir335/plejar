@@ -6,6 +6,8 @@ const commentSchema = new mongoose.Schema(
   {
     post: { type: mongoose.Schema.ObjectId, ref: 'Post', required: true },
     author: { type: mongoose.Schema.ObjectId, ref: 'User', required: true },
+    // A staff member answering on their agency's wall: shown as the agency, not the person
+    asAgency: { type: mongoose.Schema.ObjectId, ref: 'Agency' },
     parent: { type: mongoose.Schema.ObjectId, ref: 'Comment', default: null },
     replyTo: { type: mongoose.Schema.ObjectId, ref: 'User' },
     text: { type: String, trim: true, required: [true, 'Write a comment'], maxlength: [2000, 'Keep the comment under 2000 characters'] },

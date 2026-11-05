@@ -11,7 +11,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { originalImageUrl } = require('../utils/cache');
 const {
-  viewerContext, visibleFilter, canView, canComment, assertCanPost, userCard, USER_CARD_FIELDS, POPULATE, hydratePosts,
+  viewerContext, visibleFilter, canView, canComment, assertCanPost, ownerIsActive, agencyAsAuthor, userCard, USER_CARD_FIELDS, POPULATE, hydratePosts,
   pageSize, cursorFilter, nextCursor, snippet, notifySocial, unnotifySocial, checkMedia, savePostMedia, removePostMedia
 } = require('../utils/social');
 
@@ -21,16 +21,20 @@ const AUDIENCES = ['public', 'followers', 'private'];
 // The post if the viewer may see it (404 otherwise, so private posts don't reveal they exist)
 const loadVisiblePost = async (id, ctx) => {
   const post = validId(id) ? await Post.findById(id).populate(POPULATE) : null;
-  if (!post || !post.author || post.author.status !== 'active' || !canView(post, ctx)) throw new AppError('This post is not available.', 404);
+  if (!post || !ownerIsActive(post) || !canView(post, ctx)) throw new AppError('This post is not available.', 404);
   return post;
 };
 
 const loadOwnPost = async (id, user) => {
   const post = validId(id) ? await Post.findById(id) : null;
   if (!post || post.status === 'removed') throw new AppError('This post is not available.', 404);
+  if (post.byAgency) throw new AppError("This post is on an agency's wall. Manage it from the vendor panel.", 403);
   if (String(post.author) !== String(user._id)) throw new AppError('You can only change your own posts.', 403);
   return post;
 };
+
+// A wall post belongs to its agency, not to the staff member who wrote it, so they aren't told personally
+const notifyPostAuthor = (post, fields) => (post.byAgency ? null : notifySocial({ recipient: post.author._id, ...fields }));
 
 // Optional tags: a published destination, an active agency, a published tour event
 const readTags = async (b, post) => {
@@ -87,7 +91,9 @@ exports.feed = catchAsync(async (req, res) => {
   const ctx = await viewerContext(req.user);
   const limit = pageSize(req.query);
   const filter = { $and: [visibleFilter(ctx), cursorFilter(req.query.cursor)] };
-  if (req.query.tab === 'following') filter.$and.push({ author: { $in: [...ctx.following, ctx.me] } });
+  if (req.query.tab === 'following') {
+    filter.$and.push({ $or: [{ byAgency: null, author: { $in: [...ctx.following, ctx.me] } }, { byAgency: { $in: [...ctx.followingAgencies] } }] });
+  }
   const rows = await Post.find(filter).sort({ createdAt: -1, _id: -1 }).limit(limit).populate(POPULATE);
   res.status(200).json({ status: 'success', data: { posts: await hydratePosts(rows, ctx), nextCursor: nextCursor(rows, limit) } });
 });
@@ -175,7 +181,7 @@ exports.reactToPost = catchAsync(async (req, res) => {
   const { isNew } = await react({ user: req.user, targetType: 'post', target: post, kind });
   if (isNew) {
     await Post.updateOne({ _id: post._id }, { $inc: { reactionCount: 1 } });
-    await notifySocial({ recipient: post.author._id, actor: req.user, kind: 'post_reaction', title: `${req.user.name} reacted to your post`, body: snippet(post.text), post: post._id });
+    await notifyPostAuthor(post, { actor: req.user, kind: 'post_reaction', title: `${req.user.name} reacted to your post`, body: snippet(post.text), post: post._id });
   }
   res.status(200).json({ status: 'success', data: { reaction: kind, reactions: post.reactionCount + (isNew ? 1 : 0) } });
 });
@@ -227,7 +233,7 @@ exports.sharePost = catchAsync(async (req, res, next) => {
   await readTags({ text: req.body.text, audience: req.body.audience }, share);
   await share.save();
   await Post.updateOne({ _id: original._id }, { $inc: { shareCount: 1 } });
-  await notifySocial({ recipient: original.author._id, actor: req.user, kind: 'post_share', title: `${req.user.name} shared your post`, body: snippet(original.text), post: original._id });
+  await notifyPostAuthor(original, { actor: req.user, kind: 'post_share', title: `${req.user.name} shared your post`, body: snippet(original.text), post: original._id });
   await sendPost(res, 201, share, ctx, 'Shared to your feed.');
 });
 
@@ -260,12 +266,19 @@ const reportMessage = r => (r.duplicate ? 'You already reported this. Plejar\'s 
 exports.reportPost = catchAsync(async (req, res) => {
   const ctx = await viewerContext(req.user);
   const post = await loadVisiblePost(req.params.id, ctx);
-  const result = await fileReport({ reporter: req.user, targetType: 'post', target: post._id, targetUser: post.author._id, reason: req.body.reason, note: req.body.note });
+  const result = await fileReport({ reporter: req.user, targetType: 'post', target: post._id, targetUser: post.byAgency ? undefined : post.author._id, reason: req.body.reason, note: req.body.note });
   if (!result.duplicate) await Post.updateOne({ _id: post._id }, { $inc: { reportCount: 1 } });
   res.status(201).json({ status: 'success', message: reportMessage(result) });
 });
 
 // ---------- Comments and replies ----------
+
+const COMMENT_POPULATE = [{ path: 'author', select: USER_CARD_FIELDS }, { path: 'replyTo', select: USER_CARD_FIELDS }, { path: 'asAgency', select: 'name logo verified' }];
+
+const commentAuthor = c => {
+  if (c.status !== 'active') return null;
+  return c.asAgency ? agencyAsAuthor(c.asAgency) : userCard(c.author);
+};
 
 const commentView = (c, ctx, reactions) => ({
   _id: c._id,
@@ -273,21 +286,22 @@ const commentView = (c, ctx, reactions) => ({
   parent: c.parent,
   text: c.status === 'active' ? c.text : '',
   removed: c.status !== 'active',
-  author: c.status === 'active' ? userCard(c.author) : null,
+  postedAs: c.asAgency ? 'agency' : 'traveler',
+  author: commentAuthor(c),
   replyTo: c.replyTo && c.status === 'active' ? userCard(c.replyTo) : null,
   counts: { reactions: c.reactionCount, replies: c.replyCount },
   createdAt: c.createdAt,
   editedAt: c.editedAt || null,
-  viewer: { reaction: reactions.get(String(c._id)) || null, isMine: Boolean(ctx.me && c.author && String(c.author._id) === ctx.me) }
+  viewer: { reaction: reactions.get(String(c._id)) || null, isMine: Boolean(!c.asAgency && ctx.me && c.author && String(c.author._id) === ctx.me) }
 });
 
 const listComments = async (filter, dir, req, ctx) => {
   const limit = pageSize(req.query);
   const sort = dir === 'asc' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 };
-  const rows = await Comment.find({ ...filter, ...cursorFilter(req.query.cursor, dir) }).sort(sort).limit(limit)
-    .populate('author', USER_CARD_FIELDS).populate('replyTo', USER_CARD_FIELDS).lean();
+  const rows = await Comment.find({ ...filter, ...cursorFilter(req.query.cursor, dir) }).sort(sort).limit(limit).populate(COMMENT_POPULATE).lean();
   // A removed comment stays as "removed" only if it still has replies to hold together
-  const visible = rows.filter(c => (c.status === 'active' && c.author && !ctx.blocked.has(String(c.author._id))) || (c.status !== 'active' && c.replyCount > 0));
+  const showing = c => c.asAgency || (c.author && !ctx.blocked.has(String(c.author._id)));
+  const visible = rows.filter(c => (c.status === 'active' && showing(c)) || (c.status !== 'active' && c.replyCount > 0));
   const reactions = ctx.me
     ? new Map((await Reaction.find({ user: ctx.me, targetType: 'comment', target: { $in: visible.map(c => c._id) } }).select('target kind').lean()).map(r => [String(r.target), r.kind]))
     : new Map();
@@ -326,22 +340,23 @@ exports.addComment = catchAsync(async (req, res, next) => {
   if (req.body.parent) {
     const answered = validId(req.body.parent) ? await Comment.findOne({ _id: req.body.parent, post: post._id, status: 'active' }) : null;
     if (!answered) return next(new AppError('That comment is no longer there.', 404));
-    if (ctx.blocked.has(String(answered.author))) return next(new AppError('You can\'t reply to this person.', 403));
+    if (!answered.asAgency && ctx.blocked.has(String(answered.author))) return next(new AppError('You can\'t reply to this person.', 403));
     parent = answered.parent ? await Comment.findById(answered.parent) : answered;
-    replyTo = answered.author;
+    // Answering an agency's comment answers the agency, so the staff member who wrote it isn't named or told
+    replyTo = answered.asAgency ? undefined : answered.author;
   }
 
   const comment = await Comment.create({ post: post._id, author: req.user._id, parent: parent ? parent._id : null, replyTo, text });
   await Post.updateOne({ _id: post._id }, { $inc: { commentCount: 1 } });
   if (parent) {
     await Comment.updateOne({ _id: parent._id }, { $inc: { replyCount: 1 } });
-    await notifySocial({ recipient: replyTo, actor: req.user, kind: 'comment_reply', title: `${req.user.name} replied to your comment`, body: snippet(text), post: post._id, comment: comment._id });
+    if (replyTo) await notifySocial({ recipient: replyTo, actor: req.user, kind: 'comment_reply', title: `${req.user.name} replied to your comment`, body: snippet(text), post: post._id, comment: comment._id });
   }
-  if (!parent || String(post.author._id) !== String(replyTo)) {
-    await notifySocial({ recipient: post.author._id, actor: req.user, kind: 'post_comment', title: `${req.user.name} commented on your post`, body: snippet(text), post: post._id, comment: comment._id });
+  if (!parent || post.byAgency || String(post.author._id) !== String(replyTo)) {
+    await notifyPostAuthor(post, { actor: req.user, kind: 'post_comment', title: `${req.user.name} commented on your post`, body: snippet(text), post: post._id, comment: comment._id });
   }
 
-  await comment.populate([{ path: 'author', select: USER_CARD_FIELDS }, { path: 'replyTo', select: USER_CARD_FIELDS }]);
+  await comment.populate(COMMENT_POPULATE);
   res.status(201).json({ status: 'success', data: { comment: commentView(comment.toObject(), ctx, new Map()) } });
 });
 
@@ -356,28 +371,35 @@ exports.updateComment = catchAsync(async (req, res, next) => {
   assertCanPost(req.user);
   const ctx = await viewerContext(req.user);
   const { comment } = await loadComment(req.params.id, ctx);
-  if (String(comment.author) !== ctx.me) return next(new AppError('You can only edit your own comments.', 403));
+  if (comment.asAgency || String(comment.author) !== ctx.me) return next(new AppError('You can only edit your own comments.', 403));
   const text = String(req.body.text || '').trim();
   if (!text) return next(new AppError('Write a comment.', 400));
   comment.text = text;
   comment.editedAt = new Date();
   await comment.save();
-  await comment.populate([{ path: 'author', select: USER_CARD_FIELDS }, { path: 'replyTo', select: USER_CARD_FIELDS }]);
+  await comment.populate(COMMENT_POPULATE);
   res.status(200).json({ status: 'success', data: { comment: commentView(comment.toObject(), ctx, new Map()) } });
 });
 
-// The comment's author or the post's author can remove it; removing a comment removes its replies too
-exports.deleteComment = catchAsync(async (req, res, next) => {
-  const ctx = await viewerContext(req.user);
-  const { comment, post } = await loadComment(req.params.id, ctx);
-  if (String(comment.author) !== ctx.me && String(post.author._id) !== ctx.me) return next(new AppError('You can only remove your own comments, or comments on your posts.', 403));
+// Removing a comment removes its replies too
+const removeComment = async (comment, postId) => {
   const replies = comment.parent ? [] : await Comment.find({ parent: comment._id, status: 'active' }).select('_id');
   const ids = [comment._id, ...replies.map(r => r._id)];
   await Comment.updateMany({ _id: { $in: ids } }, { status: 'removed' });
-  await Post.updateOne({ _id: post._id }, { $inc: { commentCount: -ids.length } });
-  await Post.updateOne({ _id: post._id, commentCount: { $lt: 0 } }, { commentCount: 0 });
+  await Post.updateOne({ _id: postId }, { $inc: { commentCount: -ids.length } });
+  await Post.updateOne({ _id: postId, commentCount: { $lt: 0 } }, { commentCount: 0 });
   if (comment.parent) await Comment.updateOne({ _id: comment.parent, replyCount: { $gt: 0 } }, { $inc: { replyCount: -1 } });
   await unnotifySocial({ comment: { $in: ids } });
+};
+
+// The comment's author or the post's author can remove it. On a wall, staff do that from the vendor panel.
+exports.deleteComment = catchAsync(async (req, res, next) => {
+  const ctx = await viewerContext(req.user);
+  const { comment, post } = await loadComment(req.params.id, ctx);
+  const mine = !comment.asAgency && String(comment.author) === ctx.me;
+  const onMyPost = !post.byAgency && String(post.author._id) === ctx.me;
+  if (!mine && !onMyPost) return next(new AppError('You can only remove your own comments, or comments on your posts.', 403));
+  await removeComment(comment, post._id);
   res.status(204).json({ status: 'success', data: null });
 });
 
@@ -389,7 +411,7 @@ exports.reactToComment = catchAsync(async (req, res) => {
   const { isNew } = await react({ user: req.user, targetType: 'comment', target: comment, kind });
   if (isNew) {
     await Comment.updateOne({ _id: comment._id }, { $inc: { reactionCount: 1 } });
-    await notifySocial({ recipient: comment.author, actor: req.user, kind: 'comment_reaction', title: `${req.user.name} reacted to your comment`, body: snippet(comment.text), post: post._id, comment: comment._id });
+    if (!comment.asAgency) await notifySocial({ recipient: comment.author, actor: req.user, kind: 'comment_reaction', title: `${req.user.name} reacted to your comment`, body: snippet(comment.text), post: post._id, comment: comment._id });
   }
   res.status(200).json({ status: 'success', data: { reaction: kind, reactions: comment.reactionCount + (isNew ? 1 : 0) } });
 });
@@ -414,8 +436,10 @@ exports.commentReactions = catchAsync(async (req, res) => {
 exports.reportComment = catchAsync(async (req, res) => {
   const ctx = await viewerContext(req.user);
   const { comment } = await loadComment(req.params.id, ctx);
-  const result = await fileReport({ reporter: req.user, targetType: 'comment', target: comment._id, targetUser: comment.author, reason: req.body.reason, note: req.body.note });
+  const result = await fileReport({ reporter: req.user, targetType: 'comment', target: comment._id, targetUser: comment.asAgency ? undefined : comment.author, reason: req.body.reason, note: req.body.note });
   if (!result.duplicate) await Comment.updateOne({ _id: comment._id }, { $inc: { reportCount: 1 } });
   res.status(201).json({ status: 'success', message: reportMessage(result) });
 });
 
+// Shared with the vendor panel's wall (agencyWallController)
+Object.assign(exports, { readTags, listComments, commentView, removeComment, COMMENT_POPULATE });

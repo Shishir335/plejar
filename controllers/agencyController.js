@@ -2,6 +2,7 @@ const Agency = require('../models/agencyModel');
 const Package = require('../models/packageModel');
 const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
+const validator = require('validator');
 const AppError = require('../utils/appError');
 const { sendInvite } = require('../utils/invites');
 const { agencyBlockedReason } = require('../utils/agencyStanding');
@@ -31,7 +32,7 @@ const {
   removePrivateDocument
 } = require('../utils/uploads');
 
-const PROFILE_FIELDS = ['name', 'description', 'phone', 'email', 'website', 'tradeLicenseNumber'];
+const PROFILE_FIELDS = ['name', 'description', 'tagline', 'address', 'phone', 'email', 'website', 'tradeLicenseNumber'];
 const PACKAGE_FIELDS = ['title', 'destination', 'priceFrom', 'description', 'meetingPoint'];
 
 // "Sajek, Bandarban" or ["Sajek", "Bandarban"] -> ["Sajek", "Bandarban"]
@@ -124,15 +125,45 @@ exports.getMyAgency = catchAsync(async (req, res, next) => {
   });
 });
 
+// { facebook, instagram, youtube, tiktok } as JSON or a form field; an empty value clears that link
+const SOCIAL_SITES = ['facebook', 'instagram', 'youtube', 'tiktok'];
+const readSocialLinks = (value, agency) => {
+  if (value === undefined) return;
+  let links = value;
+  if (typeof links === 'string') {
+    try {
+      links = JSON.parse(links);
+    } catch (err) {
+      throw new AppError('Those social links could not be read.', 400);
+    }
+  }
+  if (!links || typeof links !== 'object') throw new AppError('Those social links could not be read.', 400);
+  SOCIAL_SITES.filter(site => links[site] !== undefined).forEach(site => {
+    const link = String(links[site]).trim();
+    // Full http(s) addresses only: the panel and the app open these as links
+    if (link && !validator.isURL(link, { protocols: ['http', 'https'], require_protocol: true })) {
+      throw new AppError(`Enter the full ${site} address, starting with https://`, 400);
+    }
+    agency.socialLinks[site] = link;
+  });
+};
+
 exports.updateMyAgency = catchAsync(async (req, res, next) => {
   const agency = req.agency;
   Object.assign(agency, pick(req.body, PROFILE_FIELDS));
   if (req.body.regions !== undefined) agency.regions = toList(req.body.regions);
+  readSocialLinks(req.body.socialLinks, agency);
 
-  if (req.file) {
+  const files = req.files || {};
+  if (files.logo) {
     const oldLogo = agency.logo;
-    agency.logo = await saveAgencyImage(req.file, agency._id, { width: 400, height: 400 });
+    agency.logo = await saveAgencyImage(files.logo[0], agency._id, { width: 400, height: 400 });
     await removeAgencyImage(oldLogo);
+  }
+  if (files.cover || req.body.removeCover === true || req.body.removeCover === 'true') {
+    const oldCover = agency.cover;
+    agency.cover = files.cover ? await saveAgencyImage(files.cover[0], agency._id, { width: 1600, height: 600 }) : '';
+    await removeAgencyImage(oldCover);
   }
 
   await agency.save();

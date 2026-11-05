@@ -5,6 +5,8 @@ const content = require('../controllers/vendorContentController');
 const places = require('../controllers/vendorDestinationController');
 const guides = require('../controllers/guideController');
 const ads = require('../controllers/adController');
+const wall = require('../controllers/agencyWallController');
+const { postMediaUpload } = require('../utils/social');
 const { imageUpload, documentUpload } = require('../utils/uploads');
 
 const router = express.Router();
@@ -22,7 +24,15 @@ router.route('/me/guides/:id').patch(imageUpload.single('photo'), guides.updateG
 router.route('/me/ads').get(ads.myAds).post(imageUpload.single('image'), ads.applyForAd);
 router.route('/me/ads/:id').patch(imageUpload.single('image'), ads.updateMyAd).delete(ads.removeMyAd);
 
-router.patch('/me', agencyController.requireOwner, imageUpload.single('logo'), agencyController.updateMyAgency);
+router.patch('/me', agencyController.requireOwner, imageUpload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), agencyController.updateMyAgency);
+
+// The agency's wall: posts with text, photos or a video (multipart field "media"), and the comments on them
+router.route('/me/posts').get(wall.listPosts).post(postMediaUpload, wall.createPost);
+router.route('/me/posts/:id').get(wall.getPost).patch(postMediaUpload, wall.updatePost).delete(wall.deletePost);
+router.route('/me/posts/:id/pin').post(wall.pinPost).delete(wall.unpinPost);
+router.route('/me/posts/:id/comments').get(wall.listComments).post(wall.addComment);
+router.get('/me/comments/:id/replies', wall.listReplies);
+router.delete('/me/comments/:id', wall.removeComment);
 
 router
   .route('/me/packages')

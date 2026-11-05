@@ -11,7 +11,7 @@ const { logActivity } = require('../utils/activity');
 const { escapeRegex, pageParams, paged } = require('../utils/query');
 const { snippet } = require('../utils/social');
 
-// Moderating what travelers post in the app: posts, comments and the reports on them
+// Moderating what travelers and agencies post in the app: posts, comments and the reports on them
 
 const validId = id => mongoose.isValidObjectId(id);
 const AUTHOR = 'name email photo status restrictions';
@@ -27,6 +27,8 @@ const postRow = p => ({
   moderatedAt: p.moderatedAt || null,
   counts: { reactions: p.reactionCount, comments: p.commentCount, shares: p.shareCount, reports: p.reportCount },
   author: p.author ? { _id: p.author._id, name: p.author.name, email: p.author.email, status: p.author.status } : null,
+  // On this agency's wall (author is the staff member who wrote it)
+  agency: p.byAgency ? { _id: p.byAgency._id, name: p.byAgency.name } : null,
   placeName: p.placeName || (p.place && p.place.name) || '',
   createdAt: p.createdAt
 });
@@ -59,14 +61,14 @@ exports.listPosts = catchAsync(async (req, res) => {
   const pg = pageParams(q);
   const sort = q.reported === 'true' ? { reportCount: -1, createdAt: -1 } : { createdAt: -1 };
   const [rows, total] = await Promise.all([
-    Post.find(filter).sort(sort).skip(pg.skip).limit(pg.limit).populate('author', AUTHOR).populate('place', 'name').lean(),
+    Post.find(filter).sort(sort).skip(pg.skip).limit(pg.limit).populate('author', AUTHOR).populate('byAgency', 'name').populate('place', 'name').lean(),
     Post.countDocuments(filter)
   ]);
   res.status(200).json({ status: 'success', data: { posts: rows.map(postRow), ...paged(total, pg) } });
 });
 
 exports.getPost = catchAsync(async (req, res, next) => {
-  const post = validId(req.params.id) ? await Post.findById(req.params.id).populate('author', AUTHOR).populate('place', 'name').lean() : null;
+  const post = validId(req.params.id) ? await Post.findById(req.params.id).populate('author', AUTHOR).populate('byAgency', 'name').populate('place', 'name').lean() : null;
   if (!post) return next(new AppError('No post found with that ID.', 404));
   const [comments, reports] = await Promise.all([
     Comment.find({ post: post._id }).sort({ createdAt: 1 }).limit(200).populate('author', 'name email').lean(),
@@ -149,7 +151,7 @@ exports.moderateComment = catchAsync(async (req, res, next) => {
 const targetSummaries = async reports => {
   const ids = type => reports.filter(r => r.targetType === type).map(r => r.target);
   const [posts, comments, users] = await Promise.all([
-    Post.find({ _id: { $in: ids('post') } }).select('text media status author').lean(),
+    Post.find({ _id: { $in: ids('post') } }).select('text media status author byAgency').populate('byAgency', 'name').lean(),
     Comment.find({ _id: { $in: ids('comment') } }).select('text status post author').lean(),
     User.find({ _id: { $in: ids('user') } }).select('name email status').lean()
   ]);
@@ -158,7 +160,7 @@ const targetSummaries = async reports => {
   return r => {
     const t = all[r.targetType].get(String(r.target));
     if (!t) return { missing: true };
-    if (r.targetType === 'post') return { text: snippet(t.text, 140), photos: (t.media || []).length, status: t.status };
+    if (r.targetType === 'post') return { text: snippet(t.text, 140), photos: (t.media || []).length, status: t.status, agency: t.byAgency ? t.byAgency.name : null };
     if (r.targetType === 'comment') return { text: snippet(t.text, 140), status: t.status, post: t.post };
     return { name: t.name, email: t.email, status: t.status };
   };

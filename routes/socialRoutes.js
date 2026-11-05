@@ -67,6 +67,8 @@ const agencyRoutes = express.Router();
 agencyRoutes.get('/', optionalAuth, agencies.listAgencies);
 agencyRoutes.get('/filters', agencies.filters);
 agencyRoutes.get('/:id', optionalAuth, agencies.getAgency);
+agencyRoutes.get('/:id/posts', optionalAuth, agencies.wallPosts);
+agencyRoutes.get('/:id/media', agencies.wallMedia);
 agencyRoutes.route('/:id/follow').post(protect, agencies.follow).delete(protect, agencies.unfollow);
 
 // Settings tab

@@ -26,7 +26,7 @@ const countsFor = async (userId, ctx) => {
   const [followers, following, posts, trips] = await Promise.all([
     Follow.countDocuments({ targetType: 'user', target: userId }),
     Follow.countDocuments({ follower: userId }),
-    Post.countDocuments({ ...visibleFilter(ctx), author: userId }),
+    Post.countDocuments({ ...visibleFilter(ctx), author: userId, byAgency: null }),
     Booking.countDocuments({ user: userId, status: 'completed' })
   ]);
   return { followers, following, posts, trips };
@@ -75,7 +75,7 @@ exports.posts = catchAsync(async (req, res) => {
   const ctx = await viewerContext(req.user);
   const user = await findTraveler(req.params.id, ctx);
   const limit = pageSize(req.query);
-  const rows = await Post.find({ $and: [visibleFilter(ctx), cursorFilter(req.query.cursor), { author: user._id }] }).sort({ createdAt: -1, _id: -1 }).limit(limit).populate(POPULATE);
+  const rows = await Post.find({ $and: [visibleFilter(ctx), cursorFilter(req.query.cursor), { author: user._id, byAgency: null }] }).sort({ createdAt: -1, _id: -1 }).limit(limit).populate(POPULATE);
   res.status(200).json({ status: 'success', data: { posts: await hydratePosts(rows, ctx), nextCursor: nextCursor(rows, limit) } });
 });
 

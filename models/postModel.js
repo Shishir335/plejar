@@ -1,17 +1,23 @@
 const mongoose = require('mongoose');
 
-// A traveler's post in the app feed (text, photos or a video, optionally tagged with a place, an agency or a tour)
+// A post in the app feed (text, photos or a video, optionally tagged with a place, an agency or a tour).
+// Most are by travelers. A post with byAgency is on that agency's wall: the agency is shown as its author,
+// and author only records which staff member wrote it.
 const mediaSchema = new mongoose.Schema({
   type: { type: String, enum: ['image', 'video'], required: true },
   url: { type: String, required: true },
   width: Number,
   height: Number,
-  size: Number
+  size: Number,
+  // Videos on Cloudinary: a still picture to show before playing, and the length in seconds
+  poster: String,
+  duration: Number
 }, { _id: false });
 
 const postSchema = new mongoose.Schema(
   {
     author: { type: mongoose.Schema.ObjectId, ref: 'User', required: true, index: true },
+    byAgency: { type: mongoose.Schema.ObjectId, ref: 'Agency' },
     // 'share' posts point at the original through sharedFrom; 'live' is reserved for streaming later
     kind: { type: String, enum: ['post', 'share', 'live'], default: 'post' },
     text: { type: String, trim: true, maxlength: [5000, 'Keep the post under 5000 characters'], default: '' },
@@ -49,5 +55,6 @@ postSchema.index({ status: 1, createdAt: -1 });
 postSchema.index({ author: 1, createdAt: -1 });
 postSchema.index({ place: 1, createdAt: -1 });
 postSchema.index({ agency: 1, createdAt: -1 });
+postSchema.index({ byAgency: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Post', postSchema);
