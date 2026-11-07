@@ -573,12 +573,15 @@ const STOP_KINDS = { departure: 'Departure', stop: 'Stop', activity: 'Activity',
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const linesOf = value => String(value || '').split('\n').map(s => s.trim()).filter(Boolean);
 
+// Dates come from the picker (js/picker-only.js); a year before 2000 still isn't taken as a real date
+const fullDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') && v >= '2000-01-01';
+
 // Days and nights from the date fields (null until a valid range is chosen)
 function tripLength() {
   const form = $('eventForm');
   const start = form.startDate.value;
   const end = form.endDate.value || start;
-  if (!start || end < start) return null;
+  if (!fullDate(start) || !fullDate(end) || end < start) return null;
   const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
   return { days, nights: days - 1, start };
 }
@@ -747,9 +750,11 @@ $('eventForm').addEventListener('change', e => { if (!e.target.closest('#evItine
 
 ['startDate', 'endDate'].forEach(name => $('eventForm')[name].addEventListener('change', () => {
   const form = $('eventForm');
-  if (name === 'startDate' && (!form.endDate.value || form.endDate.value < form.startDate.value)) form.endDate.value = form.startDate.value;
-  form.endDate.min = form.startDate.value;
-  form.registrationDeadline.max = form.startDate.value;
+  if (name === 'startDate' && fullDate(form.startDate.value)) {
+    if (!fullDate(form.endDate.value) || form.endDate.value < form.startDate.value) form.endDate.value = form.startDate.value;
+    form.endDate.min = form.startDate.value;
+    form.registrationDeadline.max = form.startDate.value;
+  }
   updateDurationHint();
   syncItineraryDays();
 }));
