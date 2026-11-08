@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
-const sharp = require('sharp');
+const { compressImage } = require('./imageCompress');
 const AppError = require('./appError');
 const { isCloudinaryConfigured, isPrivateRef, uploadPrivateFile, streamPrivateFile, deletePrivateFile, deletePrivateFolder } = require('./cloudinary');
 
@@ -29,23 +29,22 @@ const roomDir = roomId => path.join(CHAT_DIR, String(roomId));
 const saveChatFile = async (file, roomId) => {
   const name = String(file.originalname || '').slice(0, 150);
   const isImage = IMAGE_TYPES.includes(file.mimetype);
-  const photo = isImage && sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 });
+  const photo = isImage ? await compressImage(file.buffer, 'photo') : null;
   if (isCloudinaryConfigured()) {
     if (!isImage) {
       const saved = await uploadPrivateFile(file.buffer, { folder: `chat/${roomId}`, mimeType: file.mimetype });
       return { kind: 'file', file: saved.ref, name, mimeType: file.mimetype, size: file.size };
     }
-    const { data, info } = await photo.toBuffer({ resolveWithObject: true });
-    const saved = await uploadPrivateFile(data, { folder: `chat/${roomId}`, mimeType: 'image/jpeg' });
-    return { kind: 'image', file: saved.ref, name, mimeType: 'image/jpeg', size: info.size, width: info.width, height: info.height };
+    const saved = await uploadPrivateFile(photo.buffer, { folder: `chat/${roomId}`, mimeType: photo.mimeType });
+    return { kind: 'image', file: saved.ref, name, mimeType: photo.mimeType, size: photo.size, width: photo.width, height: photo.height };
   }
   const dir = roomDir(roomId);
   await fs.promises.mkdir(dir, { recursive: true });
   const base = crypto.randomBytes(12).toString('hex');
   if (isImage) {
-    const filename = `${base}.jpg`;
-    const info = await photo.toFile(path.join(dir, filename));
-    return { kind: 'image', file: `${roomId}/${filename}`, name, mimeType: 'image/jpeg', size: info.size, width: info.width, height: info.height };
+    const filename = `${base}${photo.ext}`;
+    await fs.promises.writeFile(path.join(dir, filename), photo.buffer, { mode: 0o600 });
+    return { kind: 'image', file: `${roomId}/${filename}`, name, mimeType: photo.mimeType, size: photo.size, width: photo.width, height: photo.height };
   }
   const filename = `${base}.pdf`;
   await fs.promises.writeFile(path.join(dir, filename), file.buffer, { mode: 0o600 });

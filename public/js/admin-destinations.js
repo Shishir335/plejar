@@ -495,7 +495,7 @@ async function openNewDestination(parentId) {
       <div class="form-group"><label class="form-label" for="ndPhoto">Cover photo <span class="detail-muted">(optional)</span></label>
         <input id="ndPhoto" type="file" class="form-input" accept="image/jpeg,image/png,image/webp" onchange="previewNewPhoto(this)">
         <img id="ndPhotoPreview" class="new-photo-preview" alt="" hidden>
-        <p class="detail-muted" style="margin:4px 0 0">JPG, PNG or WebP, up to 5 MB. You can add more photos, captions and credits afterwards.</p></div>
+        <p class="detail-muted" style="margin:4px 0 0">JPG, PNG or WebP, up to 12 MB. You can add more photos, captions and credits afterwards.</p></div>
       <div class="form-error-box" id="ndError" role="alert" hidden></div>
       <button type="submit" class="btn btn-primary" id="ndSubmit">Create as draft</button>
     </form>`;
@@ -592,10 +592,10 @@ function previewNewPhoto(input) {
   const img = document.getElementById('ndPhotoPreview');
   const file = input.files[0];
   if (!file) { img.hidden = true; return; }
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 12 * 1024 * 1024) {
     input.value = '';
     img.hidden = true;
-    return formError('ndError', 'Use a JPG, PNG or WebP photo under 5 MB.');
+    return formError('ndError', 'Use a JPG, PNG or WebP photo under 12 MB.');
   }
   formError('ndError');
   img.src = URL.createObjectURL(file);
@@ -897,7 +897,7 @@ function destPhotosTab() {
   return `
     <div class="detail-card">
       <div class="control-bar" style="margin-bottom:12px">
-        <p class="detail-muted" style="margin:0">Up to 20 photos, JPG, PNG or WebP, 5 MB each. The cover shows on cards and at the top of the page. Credit the photographer when the photo isn't yours.</p>
+        <p class="detail-muted" style="margin:0">Up to 20 photos, JPG, PNG or WebP, 12 MB each. The cover shows on cards and at the top of the page. Credit the photographer when the photo isn't yours.</p>
         <label class="btn btn-primary">+ Upload photos<input type="file" id="dePhotoInput" accept="image/jpeg,image/png,image/webp" multiple hidden onchange="uploadDestinationPhotos(this)"></label>
       </div>
       ${d.gallery.length ? `<div class="photo-grid">${d.gallery.map((p, i) => `
@@ -932,8 +932,8 @@ async function uploadDestinationPhotos(input) {
   const files = [...input.files];
   input.value = '';
   if (!files.length) return;
-  const bad = files.find(f => !['image/jpeg', 'image/png', 'image/webp'].includes(f.type) || f.size > 5 * 1024 * 1024);
-  if (bad) return showAdminToast(`${bad.name} is not a JPG, PNG or WebP under 5 MB.`, 'error');
+  const bad = files.find(f => !['image/jpeg', 'image/png', 'image/webp'].includes(f.type) || f.size > 12 * 1024 * 1024);
+  if (bad) return showAdminToast(`${bad.name} is not a JPG, PNG or WebP under 12 MB.`, 'error');
   const fd = new FormData();
   files.slice(0, 10).forEach(f => fd.append('photos', f));
   showAdminToast(`Uploading ${files.length} photo${files.length === 1 ? '' : 's'}...`, 'info');

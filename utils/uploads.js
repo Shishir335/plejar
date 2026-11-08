@@ -2,14 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
-const sharp = require('sharp');
+const { compressImage, isImageType } = require('./imageCompress');
 const AppError = require('./appError');
 const {
   isCloudinaryConfigured, isCloudinaryUrl, uploadBufferToCloudinary, deleteFromCloudinary, deleteCloudinaryFolder,
   isPrivateRef, uploadPrivateFile, streamPrivateFile, downloadPrivateFile, deletePrivateFile, deletePrivateFolder
 } = require('./cloudinary');
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB: documents, which may be PDFs and are kept as sent
+// Photo-only uploads may be larger, as phones take them: they are compressed on arrival (utils/imageCompress.js)
+const MAX_PHOTO_SIZE = 12 * 1024 * 1024; // 12 MB
 
 const PUBLIC_AGENCY_DIR = path.join(__dirname, '..', 'public', 'img', 'agencies');
 const PUBLIC_DESTINATION_DIR = path.join(__dirname, '..', 'public', 'img', 'destinations');
@@ -27,11 +29,11 @@ const fileFilter = allowed => (req, file, cb) => {
   cb(new AppError(`Unsupported file type. Upload ${allowed === IMAGE_TYPES ? 'a JPG, PNG or WebP image' : 'a JPG, PNG, WebP or PDF file'}.`, 400), false);
 };
 
-// Public images (logos, package photos): kept in memory, then resized with sharp
+// Public images (logos, package photos): kept in memory, then compressed
 const imageUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: fileFilter(IMAGE_TYPES),
-  limits: { fileSize: MAX_FILE_SIZE, files: 6 }
+  limits: { fileSize: MAX_PHOTO_SIZE, files: 6 }
 });
 
 // Private documents: kept in memory so we can choose the final private path ourselves
@@ -74,27 +76,29 @@ const agencyApplicationUpload = multer({
 ]);
 
 /**
- * Save a resized image (a sharp pipeline) to Cloudinary, or to public/img/<folder>/ without it.
- * Returns the URL to store: a full Cloudinary URL, or a path on this server.
+ * Compress an uploaded image (see utils/imageCompress.js) and save it to Cloudinary, or to
+ * public/img/<folder>/ without it. Returns the URL to store: a full Cloudinary URL, or a path on this server.
  */
-const storeImage = async (image, folder) => {
-  const jpeg = image.jpeg({ quality: 82 });
+const storeImage = async (file, folder, options) => {
+  const image = await compressImage(file.buffer, options);
   if (isCloudinaryConfigured()) {
-    return (await uploadBufferToCloudinary(await jpeg.toBuffer(), { folder })).secure_url;
+    return (await uploadBufferToCloudinary(image.buffer, { folder })).secure_url;
   }
   const dir = path.join(__dirname, '..', 'public', 'img', folder);
   await ensureDir(dir);
-  const filename = `${randomName()}.jpg`;
-  await jpeg.toFile(path.join(dir, filename));
+  const filename = `${randomName()}${image.ext}`;
+  await fs.promises.writeFile(path.join(dir, filename), image.buffer);
   return `/img/${folder}/${filename}`;
 };
 
 /**
- * Resize an uploaded image and store it in the agency's folder. Returns its URL.
+ * Compress an uploaded image and store it in the agency's folder. Returns its URL.
+ * With a height it is cropped to that shape (guide portraits); otherwise it fits inside width x width.
  */
 const saveAgencyImage = (file, agencyId, { width = 1600, height } = {}) => storeImage(
-  sharp(file.buffer).rotate().resize({ width, height, fit: height ? 'cover' : 'inside', withoutEnlargement: true }),
-  `agencies/${agencyId}`
+  file,
+  `agencies/${agencyId}`,
+  height ? { width, height, fit: 'cover', quality: 82 } : { width, height: width, fit: 'inside', quality: 80 }
 );
 
 // Delete a previously saved public agency image (ignores missing files)
@@ -107,10 +111,7 @@ const removeAgencyImage = async urlPath => {
 };
 
 // Destination photos are stored per destination
-const saveDestinationImage = (file, destinationId) => storeImage(
-  sharp(file.buffer).rotate().resize({ width: 2000, fit: 'inside', withoutEnlargement: true }),
-  `destinations/${destinationId}`
-);
+const saveDestinationImage = (file, destinationId) => storeImage(file, `destinations/${destinationId}`, 'large');
 
 const removeDestinationImage = async urlPath => {
   if (isCloudinaryUrl(urlPath)) return deleteFromCloudinary(urlPath);
@@ -133,7 +134,7 @@ const contentDir = kind => path.join(__dirname, '..', 'public', 'img', kind);
 
 const saveContentImage = async (file, kind, id, { width = 2000 } = {}) => {
   if (!CONTENT_KINDS.includes(kind)) throw new Error(`Unknown image kind ${kind}`);
-  return storeImage(sharp(file.buffer).rotate().resize({ width, fit: 'inside', withoutEnlargement: true }), `${kind}/${id}`);
+  return storeImage(file, `${kind}/${id}`, { width, height: width, fit: 'inside', quality: 80 });
 };
 
 const removeContentImage = async urlPath => {
@@ -158,6 +159,12 @@ const removeContentFolder = async (kind, id) => {
  * dir without it. Returns what to save in the database, which is only ever read by the functions below.
  */
 const savePrivateDocument = async (file, agencyId) => {
+  // Photos of documents are compressed too, at a resolution that keeps the text readable. The callers
+  // record file.mimetype and file.size after this, so they describe what was stored. PDFs stay as sent.
+  if (isImageType(file.mimetype)) {
+    const image = await compressImage(file.buffer, 'document');
+    Object.assign(file, { buffer: image.buffer, mimetype: image.mimeType, size: image.size });
+  }
   if (isCloudinaryConfigured()) {
     return (await uploadPrivateFile(file.buffer, { folder: `verification/${agencyId}`, mimeType: file.mimetype })).ref;
   }

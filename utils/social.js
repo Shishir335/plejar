@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
-const sharp = require('sharp');
+const { compressImage } = require('./imageCompress');
 const Post = require('../models/postModel');
 const Follow = require('../models/followModel');
 const Block = require('../models/blockModel');
@@ -283,10 +283,9 @@ const notAPhoto = () => { throw new AppError("One of those photos couldn't be re
 // userId names the folder: the traveler, or the agency for a wall post.
 const savePostMedia = async (file, userId) => {
   const isImage = IMAGE_TYPES.includes(file.mimetype);
+  const photo = isImage ? await compressImage(file.buffer, 'photo').catch(notAPhoto) : null;
   if (isCloudinaryConfigured()) {
-    const buffer = isImage
-      ? await sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer().catch(notAPhoto)
-      : file.buffer;
+    const buffer = isImage ? photo.buffer : file.buffer;
     const saved = await uploadBufferToCloudinary(buffer, { folder: `posts/${userId}`, resourceType: isImage ? 'image' : 'video' });
     return isImage
       ? { type: 'image', url: saved.secure_url, width: saved.width, height: saved.height, size: saved.bytes }
@@ -296,9 +295,9 @@ const savePostMedia = async (file, userId) => {
   const dir = path.join(POST_MEDIA_DIR, String(userId));
   await fs.promises.mkdir(dir, { recursive: true });
   if (isImage) {
-    const name = `${randomName()}.jpg`;
-    const info = await sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toFile(path.join(dir, name)).catch(notAPhoto);
-    return { type: 'image', url: `/media/posts/${userId}/${name}`, width: info.width, height: info.height, size: info.size };
+    const name = `${randomName()}${photo.ext}`;
+    await fs.promises.writeFile(path.join(dir, name), photo.buffer);
+    return { type: 'image', url: `/media/posts/${userId}/${name}`, width: photo.width, height: photo.height, size: photo.size };
   }
   const ext = { 'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm' }[file.mimetype];
   const name = `${randomName()}${ext}`;

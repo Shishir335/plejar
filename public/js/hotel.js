@@ -560,7 +560,7 @@ $('rPhotos').addEventListener('change', e => {
   const kept = room ? room.photos.filter(p => !state.removeRoomPhotos.has(p)).length : 0;
   const files = [...e.target.files].filter(f => {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) { toast(`${f.name}: use a JPG, PNG or WebP photo.`, 'error'); return false; }
-    if (f.size > 5 * 1024 * 1024) { toast(`${f.name} is over 5 MB.`, 'error'); return false; }
+    if (f.size > 12 * 1024 * 1024) { toast(`${f.name} is over 12 MB.`, 'error'); return false; }
     return true;
   });
   state.roomFiles = [...state.roomFiles, ...files].slice(0, Math.max(0, 6 - kept));
@@ -643,7 +643,7 @@ async function uploadPhotos(fileList) {
   const room = 12 - state.hotel.photos.length;
   const files = [...fileList].filter(f => {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) { toast(`${f.name}: use a JPG, PNG or WebP photo.`, 'error'); return false; }
-    if (f.size > 5 * 1024 * 1024) { toast(`${f.name} is over 5 MB.`, 'error'); return false; }
+    if (f.size > 12 * 1024 * 1024) { toast(`${f.name} is over 12 MB.`, 'error'); return false; }
     return true;
   }).slice(0, Math.min(6, room));
   if (!files.length) return;

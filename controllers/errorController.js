@@ -23,7 +23,7 @@ const handleValidationErrorDB = err => {
 
 const handleMulterError = err => {
     const messages = {
-        LIMIT_FILE_SIZE: 'That file is too large. Upload files of 5 MB or less.',
+        LIMIT_FILE_SIZE: 'That file is too large. Use a smaller photo, or a document of 5 MB or less.',
         LIMIT_FILE_COUNT: 'Too many files. Remove some and try again.',
         LIMIT_UNEXPECTED_FILE: 'Unexpected file field or too many files.'
     };

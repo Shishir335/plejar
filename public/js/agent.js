@@ -912,7 +912,7 @@ $('placeForm').addEventListener('submit', async e => {
   if (!name && !(type === 'city' && $('plDistrict').value)) return showAlert('placeError', 'Enter the name of the place.');
   if ((lat === '') !== (lng === '')) return showAlert('placeError', 'Enter both latitude and longitude, or leave both empty.');
   const photo = $('plPhoto').files[0];
-  if (photo && (!['image/jpeg', 'image/png', 'image/webp'].includes(photo.type) || photo.size > 5 * 1024 * 1024)) return showAlert('placeError', 'Use a JPG, PNG or WebP photo under 5 MB.');
+  if (photo && (!['image/jpeg', 'image/png', 'image/webp'].includes(photo.type) || photo.size > 12 * 1024 * 1024)) return showAlert('placeError', 'Use a JPG, PNG or WebP photo under 12 MB.');
 
   const fd = new FormData();
   Object.entries({ type, name, nameBn: $('plNameBn').value.trim(), division: $('plDivision').value, district: $('plDistrict').value, lat, lng, summary: $('plSummary').value.trim() })

@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
-const sharp = require('sharp');
+const { compressImage } = require('./imageCompress');
 const AppError = require('./appError');
 const { isCloudinaryConfigured, isCloudinaryUrl, uploadBufferToCloudinary, deleteFromCloudinary } = require('./cloudinary');
 
@@ -23,14 +23,13 @@ const profileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSi
 // Square-cropped (or banner for covers) and re-encoded, which also strips camera location data
 // Returns what to store: a full Cloudinary URL, or a file name in public/img/users
 const saveProfileImage = async (file, userId, kind) => {
-  const size = kind === 'cover' ? { width: 1500, height: 500 } : { width: 500, height: 500 };
-  const image = sharp(file.buffer).rotate().resize({ ...size, fit: 'cover' }).jpeg({ quality: 85 });
+  const image = await compressImage(file.buffer, kind === 'cover' ? 'cover' : 'avatar');
   if (isCloudinaryConfigured()) {
-    return (await uploadBufferToCloudinary(await image.toBuffer(), { folder: `users/${userId}` })).secure_url;
+    return (await uploadBufferToCloudinary(image.buffer, { folder: `users/${userId}` })).secure_url;
   }
   await fs.promises.mkdir(USER_IMG_DIR, { recursive: true });
-  const name = `${kind}-${userId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.jpg`;
-  await image.toFile(path.join(USER_IMG_DIR, name));
+  const name = `${kind}-${userId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${image.ext}`;
+  await fs.promises.writeFile(path.join(USER_IMG_DIR, name), image.buffer);
   return name;
 };
 
