@@ -138,7 +138,7 @@ async function ensureCategories(force) {
 async function ensureVendorOptions() {
   if (V.vendorOptions.length) return V.vendorOptions;
   const { ok, data } = await adminFetch('/api/v1/admin/vendors?limit=100&sort=name');
-  if (ok) V.vendorOptions = data.data.vendors.map(v => ({ id: v.id, name: v.name }));
+  if (ok) V.vendorOptions = data.data.vendors.map(v => ({ id: v.id, name: v.name, kind: v.kind || 'agency' }));
   const html = V.vendorOptions.map(v => `<option value="${E(v.id)}">${E(v.name)}</option>`).join('');
   [['bkVendor', 'All vendors'], ['vaVendor', 'All vendors']].forEach(([id, first]) => {
     const el = document.getElementById(id);

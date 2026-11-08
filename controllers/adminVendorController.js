@@ -481,7 +481,7 @@ exports.setMemberPassword = catchAsync(async (req, res, next) => {
   });
 
   const loginURL = `${req.protocol}://${req.get('host')}/${agency.kind === 'hotel' ? 'hotel' : 'agent'}`;
-  const kind = wasNew && member.agencyRole === 'owner' ? 'new' : 'changed';
+  const kind = wasNew && membership.roleIn(member, agency._id) === 'owner' ? 'new' : 'changed';
   const vendorId = vendorCode(agency);
   const emailDraft = credentialsEmail({ name: member.name, agencyName: agency.name, email: member.email, password, loginURL, kind, temporary: requireChange, vendorId, hotel: agency.kind === 'hotel' });
 

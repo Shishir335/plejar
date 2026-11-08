@@ -57,6 +57,8 @@ const userView = u => {
     roles: rolesOf(u),
     agency: u.agency || null,
     agencyRole: u.agencyRole || null,
+    hotelAgency: u.hotelAgency || null,
+    hotelAgencyRole: u.hotelAgencyRole || null,
     authProvider: u.authProvider,
     accountStatus: u.accountStatus,
     status: u.status || 'active',
@@ -268,6 +270,8 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     if (!roleCalc.roles.includes('agent')) {
       user.agency = null;
       user.agencyRole = null;
+      user.hotelAgency = null;
+      user.hotelAgencyRole = null;
     }
     await logActivity(req, {
       action: 'user.roles_changed',
@@ -305,6 +309,8 @@ exports.setRoles = catchAsync(async (req, res, next) => {
   if (!roleCalc.roles.includes('agent')) {
     user.agency = null;
     user.agencyRole = null;
+    user.hotelAgency = null;
+    user.hotelAgencyRole = null;
   }
   await user.save({ validateBeforeSave: false });
 

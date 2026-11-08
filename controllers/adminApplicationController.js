@@ -226,8 +226,8 @@ exports.approve = catchAsync(async (req, res, next) => {
   const lead = await findLead(req.params.id, next, '+documents.file');
   if (!lead || decidedAlready(lead, next)) return;
 
-  // One person can be a traveler and a vendor: an existing account becomes the owner when it's the
-  // traveler who applied from the app, or when the admin says so (useExistingAccount)
+  // One person can be a traveler and a vendor: an account that already uses this email becomes the
+  // owner. The admin reviewing and accepting the application is the confirmation.
   const isHotel = lead.vendorType === 'hotel';
   const existing = await User.findOne({ email: lead.email });
   if (existing) {
@@ -239,10 +239,6 @@ exports.approve = catchAsync(async (req, res, next) => {
         : `${lead.email} already has a ${isHotel ? 'hotel' : 'tour agency'}. Ask the applicant for another email.`, 400));
     }
     if (existing.deletedAt || existing.status !== 'active') return next(new AppError(`The account for ${lead.email} is suspended or removed. Ask the applicant for another email.`, 400));
-    const ownApplication = lead.applicant && String(lead.applicant) === String(existing._id);
-    if (!ownApplication && !(req.body.useExistingAccount === true || req.body.useExistingAccount === 'true')) {
-      return next(new AppError(`An account already exists for ${lead.email}. Tick "Add the vendor role to their existing account" to make it the owner, or ask the applicant for another email.`, 400));
-    }
   }
 
   const verify = req.body.verify !== false && req.body.verify !== 'false';

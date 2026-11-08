@@ -418,13 +418,24 @@ async function openEditRoleModal(userId, name, currentRoles) {
     box.checked = roles.includes(box.value);
   });
   syncEditRoleVendor();
-  // The agencies to choose from, and the one this person is in now
-  const select = document.getElementById('editRoleAgency');
+  // The tour agencies and hotels to choose from, and where this person is now
+  // (one of each; someone with only a hotel has it in user.agency)
   const [options, details] = await Promise.all([ensureVendorOptions(), adminFetch(`/api/v1/admin/users/${userId}`)]);
   const user = details.ok && details.data.data.user ? details.data.data.user : {};
-  select.innerHTML = `<option value="">Choose an agency</option>${options.map(v => `<option value="${escapeHTML(v.id)}">${escapeHTML(v.name)}</option>`).join('')}`;
-  select.value = user.agency ? String(user.agency._id || user.agency) : '';
-  document.getElementById('editRoleAgencyRole').value = user.agencyRole || '';
+  const idOf = x => (x ? String(x._id || x) : '');
+  const kindOf = id => (options.find(v => v.id === id) || {}).kind;
+  const fill = (selectId, kind, none) => {
+    const list = options.filter(v => (v.kind === 'hotel') === (kind === 'hotel'));
+    document.getElementById(selectId).innerHTML = `<option value="">${none}</option>${list.map(v => `<option value="${escapeHTML(v.id)}">${escapeHTML(v.name)}</option>`).join('')}`;
+  };
+  fill('editRoleAgency', 'agency', 'No tour agency');
+  fill('editRoleHotel', 'hotel', 'No hotel');
+  const main = idOf(user.agency);
+  const mainIsHotel = main && kindOf(main) === 'hotel';
+  document.getElementById('editRoleAgency').value = main && !mainIsHotel ? main : '';
+  document.getElementById('editRoleAgencyRole').value = main && !mainIsHotel ? (user.agencyRole || '') : '';
+  document.getElementById('editRoleHotel').value = mainIsHotel ? main : idOf(user.hotelAgency);
+  document.getElementById('editRoleHotelRole').value = (mainIsHotel ? user.agencyRole : user.hotelAgencyRole) || '';
   openModal('editRoleModal');
 }
 
@@ -437,8 +448,9 @@ async function handleUpdateRole(e) {
     return;
   }
   const agency = document.getElementById('editRoleAgency').value;
-  if (roles.includes('agent') && !agency) {
-    showAdminToast('Choose which agency this vendor belongs to.', 'error');
+  const hotel = document.getElementById('editRoleHotel').value;
+  if (roles.includes('agent') && !agency && !hotel) {
+    showAdminToast('Choose a tour agency, a hotel or both for this vendor.', 'error');
     return;
   }
 
@@ -448,7 +460,9 @@ async function handleUpdateRole(e) {
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/users/${userId}/roles`, {
       method: 'PATCH',
-      body: JSON.stringify(roles.includes('agent') ? { roles, agency, agencyRole: document.getElementById('editRoleAgencyRole').value } : { roles })
+      body: JSON.stringify(roles.includes('agent')
+        ? { roles, agency, agencyRole: document.getElementById('editRoleAgencyRole').value, hotel, hotelRole: document.getElementById('editRoleHotelRole').value }
+        : { roles })
     });
 
     if (ok) {

@@ -354,32 +354,23 @@ async function deleteApplication() {
 
 // ---------- Accept ----------
 
-// Accepting onto an existing account waits for the admin's tick
-function syncApproveSubmit() {
-  const row = document.getElementById('apUseExistingRow');
-  document.getElementById('approveSubmit').disabled = !row.hidden && !document.getElementById('apUseExisting').checked;
-}
-
 async function openApproveModal() {
   const a = AP.detail.application;
   // Someone who already has a Plejar account becomes the owner with the login they have.
   // From the website nobody proved they own that email, so the admin confirms it's the same person.
   const acct = AP.detail.checks && AP.detail.checks.account;
-  const own = acct && a.applicant && String(a.applicant._id || a.applicant) === String(acct._id);
-  const confirmAccount = acct && !acct.agency && !own;
   const isHotel = a.vendorType === 'hotel';
-  document.getElementById('approveLead').innerHTML = `<strong>${E(a.agencyName)}</strong>${isHotel ? ' <span class="tag">Hotel</span>' : ''}<br>Owner: ${E(a.contactName)} (${E(a.email)})${acct ? '' : '<br>A new account with a temporary password is created.'}${isHotel ? '<br>A draft hotel listing is created from the application, for you to add photos to and publish.' : ''}`;
+  // An account with this email becomes the owner, keeping its password (one tour agency and one hotel each)
+  const roles = acct ? (acct.roles && acct.roles.length ? acct.roles : [acct.role]).map(r => ROLE_NAMES[r] || r).join(', ') : '';
+  const accountNote = acct
+    ? `<br>${E(acct.name || a.email)} already has a Plejar account (${E(roles)}). The ${isHotel ? 'hotel' : 'agency'} is added to that account and they sign in with their usual password.`
+    : '<br>A new account with a temporary password is created.';
+  document.getElementById('approveLead').innerHTML = `<strong>${E(a.agencyName)}</strong>${isHotel ? ' <span class="tag">Hotel</span>' : ''}<br>Owner: ${E(a.contactName)} (${E(a.email)})${accountNote}${isHotel ? '<br>A draft hotel listing is created from the application, for you to add photos to and publish.' : ''}`;
   AP.approveLabel = acct ? (isHotel ? 'Accept hotel' : 'Accept agency') : 'Accept and create account';
   document.getElementById('approveTitle').textContent = isHotel ? 'Accept this hotel' : 'Accept this agency';
   document.getElementById('apVerify').checked = true;
-  document.getElementById('apUseExistingRow').hidden = !confirmAccount;
-  document.getElementById('apUseExisting').checked = false;
-  if (confirmAccount) {
-    const roles = (acct.roles && acct.roles.length ? acct.roles : [acct.role]).map(r => ROLE_NAMES[r] || r).join(', ');
-    document.getElementById('apUseExistingText').textContent = `Same person as the existing account (${roles})`;
-  }
   document.getElementById('approveSubmit').textContent = AP.approveLabel;
-  syncApproveSubmit();
+  document.getElementById('approveSubmit').disabled = false;
   document.getElementById('approveForm').hidden = false;
   document.getElementById('approveResult').hidden = true;
   formError('approveError');
@@ -402,7 +393,7 @@ async function submitApprove(e) {
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/applications/${AP.detail.application._id}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ verify: document.getElementById('apVerify').checked, categories, send: document.getElementById('apSend').checked, useExistingAccount: document.getElementById('apUseExisting').checked })
+      body: JSON.stringify({ verify: document.getElementById('apVerify').checked, categories, send: document.getElementById('apSend').checked })
     });
     if (!ok) return formError('approveError', data.message || 'Could not accept this application.');
 
@@ -419,11 +410,13 @@ async function submitApprove(e) {
       </div>`;
     loadVendorSummary();
     updateStats();
+    // The new vendor shows up in vendor pickers, such as Change Account Roles
+    if (typeof V !== 'undefined' && V.vendorOptions) V.vendorOptions = [];
   } catch (err) {
     formError('approveError', 'Could not reach the server.');
   } finally {
     btn.textContent = AP.approveLabel;
-    syncApproveSubmit();
+    btn.disabled = false;
   }
 }
 
