@@ -290,6 +290,7 @@ img { max-width: 100%; }
 }
 .join-steps strong { display: block; }
 .join-steps span { display: block; color: var(--ink-soft); font-size: 0.92rem; }
+.join-hotel { margin-top: 10px; }
 .join-status { display: block; text-align: center; margin-top: 14px; font-weight: 600; font-size: 0.92rem; color: var(--tea-deep); text-underline-offset: 3px; }
 
 .agent-done { text-align: center; padding: 40px 8px; }
