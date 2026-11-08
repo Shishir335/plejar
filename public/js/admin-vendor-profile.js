@@ -320,7 +320,8 @@ const STAY_TEXT = { none: 'No overnight stay', hotel: 'Hotel', resort: 'Resort',
 const STOP_TEXT = { departure: 'Departure', stop: 'Stop', activity: 'Activity', meal: 'Meal', stay: 'Check in', return: 'Return' };
 
 function showEventPlan(packageId) {
-  const p = V.detail.packages.find(x => String(x._id) === String(packageId));
+  // From the open vendor profile, or from Travel agents > Tour packages
+  const p = [...(V.detail ? V.detail.packages : []), ...(V.pkgList || [])].find(x => String(x._id) === String(packageId));
   if (!p) return;
   const listOf = items => (items && items.length ? `<ul class="plan-ul">${items.map(i => `<li>${E(i)}</li>`).join('')}</ul>` : '<span class="detail-muted">Not given</span>');
   const row = (name, value) => appPlanRow(name, value);
@@ -365,7 +366,8 @@ async function moderateVendorPackage(agencyId, packageId, hidden) {
   const { ok, data } = await adminFetch(`/api/v1/admin/agencies/${agencyId}/packages/${packageId}`, { method: 'PATCH', body: JSON.stringify({ hidden }) });
   if (!ok) return showAdminToast(data.message || 'Could not update the package.', 'error');
   showAdminToast(hidden ? 'Tour event hidden.' : 'Tour event allowed again.', 'success');
-  reloadVendor();
+  if (document.getElementById('tab-vendorDetail').classList.contains('active') && V.detail) reloadVendor();
+  else loadPackages(V.pkPage);
 }
 
 // ---------- Bookings ----------

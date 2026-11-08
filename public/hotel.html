@@ -350,6 +350,11 @@
         <div class="field"><label for="rDescription">About the room</label><textarea id="rDescription" name="description" rows="3" maxlength="600"></textarea></div>
         <div class="field"><label for="rAmenities">Room amenities</label><input id="rAmenities" name="amenities" type="text" maxlength="600" placeholder="Air conditioning, Hot water, Balcony, TV"><span class="hint">Separate with commas.</span></div>
         <div class="field">
+          <span class="label">What comes with this room</span>
+          <div class="chips" id="roomBenefits"></div>
+          <span class="hint">Shown as ticks on the room in the app, so guests see what they get before booking.</span>
+        </div>
+        <div class="field">
           <span class="label">Photos</span>
           <div class="thumbs" id="roomThumbs"></div>
           <input id="rPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top:8px">

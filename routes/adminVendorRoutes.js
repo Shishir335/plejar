@@ -29,6 +29,8 @@ router.get('/vendors/:id/earnings', vendor.getEarnings);
 router.get('/vendors/:id/payouts', finance.vendorPayouts);
 router.post('/vendors/:id/payouts', moneyAdmin, finance.createPayout);
 
+router.get('/packages', vendor.listPackages);
+
 router.get('/bookings', finance.listBookings);
 router.patch('/bookings/:id', finance.updateBooking);
 

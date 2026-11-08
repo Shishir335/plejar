@@ -113,6 +113,80 @@ exports.summary = catchAsync(async (req, res, next) => {
   });
 });
 
+// Every travel agency's tour packages in one list, for Travel agents > Tour packages.
+// ?search, ?status (published, draft, hidden, cancelled, or byPlejar for hidden by an admin),
+// ?agency, ?when (upcoming, past, undated), ?sort (updated, soonest, newest), ?page, ?limit
+exports.listPackages = catchAsync(async (req, res, next) => {
+  const q = req.query;
+  const and = [];
+  if (q.search) {
+    const rx = new RegExp(escapeRegex(String(q.search).trim()), 'i');
+    and.push({ $or: [{ title: rx }, { destination: rx }] });
+  }
+  if (q.agency && validId(q.agency)) and.push({ agency: toId(q.agency) });
+  const today = new Date(new Date().setUTCHours(0, 0, 0, 0));
+  if (q.when === 'upcoming') and.push({ startDate: { $gte: today } });
+  else if (q.when === 'past') and.push({ startDate: { $lt: today } });
+  else if (q.when === 'undated') and.push({ startDate: null });
+  // Counts per status use every filter except the status itself
+  const base = and.length ? { $and: [...and] } : {};
+  if (q.status === 'byPlejar') and.push({ hiddenByAdmin: true });
+  else if (['published', 'draft', 'hidden', 'cancelled'].includes(q.status)) and.push({ status: q.status });
+  const filter = and.length ? { $and: and } : {};
+
+  const sorts = { updated: { updatedAt: -1 }, newest: { createdAt: -1 } };
+  const pg = pageParams(q);
+  const populate = query => query.populate('agency', 'name status kind').populate('itinerary.stops.destinationRef', 'name slug');
+  // Soonest: upcoming tours by date first, then ones that already ran (latest first), then undated
+  const page = async () => {
+    if (q.sort !== 'soonest') return populate(Package.find(filter).sort(sorts[q.sort] || sorts.updated).skip(pg.skip).limit(pg.limit));
+    const order = await Package.aggregate([
+      { $match: filter },
+      { $addFields: {
+        _when: { $cond: [{ $eq: [{ $ifNull: ['$startDate', null] }, null] }, 2, { $cond: [{ $gte: ['$startDate', today] }, 0, 1] }] },
+        _t: { $toLong: { $ifNull: ['$startDate', 0] } }
+      } },
+      { $addFields: { _key: { $cond: [{ $eq: ['$_when', 1] }, { $multiply: ['$_t', -1] }, '$_t'] } } },
+      { $sort: { _when: 1, _key: 1, _id: 1 } },
+      { $skip: pg.skip }, { $limit: pg.limit }, { $project: { _id: 1 } }
+    ]);
+    const rows = await populate(Package.find({ _id: { $in: order.map(o => o._id) } }));
+    const at = Object.fromEntries(order.map((o, i) => [String(o._id), i]));
+    return rows.sort((a, b) => at[String(a._id)] - at[String(b._id)]);
+  };
+  const [packages, total, counts, byPlejar] = await Promise.all([
+    page(),
+    Package.countDocuments(filter),
+    Package.aggregate([{ $match: base }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Package.countDocuments({ ...base, hiddenByAdmin: true })
+  ]);
+
+  const ids = packages.map(p => p._id);
+  const booked = ids.length
+    ? await Booking.aggregate([
+      { $match: { package: { $in: ids }, status: { $ne: 'cancelled' } } },
+      { $group: { _id: '$package', bookings: { $sum: 1 }, travelers: { $sum: '$travelers' } } }
+    ])
+    : [];
+  const bookedBy = Object.fromEntries(booked.map(b => [String(b._id), b]));
+  const summary = { all: 0, published: 0, draft: 0, hidden: 0, cancelled: 0, byPlejar };
+  counts.forEach(c => { summary[c._id] = c.count; summary.all += c.count; });
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      packages: packages.map(p => ({
+        ...p.toObject(),
+        planMissing: planProblems(p),
+        bookings: (bookedBy[String(p._id)] || {}).bookings || 0,
+        travelers: (bookedBy[String(p._id)] || {}).travelers || 0
+      })),
+      summary,
+      ...paged(total, pg)
+    }
+  });
+});
+
 exports.listVendors = catchAsync(async (req, res, next) => {
   const q = req.query;
   const and = [];

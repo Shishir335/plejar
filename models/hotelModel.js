@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
  * (and the Hotels tab later). Located at a destination and on the map.
  */
 const STAY_TYPES = ['hotel', 'resort', 'cottage', 'guest_house', 'homestay', 'eco_resort', 'houseboat'];
+// What comes with a room, shown as ticks on the room in the app
+const ROOM_BENEFITS = ['breakfast', 'free_cancellation', 'pay_at_hotel', 'free_wifi', 'free_parking', 'airport_pickup', 'late_checkout', 'welcome_drink'];
 
 const hotelSchema = new mongoose.Schema(
   {
@@ -54,6 +56,7 @@ const hotelSchema = new mongoose.Schema(
           sizeSqft: { type: Number, min: 0, max: 20000, default: null },
           count: { type: Number, min: [1, 'At least 1 room of this type'], max: 500, default: 1 },
           amenities: { type: [String], default: [] },
+          benefits: { type: [{ type: String, enum: ROOM_BENEFITS }], default: [] },
           photos: { type: [String], default: [] },
           active: { type: Boolean, default: true }
         }, { timestamps: true })
@@ -118,4 +121,5 @@ hotelSchema.virtual('discountPercent').get(function () {
 
 const Hotel = mongoose.model('Hotel', hotelSchema);
 Hotel.STAY_TYPES = STAY_TYPES;
+Hotel.ROOM_BENEFITS = ROOM_BENEFITS;
 module.exports = Hotel;

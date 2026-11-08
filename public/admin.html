@@ -692,6 +692,7 @@
           <div class="subtabs" role="tablist" aria-label="Vendor management">
             <button type="button" role="tab" class="subtab active" data-vsub="all" aria-selected="true"><span data-for="agency">All travel agents</span><span data-for="hotel">All hotels</span></button>
             <button type="button" role="tab" class="subtab" data-vsub="listings" data-for="hotel" aria-selected="false">Listings <span class="mini-count" id="vsubListingCount" hidden>0</span></button>
+            <button type="button" role="tab" class="subtab" data-vsub="packages" data-for="agency" aria-selected="false">Tour packages</button>
             <button type="button" role="tab" class="subtab" data-vsub="applications" aria-selected="false">Applications <span class="mini-count" id="vsubLeadCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-vsub="verification" aria-selected="false">Verification <span class="mini-count" id="vsubVerifyCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-vsub="categories" data-for="agency" aria-selected="false">Categories</button>
@@ -802,6 +803,35 @@
                 <tbody id="pendingReviewBody"></tbody>
               </table>
             </div>
+          </div>
+
+          <!-- Tour packages: every travel agency's tour events in one list -->
+          <div class="subpane" id="vsub-packages">
+            <div class="chips" id="packageChips" role="group" aria-label="Packages by status"></div>
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="pkSearch" class="search-input" placeholder="Search title or destination" aria-label="Search tour packages" oninput="debouncedPackages()"></div>
+                <select id="pkStatus" class="form-select" aria-label="Package status" onchange="loadPackages(1)">
+                  <option value="">Any status</option><option value="published">Published</option><option value="draft">Draft</option><option value="hidden">Hidden</option><option value="byPlejar">Hidden by Plejar</option><option value="cancelled">Cancelled</option>
+                </select>
+                <select id="pkWhen" class="form-select" aria-label="Tour date" onchange="loadPackages(1)">
+                  <option value="">Any date</option><option value="upcoming">Upcoming</option><option value="past">Already ran</option><option value="undated">No date</option>
+                </select>
+                <select id="pkVendor" class="form-select" aria-label="Travel agent" onchange="loadPackages(1)"><option value="">All travel agents</option></select>
+                <select id="pkSort" class="form-select" aria-label="Sort" onchange="loadPackages(1)">
+                  <option value="updated">Recently updated</option><option value="soonest">Soonest tour date</option><option value="newest">Newest first</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary" onclick="loadPackages()">↻ Refresh</button>
+            </div>
+            <p class="totals-line" id="packageTotals"></p>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Tour event</th><th>Travel agent</th><th>Dates</th><th>Seats</th><th>Price</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="packagesTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="packagesPager"></div>
           </div>
 
           <!-- Categories -->

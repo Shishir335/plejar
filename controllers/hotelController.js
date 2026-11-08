@@ -120,6 +120,7 @@ exports.getHotel = catchAsync(async (req, res, next) => {
           sizeSqft: r.sizeSqft,
           rooms: r.count,
           amenities: r.amenities,
+          benefits: r.benefits || [],
           photos: r.photos
         })),
         policies: hotel.policies || {},

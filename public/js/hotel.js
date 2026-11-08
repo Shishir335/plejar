@@ -505,6 +505,18 @@ $('answerForm').addEventListener('submit', async e => {
 
 // ---------- Rooms & rates ----------
 
+const ROOM_BENEFITS = [
+  ['breakfast', 'Breakfast included'], ['free_cancellation', 'Free cancellation'], ['pay_at_hotel', 'Pay at the hotel'],
+  ['free_wifi', 'Free Wi-Fi'], ['free_parking', 'Free parking'], ['airport_pickup', 'Airport pickup'],
+  ['late_checkout', 'Late check-out'], ['welcome_drink', 'Welcome drink']
+];
+const benefitLabel = key => (ROOM_BENEFITS.find(([k]) => k === key) || [key, key])[1];
+
+function renderRoomBenefits(chosen = []) {
+  const on = new Set(chosen);
+  $('roomBenefits').innerHTML = ROOM_BENEFITS.map(([v, l]) => `<label class="chip"><input type="checkbox" value="${v}" ${on.has(v) ? 'checked' : ''}><span>${l}</span></label>`).join('');
+}
+
 function renderRooms() {
   const rooms = state.hotel ? state.hotel.roomTypes : [];
   $('roomList').innerHTML = rooms.length ? rooms.map(r => `
@@ -517,6 +529,7 @@ function renderRooms() {
         <div class="room-price">${taka(r.pricePerNight)}${r.regularPrice ? `<s>${taka(r.regularPrice)}</s>` : ''} <small>a night</small></div>
         <div class="room-facts">${plural(r.maxGuests, 'guest')} a room${r.beds ? ` · ${E(r.beds)}` : ''}${r.sizeSqft ? ` · ${r.sizeSqft} sq ft` : ''}</div>
         <div class="room-facts">${plural(r.count, 'room')} of this type${r.photos.length ? ` · ${plural(r.photos.length, 'photo')}` : ' · no photos yet'}</div>
+        ${(r.benefits || []).length ? `<div class="room-facts">${r.benefits.map(b => `✓ ${E(benefitLabel(b))}`).join(' · ')}</div>` : ''}
         <div class="room-actions">
           <button class="btn btn-ghost btn-sm" data-action="edit-room" data-id="${E(r._id)}">Edit</button>
           <button class="btn btn-ghost btn-sm" data-action="toggle-room" data-id="${E(r._id)}">${r.active ? 'Pause' : 'Take requests'}</button>
@@ -559,6 +572,7 @@ function openRoom(id) {
     f.description.value = room.description || '';
     f.amenities.value = (room.amenities || []).join(', ');
   }
+  renderRoomBenefits(room ? room.benefits : []);
   $('rActive').checked = room ? room.active : true;
   $('roomDelete').hidden = !room;
   $('rPhotos').value = '';
@@ -589,6 +603,7 @@ $('roomForm').addEventListener('submit', async e => {
   if (!/^\d+$/.test(f.pricePerNight.value.trim())) return showAlert('roomError', 'Enter the price per night in taka, for example 3500.');
   const fd = new FormData();
   ['name', 'pricePerNight', 'regularPrice', 'maxGuests', 'count', 'sizeSqft', 'beds', 'description', 'amenities'].forEach(k => fd.append(k, f[k].value.trim()));
+  fd.append('benefits', [...$('roomBenefits').querySelectorAll('input:checked')].map(i => i.value).join(','));
   fd.append('active', $('rActive').checked ? 'true' : 'false');
   state.roomFiles.forEach(file => fd.append('photos', file, file.name));
   if (state.removeRoomPhotos.size) fd.append('removePhotos', [...state.removeRoomPhotos].join(','));

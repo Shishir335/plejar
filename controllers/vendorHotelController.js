@@ -61,6 +61,7 @@ const roomView = r => ({
   sizeSqft: r.sizeSqft,
   count: r.count,
   amenities: r.amenities,
+  benefits: r.benefits || [],
   photos: r.photos,
   active: r.active !== false
 });
@@ -229,6 +230,8 @@ const applyRoom = (room, b, { creating = false } = {}) => {
   if (has(b, 'description')) room.description = text(b.description, 600);
   if (has(b, 'beds')) room.beds = text(b.beds, 60);
   if (has(b, 'amenities')) room.amenities = list(b.amenities, 20, 40);
+  // Unknown benefits are dropped, not refused, so an older panel still saves
+  if (has(b, 'benefits')) room.benefits = [...new Set(list(b.benefits, 20, 40))].filter(k => Hotel.ROOM_BENEFITS.includes(k));
   if (has(b, 'active')) room.active = !(b.active === false || b.active === 'false');
   if (room.regularPrice != null && room.regularPrice <= room.pricePerNight) room.regularPrice = null;
 };

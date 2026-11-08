@@ -18,7 +18,9 @@ const V = {
   statusCtx: null,
   payoutCtx: null,
   commissionCtx: null,
-  bookingCtx: null
+  bookingCtx: null,
+  pkgList: [], // the page of Tour packages on screen
+  pkPage: 1
 };
 
 const METHOD_LABEL = { bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', bank: 'Bank transfer' };
@@ -52,6 +54,7 @@ function vendorBadges(v) {
 const VENDOR_SUB_LOADERS = {
   all: () => loadVendors(V.page),
   listings: () => loadHotels(1),
+  packages: () => loadPackages(1),
   applications: () => { loadApplications(); loadPendingAgencies(); },
   verification: () => loadPendingAgencies(),
   categories: () => loadCategories(),
@@ -63,7 +66,7 @@ const VENDOR_SUB_LOADERS = {
 
 // Sub-tabs each section has (the rest are hidden by [data-for] in admin.css)
 const KIND_SUBS = {
-  agency: ['all', 'applications', 'verification', 'categories', 'bookings', 'payouts', 'commission', 'activity'],
+  agency: ['all', 'packages', 'applications', 'verification', 'categories', 'bookings', 'payouts', 'commission', 'activity'],
   hotel: ['all', 'listings', 'applications', 'verification', 'bookings', 'activity']
 };
 const kindRoute = kind => (kind === 'hotel' ? 'hotels' : 'agents');
@@ -77,7 +80,7 @@ function setVendorKind(kind) {
   if (changed) {
     V.page = 1;
     // Filters from the other section don't carry over
-    ['vSearch', 'vStatusF', 'vVerifF', 'vndCategoryF', 'apSearch', 'bkSearch', 'bkKind', 'bkVendor', 'vaSearch', 'vaVendor'].forEach(id => {
+    ['vSearch', 'vStatusF', 'vVerifF', 'vndCategoryF', 'apSearch', 'bkSearch', 'bkKind', 'bkVendor', 'vaSearch', 'vaVendor', 'pkSearch', 'pkStatus', 'pkWhen', 'pkVendor'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -162,6 +165,59 @@ function applyVendorChip(key) {
   loadVendors(1);
 }
 
+// ---------- Tour packages (every travel agency's tour events) ----------
+
+const PACKAGE_BADGE = { published: 'badge-active', draft: 'badge-manager', hidden: 'badge-inactive', cancelled: 'badge-admin' };
+const debouncedPackages = makeDebounce(() => loadPackages(1));
+
+function applyPackageChip(status) {
+  document.getElementById('pkStatus').value = status;
+  loadPackages(1);
+}
+
+async function loadPackages(page = 1) {
+  V.pkPage = page;
+  tableMessage('packagesTableBody', 7, 'Loading tour packages...');
+  ensureVendorOptions();
+  const q = queryString({ search: val('pkSearch').trim(), status: val('pkStatus'), when: val('pkWhen'), agency: val('pkVendor'), sort: val('pkSort'), page, limit: 20 });
+  try {
+    const { ok, data } = await adminFetch(`/api/v1/admin/packages?${q}`);
+    if (!ok) return tableMessage('packagesTableBody', 7, data.message || 'Could not load tour packages.', true);
+    const s = data.data.summary;
+    const on = val('pkStatus');
+    document.getElementById('packageChips').innerHTML = [
+      ['', 'All', s.all], ['published', 'Published', s.published], ['draft', 'Draft', s.draft],
+      ['hidden', 'Hidden', s.hidden], ['byPlejar', 'Hidden by Plejar', s.byPlejar], ['cancelled', 'Cancelled', s.cancelled]
+    ].map(([key, text, n]) => `<button type="button" class="chip${on === key ? ' chip-active' : ''}" onclick="applyPackageChip('${key}')"><strong>${Number(n) || 0}</strong> ${E(text)}</button>`).join('');
+    renderPager('packagesPager', data.data, 'loadPackages');
+    document.getElementById('packageTotals').textContent = data.data.total ? `${data.data.total} tour package${data.data.total === 1 ? '' : 's'}` : '';
+    V.pkgList = data.data.packages;
+    if (!V.pkgList.length) return tableMessage('packagesTableBody', 7, 'No tour packages match these filters.');
+    document.getElementById('packagesTableBody').innerHTML = V.pkgList.map(packageRow).join('');
+  } catch (e) {
+    tableMessage('packagesTableBody', 7, 'Failed to load tour packages.', true);
+  }
+}
+
+function packageRow(p) {
+  const a = p.agency || {};
+  const aid = E(a._id || '');
+  const photos = (p.photos || []).length;
+  const missing = p.planMissing && p.planMissing.length;
+  const seats = p.seats ? `${Number(p.travelers)} / ${Number(p.seats)}` : (p.travelers ? `${Number(p.travelers)} booked` : '—');
+  return `<tr class="${p.status === 'published' ? '' : 'row-muted'}">
+    <td><span class="lead-main">${E(p.title)}</span><span class="lead-sub">${E(p.destination || '')}${p.destination ? ', ' : ''}${photos} photo${photos === 1 ? '' : 's'}</span></td>
+    <td>${a._id ? `<a href="#" onclick="openVendor('${aid}'); return false;">${E(a.name)}</a>${a.status && a.status !== 'active' ? `<span class="lead-sub">${E(label(a.status))}</span>` : ''}` : '<span class="lead-sub" style="margin:0">Removed</span>'}</td>
+    <td style="white-space: nowrap;">${p.startDate ? `${E(fmtDate(p.startDate))}${p.endDate && p.endDate !== p.startDate ? `<span class="lead-sub">to ${E(fmtDate(p.endDate))}</span>` : ''}` : '<span class="lead-sub" style="margin:0">No date</span>'}<span class="lead-sub">${Number(p.durationDays) || 0}D / ${Number(p.durationNights || 0)}N</span></td>
+    <td>${seats}<span class="lead-sub">${Number(p.bookings)} booking${p.bookings === 1 ? '' : 's'}</span></td>
+    <td style="white-space: nowrap;">${takaFmt(p.priceFrom)}</td>
+    <td><span class="badge ${PACKAGE_BADGE[p.status] || 'badge-inactive'}">${E(label(p.status))}</span>${p.hiddenByAdmin ? '<span class="lead-sub">Hidden by Plejar</span>' : ''}${p.status === 'cancelled' && p.cancelReason ? `<span class="lead-sub">${E(p.cancelReason)}</span>` : ''}
+      <span class="lead-sub" style="${missing ? 'color: var(--color-warning, #b7791f)' : ''}">${missing ? `Plan missing ${p.planMissing.length}` : 'Plan complete'}</span></td>
+    <td style="text-align: right;"><div class="lead-actions" style="justify-content: flex-end;"><button class="btn btn-secondary btn-sm" onclick="showEventPlan('${E(p._id)}')">View plan</button>${p.status === 'cancelled' || !a._id ? '' : p.hiddenByAdmin
+      ? `<button class="btn btn-secondary btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', false)">Allow again</button>`
+      : `<button class="btn btn-danger btn-sm" onclick="moderateVendorPackage('${aid}', '${E(p._id)}', true)">Hide</button>`}</div></td></tr>`;
+}
+
 // ---------- Shared option lists (categories, vendors) ----------
 
 async function ensureCategories(force) {
@@ -190,7 +246,7 @@ function fillVendorSelects() {
   const list = V.vendorOptions.filter(v => (v.kind === 'hotel') === (V.kind === 'hotel'));
   const html = list.map(v => `<option value="${E(v.id)}">${E(v.name)}</option>`).join('');
   const first = V.kind === 'hotel' ? 'All hotels' : 'All travel agents';
-  ['bkVendor', 'vaVendor'].forEach(id => {
+  ['bkVendor', 'vaVendor', 'pkVendor'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { const keep = el.value; el.innerHTML = `<option value="">${first}</option>${html}`; el.value = list.some(v => v.id === keep) ? keep : ''; }
   });
