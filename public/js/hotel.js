@@ -198,10 +198,11 @@ async function boot() {
     }
     return showLogin('Could not load your hotel. Reload the page to try again.');
   }
-  // Tour agencies have their own panel
+  // Tour agencies have their own panel. Don't bounce them there: this browser may
+  // simply still be signed in to a tour account, so let them sign in to a hotel here.
   if (account.agency.kind !== 'hotel') {
-    window.location.replace('/agent');
-    return;
+    const name = account.agency.name ? ` (${account.agency.name})` : '';
+    return showLogin(`This browser is signed in to a tour agency account${name}. Sign in with your hotel account below, or use the tour agency link at the bottom.`);
   }
   state.me = account.me;
   if (state.me.mustChangePassword) return showPasswordStep();
