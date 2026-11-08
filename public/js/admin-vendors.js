@@ -168,7 +168,7 @@ async function loadVendors(page = 1) {
       <tr>
         <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info">
           <span class="user-cell-name">${E(v.name)}</span>
-          <span class="user-cell-email">${E((v.regions || []).join(', ')) || 'No areas listed'}</span>
+          <span class="user-cell-email">${v.kind === 'hotel' ? '<span class="tag">Hotel</span>' : (E((v.regions || []).join(', ')) || 'No areas listed')}</span>
           ${v.categories.length ? `<span class="tag-row">${v.categories.map(c => `<span class="tag">${E(c.name)}</span>`).join('')}</span>` : ''}</div></div></td>
         <td>${v.owner ? `<span class="lead-main">${E(v.owner.name)}</span><span class="lead-sub">${E(v.owner.email)}${v.owner.accountStatus === 'invited' ? ' · invite pending' : ''}</span>` : '—'}</td>
         <td>${v.packages.published}<span class="lead-sub">${v.packages.total} total</span></td>

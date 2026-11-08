@@ -13,12 +13,15 @@ const temporaryPassword = () => {
 // The email the admin copies and sends to a vendor.
 // kind 'new': a just-accepted agency; 'changed': Plejar set a new password on an existing account.
 // temporary: they must choose their own at the next sign-in.
-const credentialsEmail = ({ name, agencyName, email, password, loginURL, kind = 'new', temporary = true, vendorId }) => {
+// hotel: a hotel or resort rather than a tour agency
+const credentialsEmail = ({ name, agencyName, email, password, loginURL, kind = 'new', temporary = true, vendorId, hotel = false }) => {
   const opening = kind === 'new'
-    ? `Good news: ${agencyName} has been accepted as a Plejar member agency.`
+    ? `Good news: ${agencyName} has been accepted as a Plejar member ${hotel ? 'hotel' : 'agency'}.`
     : `Here are your new sign-in details for the ${agencyName} vendor panel on Plejar. Any password you used before no longer works.`;
   const closing = kind === 'new'
-    ? ['From the panel you can create tour events, publish announcements, see who registered and send updates to your travelers.', '', 'Welcome aboard,']
+    ? [hotel
+      ? 'Our team is preparing your hotel listing. From the panel you can follow it and keep your hotel details up to date.'
+      : 'From the panel you can create tour events, publish announcements, see who registered and send updates to your travelers.', '', 'Welcome aboard,']
     : ['If you did not ask for this, reply to this email straight away.', '', 'Thanks,'];
   return {
     subject: kind === 'new' ? `Your Plejar vendor account for ${agencyName}` : `Your new Plejar sign-in details (${agencyName})`,

@@ -2,8 +2,10 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const validator = require('validator');
 
-// A tour agency's membership application, sent from the website or the traveler app ("Travel Agency
-// Application") and reviewed by the master admin.
+// A membership application from a tour agency or a hotel, sent from the website or the traveler app
+// ("Travel Agency Application") and reviewed by the master admin. agencyName holds the business name either way.
+// A hotel's application also carries what its draft listing starts from (hotel).
+const { STAY_TYPES } = require('./hotelModel');
 // (Older records from the first contact form have no documents or reference; they still list and work.)
 
 const DOCUMENT_KINDS = ['trade_license', 'nid', 'tourism_license', 'insurance', 'tax_id', 'other'];
@@ -44,6 +46,7 @@ const APP_OPTIONS = {
   }
 };
 const keysOf = group => Object.keys(APP_OPTIONS[group]);
+const VENDOR_TYPES = ['agency', 'hotel'];
 const STATUSES = ['new', 'reviewing', 'needs_info', 'approved', 'rejected', 'contacted', 'archived'];
 const TEAM_SIZES = ['1', '2-5', '6-15', '16+'];
 
@@ -72,6 +75,15 @@ const agentLeadSchema = new mongoose.Schema(
     source: { type: String, enum: ['website', 'app'], default: 'website' },
     // The traveler who applied from the app (they follow it in My Account)
     applicant: { type: mongoose.Schema.ObjectId, ref: 'User', index: true },
+    vendorType: { type: String, enum: { values: VENDOR_TYPES, message: 'Choose a tour agency or a hotel' }, default: 'agency', index: true },
+    hotel: {
+      stayType: { type: String, enum: { values: [...STAY_TYPES, ''], message: 'Choose the kind of stay' }, default: '' },
+      rooms: { type: Number, min: [1, 'Enter how many rooms you have'], max: [5000, 'Enter how many rooms you have'] },
+      starRating: { type: Number, min: [1, 'Choose a star rating from 1 to 5'], max: [5, 'Choose a star rating from 1 to 5'] },
+      pricePerNight: { type: Number, min: [0, 'The price cannot be negative'], max: [10000000, 'Check the price per night'] },
+      checkIn: { type: String, trim: true, match: [/^$|^([01]\d|2[0-3]):[0-5]\d$/, 'Choose a check-in time'], default: '' },
+      checkOut: { type: String, trim: true, match: [/^$|^([01]\d|2[0-3]):[0-5]\d$/, 'Choose a check-out time'], default: '' }
+    },
 
     // The agency
     agencyName: {
@@ -160,6 +172,8 @@ const agentLeadSchema = new mongoose.Schema(
     decidedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
     decidedAt: Date,
     agency: { type: mongoose.Schema.ObjectId, ref: 'Agency' },
+    // A hotel's draft listing, made when the application is accepted
+    hotelListing: { type: mongoose.Schema.ObjectId, ref: 'Hotel' },
 
     ipAddress: {
       type: String,
@@ -189,6 +203,7 @@ agentLeadSchema.pre('save', function (next) {
 const AgentLead = mongoose.model('AgentLead', agentLeadSchema);
 AgentLead.DOCUMENT_KINDS = DOCUMENT_KINDS;
 AgentLead.STATUSES = STATUSES;
+AgentLead.VENDOR_TYPES = VENDOR_TYPES;
 AgentLead.TEAM_SIZES = TEAM_SIZES;
 AgentLead.APP_OPTIONS = APP_OPTIONS;
 module.exports = AgentLead;

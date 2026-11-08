@@ -99,14 +99,28 @@ function setupDocs() {
   });
 }
 
+const isHotel = () => document.getElementById('applyView').dataset.vendor === 'hotel';
+
+// Tour agency or hotel: the page swaps its labels and fields (CSS hides what doesn't fit)
+function setVendorType(type) {
+  const hotel = type === 'hotel';
+  document.getElementById('applyView').dataset.vendor = hotel ? 'hotel' : 'agency';
+  const form = document.getElementById('applyForm');
+  form.officeAddress.required = hotel;
+  form.about.placeholder = t(hotel ? 'phAboutHotel' : 'phAbout');
+  form.website.placeholder = hotel ? 'facebook.com/yourhotel' : 'facebook.com/youragency';
+  clearFormError('applyError');
+  updateCard();
+}
+
 // The member card fills in as the visitor types
 function updateCard() {
   const form = document.getElementById('applyForm');
   const name = document.getElementById('mcName');
   const value = form.agencyName.value.trim();
-  name.textContent = value || name.dataset.empty;
+  name.textContent = value || (isHotel() ? t('cardEmptyHotel') : name.dataset.empty);
   name.classList.toggle('is-empty', !value);
-  const place = [form.district.value.trim(), form.regions.value.trim()].filter(Boolean);
+  const place = [form.district.value.trim(), isHotel() ? '' : form.regions.value.trim()].filter(Boolean);
   document.getElementById('mcPlace').textContent = place.join(', ');
   const year = form.yearStarted.value.trim();
   document.getElementById('mcSince').textContent = /^\d{4}$/.test(year) ? year : '—';
@@ -133,10 +147,19 @@ async function handleApply(e) {
   const get = name => form[name].value.trim();
   const phone = get('phone').replace(/[\s-]/g, '');
   const year = get('yearStarted');
+  const hotel = isHotel();
+  const price = get('pricePerNight').replace(/[,\s]/g, '');
+  const rooms = get('rooms');
 
-  if (!get('agencyName')) return showFormError('applyError', t('errAgency'), form.agencyName);
+  if (!get('agencyName')) return showFormError('applyError', t(hotel ? 'errHotel' : 'errAgency'), form.agencyName);
   if (!get('tradeLicenseNumber')) return showFormError('applyError', t('errLicenseNo'), form.tradeLicenseNumber);
-  if (year && !/^(19[5-9]\d|20\d\d)$/.test(year)) return showFormError('applyError', t('errYear'), form.yearStarted);
+  if (year && !/^(19[5-9]\d|20\d\d)$/.test(year)) return showFormError('applyError', t(hotel ? 'errYearHotel' : 'errYear'), form.yearStarted);
+  if (hotel) {
+    if (!get('officeAddress')) return showFormError('applyError', t('errHotelAddress'), form.officeAddress);
+    if (!get('stayType')) return showFormError('applyError', t('errStayType'), form.stayType);
+    if (!/^\d+$/.test(price)) return showFormError('applyError', t('errPrice'), form.pricePerNight);
+    if (rooms && !(/^\d+$/.test(rooms) && Number(rooms) >= 1 && Number(rooms) <= 5000)) return showFormError('applyError', t('errRooms'), form.rooms);
+  }
   if (!get('contactName')) return showFormError('applyError', t('errName'), form.contactName);
   if (!BD_PHONE.test(phone)) return showFormError('applyError', t('errPhone'), form.phone);
   if (!EMAIL.test(get('email'))) return showFormError('applyError', t('errEmail'), form.email);
@@ -146,11 +169,18 @@ async function handleApply(e) {
   clearFormError('applyError');
 
   const body = new FormData();
-  ['agencyName', 'tradeLicenseNumber', 'yearStarted', 'teamSize', 'district', 'officeAddress', 'regions', 'website', 'about', 'contactName', 'contactRole', 'email', 'message']
+  body.append('vendorType', hotel ? 'hotel' : 'agency');
+  ['agencyName', 'tradeLicenseNumber', 'yearStarted', 'teamSize', 'district', 'officeAddress', 'website', 'about', 'contactName', 'contactRole', 'email', 'message']
     .forEach(name => body.append(name, get(name)));
+  if (hotel) {
+    ['stayType', 'starRating', 'rooms', 'checkIn', 'checkOut'].forEach(name => body.append(name, get(name)));
+    body.append('pricePerNight', price);
+  } else {
+    body.append('regions', get('regions'));
+    form.querySelectorAll('input[name="categories"]:checked').forEach(box => body.append('categories', box.value));
+  }
   body.append('phone', phone);
   body.append('agreedToTerms', 'true');
-  form.querySelectorAll('input[name="categories"]:checked').forEach(box => body.append('categories', box.value));
   Object.entries(picked).forEach(([kind, files]) => files.forEach(file => body.append(kind, file, file.name)));
 
   submit.disabled = true;
@@ -159,7 +189,7 @@ async function handleApply(e) {
     const res = await fetch('/api/v1/applications', { method: 'POST', body });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const key = res.status === 409 ? 'errDuplicate' : res.status === 429 ? 'errTooMany' : 'errApplyFailed';
+      const key = res.status === 409 ? (hotel ? 'errDuplicateHotel' : 'errDuplicate') : res.status === 429 ? 'errTooMany' : 'errApplyFailed';
       return showFormError('applyError', serverText(data, key));
     }
     showSent(data.data, get('email'));
@@ -199,9 +229,13 @@ function initApply() {
   form.addEventListener('submit', handleApply);
   ['agencyName', 'district', 'regions', 'yearStarted'].forEach(name => form[name].addEventListener('input', updateCard));
   form.agreedToTerms.addEventListener('change', () => form.querySelector('.agree').classList.remove('is-invalid'));
+  form.querySelectorAll('input[name="vendorType"]').forEach(radio => radio.addEventListener('change', () => setVendorType(radio.value)));
+  // /apply?type=hotel opens the hotel form straight away
+  const wanted = new URLSearchParams(location.search).get('type') === 'hotel' ? 'hotel' : (form.querySelector('input[name="vendorType"]:checked') || {}).value;
+  form.querySelector(`input[name="vendorType"][value="${wanted === 'hotel' ? 'hotel' : 'agency'}"]`).checked = true;
   setupDocs();
   loadCategories();
-  updateCard();
+  setVendorType(wanted);
 }
 
 // ---------- Status ----------
@@ -227,7 +261,7 @@ function timeline(app) {
 
 function banner(app) {
   const s = app.status;
-  if (s === 'approved') return `<div class="sr-banner is-good"><strong>${escapeHTML(t('bannerApproved'))}</strong>${escapeHTML(t('bannerApprovedText'))}</div>`;
+  if (s === 'approved') return `<div class="sr-banner is-good"><strong>${escapeHTML(t('bannerApproved'))}</strong>${escapeHTML(t(app.vendorType === 'hotel' ? 'bannerApprovedTextHotel' : 'bannerApprovedText'))}</div>`;
   if (s === 'rejected') return `<div class="sr-banner is-bad"><strong>${escapeHTML(t('bannerRejected'))}</strong>${escapeHTML(app.rejectedReason || '')}<br>${escapeHTML(t('bannerRejectedText'))}</div>`;
   if (s === 'needs_info') return `<div class="sr-banner is-warn"><strong>${escapeHTML(t('bannerInfo'))}</strong>${escapeHTML(t('bannerInfoText'))}</div>`;
   if (s === 'archived') return `<div class="sr-banner"><strong>${escapeHTML(t('bannerClosed'))}</strong>${escapeHTML(t('bannerClosedText'))}</div>`;
@@ -423,6 +457,8 @@ document.addEventListener('langchange', () => {
   if (isStatusPage) {
     if (status.app && !document.getElementById('statusResult').hidden) renderStatus(status.app);
   } else {
+    const form = document.getElementById('applyForm');
+    form.about.placeholder = t(isHotel() ? 'phAboutHotel' : 'phAbout');
     updateCard();
     document.querySelectorAll('#applyForm .doc').forEach(renderDoc);
   }

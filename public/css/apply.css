@@ -42,6 +42,22 @@
 .chip-pick input:checked + span { background: var(--tea); border-color: var(--tea); color: #fff; }
 .chip-pick input:focus-visible + span { outline: 3px solid var(--marigold); outline-offset: 2px; }
 
+/* Tour agency or hotel: the form shows only what fits the choice */
+.apply:not([data-vendor="hotel"]) [data-for="hotel"],
+.apply[data-vendor="hotel"] [data-for="agency"] { display: none !important; }
+.kind-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kind-pick { position: relative; cursor: pointer; }
+.kind-pick input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.kind-pick span {
+  display: block; height: 100%; padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--paper);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.kind-pick strong { display: block; font-size: 0.98rem; }
+.kind-pick small { display: block; font-size: 0.85rem; color: var(--ink-faint); margin-top: 2px; }
+.kind-pick input:checked + span { border-color: var(--tea); background: var(--tea-wash); box-shadow: inset 0 0 0 1px var(--tea); }
+.kind-pick input:focus-visible + span { outline: 3px solid var(--marigold); outline-offset: 2px; }
+@media (max-width: 420px) { .kind-picks { grid-template-columns: minmax(0, 1fr); } }
+
 /* Documents */
 .doc-list { display: grid; gap: 12px; }
 .doc {

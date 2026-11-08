@@ -18,6 +18,8 @@ const documentSchema = new mongoose.Schema(
 
 const agencySchema = new mongoose.Schema(
   {
+    // A tour agency runs tour events; a hotel manages its listing (see Hotel.agency). Both use the vendor panel.
+    kind: { type: String, enum: ['agency', 'hotel'], default: 'agency', index: true },
     name: {
       type: String,
       required: [true, 'Please enter the agency name'],

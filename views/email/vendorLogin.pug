@@ -3,7 +3,7 @@ extends baseEmail
 block content
   p Hi #{firstName},
   if kind === 'new'
-    p Good news: #{agencyName} has been accepted as a #{appName} member agency. Here are your sign-in details for the vendor panel.
+    p Good news: #{agencyName} has been accepted as a #{appName} member #{hotel ? 'hotel' : 'agency'}. Here are your sign-in details for the vendor panel.
   else
     p Here are your sign-in details for the #{agencyName} vendor panel on #{appName}. Any password you used before no longer works.
   table(role='presentation', border='0', cellpadding='0', cellspacing='0', style='margin:0 0 16px;border:1px solid #d8e2da;border-radius:8px;')

@@ -155,6 +155,7 @@ exports.listVendors = catchAsync(async (req, res, next) => {
       name: a.name,
       logo: a.logo,
       regions: a.regions,
+      kind: a.kind || 'agency',
       phone: a.phone,
       status: a.status,
       verified: a.verified,

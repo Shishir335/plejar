@@ -1,5 +1,6 @@
 const Agency = require('../models/agencyModel');
 const Package = require('../models/packageModel');
+const Hotel = require('../models/hotelModel');
 const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const validator = require('validator');
@@ -61,7 +62,7 @@ exports.requireAgent = catchAsync(async (req, res, next) => {
     return next(new AppError("Your account has the Vendor role but isn't linked to an agency yet. Ask a Plejar admin to choose your agency under Users > Change roles.", 403));
   }
   if (!hasRole(req.user, 'agent') || !req.user.agency) {
-    return next(new AppError('This area is for tour agency accounts only.', 403));
+    return next(new AppError('This area is for vendor accounts only.', 403));
   }
 
   const agency = await Agency.findById(req.user.agency);
@@ -120,7 +121,9 @@ exports.getMyAgency = catchAsync(async (req, res, next) => {
         agencyRole: req.user.agencyRole,
         mustChangePassword: Boolean(req.user.mustChangePassword)
       },
-      stats: { packages, teamSize, upcomingEvents, openRegistrations, announcements }
+      stats: { packages, teamSize, upcomingEvents, openRegistrations, announcements },
+      // A hotel account's listings, for the panel's overview
+      hotels: req.agency.kind === 'hotel' ? await Hotel.find({ agency: req.agency._id }).select('name type status pricePerNight photos description checkIn checkOut phone').lean() : undefined
     }
   });
 });

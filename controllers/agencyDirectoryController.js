@@ -51,7 +51,8 @@ const agencyCardView = (a, n) => {
  */
 exports.listAgencies = catchAsync(async (req, res) => {
   const q = req.query;
-  const filter = { status: 'active' };
+  // Hotels that joined Plejar are shown as hotel listings, not as tour agencies
+  const filter = { status: 'active', kind: { $ne: 'hotel' } };
   if (q.search) {
     const rx = { $regex: escapeRegex(String(q.search).trim()), $options: 'i' };
     filter.$or = [{ name: rx }, { regions: rx }, { description: rx }];
@@ -87,14 +88,14 @@ exports.listAgencies = catchAsync(async (req, res) => {
 // Filters for the Agents tab: regions agencies cover and the vendor categories
 exports.filters = catchAsync(async (req, res) => {
   const [regions, categories] = await Promise.all([
-    Agency.distinct('regions', { status: 'active' }),
+    Agency.distinct('regions', { status: 'active', kind: { $ne: 'hotel' } }),
     VendorCategory.find({ active: true }).sort({ name: 1 }).select('name').lean()
   ]);
   res.status(200).json({ status: 'success', data: { regions: regions.filter(Boolean).sort((a, b) => a.localeCompare(b)), categories } });
 });
 
 exports.getAgency = catchAsync(async (req, res, next) => {
-  const agency = validId(req.params.id) ? await Agency.findOne({ _id: req.params.id, status: 'active' }).populate('categories', 'name').lean() : null;
+  const agency = validId(req.params.id) ? await Agency.findOne({ _id: req.params.id, status: 'active', kind: { $ne: 'hotel' } }).populate('categories', 'name').lean() : null;
   if (!agency) return next(new AppError('This agency is not available.', 404));
   const n = await agencyNumbers([agency._id], req.user);
   const [events, reviews, announcements, counts] = await Promise.all([
@@ -176,7 +177,7 @@ exports.wallMedia = catchAsync(async (req, res) => {
 });
 
 exports.follow = catchAsync(async (req, res, next) => {
-  const agency = validId(req.params.id) ? await Agency.findOne({ _id: req.params.id, status: 'active' }).select('name') : null;
+  const agency = validId(req.params.id) ? await Agency.findOne({ _id: req.params.id, status: 'active', kind: { $ne: 'hotel' } }).select('name') : null;
   if (!agency) return next(new AppError('This agency is not available.', 404));
   await Follow.updateOne({ follower: req.user._id, targetType: 'agency', target: agency._id }, { $setOnInsert: { follower: req.user._id, targetType: 'agency', target: agency._id } }, { upsert: true });
   res.status(200).json({ status: 'success', message: `You're following ${agency.name}. Their new tours show up for you first.`, data: { following: true } });

@@ -6,6 +6,7 @@ const places = require('../controllers/vendorDestinationController');
 const guides = require('../controllers/guideController');
 const ads = require('../controllers/adController');
 const wall = require('../controllers/agencyWallController');
+const hotels = require('../controllers/vendorHotelController');
 const { postMediaUpload } = require('../utils/social');
 const { imageUpload, documentUpload } = require('../utils/uploads');
 
@@ -15,6 +16,15 @@ const router = express.Router();
 router.use(authController.protect, agencyController.requireAgent);
 
 router.get('/me', agencyController.getMyAgency);
+
+// A hotel account has its listing instead of the tour pages
+router.use(
+  ['/me/guides', '/me/ads', '/me/packages', '/me/destinations', '/me/destination-geography', '/me/announcements', '/me/audience',
+    '/me/broadcasts', '/me/bookings', '/me/earnings', '/me/payouts', '/me/posts', '/me/followers', '/me/comments'],
+  hotels.toursOnly
+);
+router.get('/me/hotels', hotels.hotelsOnly, hotels.listMyHotels);
+router.patch('/me/hotels/:id', hotels.hotelsOnly, agencyController.requireOwner, hotels.updateMyHotel);
 
 // Tour guides shown on the app's tour page
 router.route('/me/guides').get(guides.listGuides).post(imageUpload.single('photo'), guides.createGuide);

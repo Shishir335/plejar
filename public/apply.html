@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Apply for membership — Plejar</title>
-  <meta name="description" content="Tour agencies in Bangladesh can apply to join Plejar. Send your agency details, trade license and owner's NID, and our team reviews them within 3 working days.">
+  <meta name="description" content="Tour agencies, hotels and resorts in Bangladesh can apply to join Plejar. Send your details, trade license and owner's NID, and our team reviews them within 3 working days.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Tiro+Bangla&display=swap">
@@ -31,19 +31,26 @@
   <main id="main">
 
     <!-- ===== Apply ===== -->
-    <section class="apply" id="applyView" hidden>
+    <section class="apply" id="applyView" data-vendor="agency" hidden>
       <div class="wrap apply-head">
-        <h1 class="apply-title" data-i18n="applyTitle">Join Plejar as a member agency</h1>
-        <p class="apply-lead" data-i18n="applyLead">Tell us about your agency and send your trade license and the owner's national ID. Our team checks every application by hand and replies within 3 working days.</p>
+        <h1 class="apply-title"><span data-for="agency" data-i18n="applyTitle">Join Plejar as a member agency</span><span data-for="hotel" data-i18n="applyTitleHotel">Join Plejar as a member hotel</span></h1>
+        <p class="apply-lead"><span data-for="agency" data-i18n="applyLead">Tell us about your agency and send your trade license and the owner's national ID. Our team checks every application by hand and replies within 3 working days.</span><span data-for="hotel" data-i18n="applyLeadHotel">Tell us about your hotel or resort and send your trade license and the owner's national ID. Our team checks every application by hand and replies within 3 working days, then prepares your listing on Plejar.</span></p>
       </div>
 
       <div class="wrap apply-grid">
         <form id="applyForm" class="apply-form" novalidate>
 
           <fieldset class="apply-part">
-            <legend><span class="part-no">1</span><span data-i18n="partAgency">Your agency</span></legend>
+            <legend><span class="part-no">1</span><span data-for="agency" data-i18n="partAgency">Your agency</span><span data-for="hotel" data-i18n="partHotel">Your hotel</span></legend>
             <div class="field">
-              <label for="agencyName" data-i18n="lblAgency">Agency name *</label>
+              <span class="field-label" id="vendorTypeLabel" data-i18n="lblVendorType">What are you registering? *</span>
+              <div class="kind-picks" role="radiogroup" aria-labelledby="vendorTypeLabel">
+                <label class="kind-pick"><input type="radio" name="vendorType" value="agency" checked><span><strong data-i18n="optAgency">Tour agency</strong><small data-i18n="optAgencyHint">You run trips and tours</small></span></label>
+                <label class="kind-pick"><input type="radio" name="vendorType" value="hotel"><span><strong data-i18n="optHotel">Hotel or resort</strong><small data-i18n="optHotelHint">Guests stay with you overnight</small></span></label>
+              </div>
+            </div>
+            <div class="field">
+              <label for="agencyName"><span data-for="agency" data-i18n="lblAgency">Agency name *</span><span data-for="hotel" data-i18n="lblHotelName">Hotel or resort name *</span></label>
               <input id="agencyName" name="agencyName" type="text" required maxlength="120" autocomplete="organization">
             </div>
             <div class="field-row">
@@ -58,7 +65,7 @@
             </div>
             <div class="field-row">
               <div class="field">
-                <label for="district" data-i18n="lblDistrict">Office district</label>
+                <label for="district"><span data-for="agency" data-i18n="lblDistrict">Office district</span><span data-for="hotel" data-i18n="lblDistrictHotel">District</span></label>
                 <input id="district" name="district" type="text" maxlength="60" list="districtList" autocomplete="address-level2" placeholder="Dhaka">
                 <datalist id="districtList"></datalist>
               </div>
@@ -74,14 +81,62 @@
               </div>
             </div>
             <div class="field">
-              <label for="officeAddress" data-i18n="lblAddress">Office address</label>
+              <label for="officeAddress"><span data-for="agency" data-i18n="lblAddress">Office address</span><span data-for="hotel" data-i18n="lblAddressHotel">Hotel address *</span></label>
               <input id="officeAddress" name="officeAddress" type="text" maxlength="300" autocomplete="street-address">
             </div>
-            <div class="field">
+            <div class="hotel-fields" data-for="hotel">
+              <div class="field-row">
+                <div class="field">
+                  <label for="stayType" data-i18n="lblStayType">Kind of stay *</label>
+                  <select id="stayType" name="stayType">
+                    <option value="" data-i18n="optChoose">Choose</option>
+                    <option value="hotel" data-i18n="stayHotel">Hotel</option>
+                    <option value="resort" data-i18n="stayResort">Resort</option>
+                    <option value="eco_resort" data-i18n="stayEco">Eco resort</option>
+                    <option value="cottage" data-i18n="stayCottage">Cottage</option>
+                    <option value="guest_house" data-i18n="stayGuest">Guest house</option>
+                    <option value="homestay" data-i18n="stayHome">Homestay</option>
+                    <option value="houseboat" data-i18n="stayBoat">Houseboat</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="starRating" data-i18n="lblStars">Star rating</label>
+                  <select id="starRating" name="starRating">
+                    <option value="" data-i18n="optNoStars">Not rated</option>
+                    <option value="1" data-i18n="star1">1 star</option>
+                    <option value="2" data-i18n="star2">2 stars</option>
+                    <option value="3" data-i18n="star3">3 stars</option>
+                    <option value="4" data-i18n="star4">4 stars</option>
+                    <option value="5" data-i18n="star5">5 stars</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="pricePerNight" data-i18n="lblPrice">Lowest price per night (৳) *</label>
+                  <input id="pricePerNight" name="pricePerNight" type="number" inputmode="numeric" min="0" step="1" placeholder="3500">
+                </div>
+                <div class="field">
+                  <label for="rooms" data-i18n="lblRooms">Number of rooms</label>
+                  <input id="rooms" name="rooms" type="number" inputmode="numeric" min="1" max="5000" step="1" placeholder="24">
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="checkIn" data-i18n="lblCheckIn">Check-in time</label>
+                  <input id="checkIn" name="checkIn" type="time">
+                </div>
+                <div class="field">
+                  <label for="checkOut" data-i18n="lblCheckOut">Check-out time</label>
+                  <input id="checkOut" name="checkOut" type="time">
+                </div>
+              </div>
+            </div>
+            <div class="field" data-for="agency">
               <label for="regions" data-i18n="lblRegions">Where do you run tours?</label>
               <input id="regions" name="regions" type="text" maxlength="200" placeholder="Sajek, Bandarban, Cox's Bazar" data-i18n-attr="placeholder:phRegions">
             </div>
-            <div class="field" id="categoryField" hidden>
+            <div class="field" id="categoryField" data-for="agency" hidden>
               <span class="field-label" id="categoryLabel" data-i18n="lblTourTypes">Kinds of tours you run</span>
               <div class="chip-picks" id="categoryPicks" role="group" aria-labelledby="categoryLabel"></div>
             </div>
@@ -90,14 +145,14 @@
               <input id="website" name="website" type="text" maxlength="200" placeholder="facebook.com/youragency">
             </div>
             <div class="field">
-              <label for="about" data-i18n="lblAbout">Describe your agency in a few lines</label>
-              <textarea id="about" name="about" rows="3" maxlength="1500" data-i18n-attr="placeholder:phAbout" placeholder="The trips you are known for, group sizes, what travelers like about you"></textarea>
+              <label for="about"><span data-for="agency" data-i18n="lblAbout">Describe your agency in a few lines</span><span data-for="hotel" data-i18n="lblAboutHotel">Describe your hotel in a few lines</span></label>
+              <textarea id="about" name="about" rows="3" maxlength="1500" placeholder="The trips you are known for, group sizes, what travelers like about you"></textarea>
             </div>
           </fieldset>
 
           <fieldset class="apply-part">
             <legend><span class="part-no">2</span><span data-i18n="partYou">You</span></legend>
-            <p class="part-note" data-i18n="partYouNote">If we accept the application, this person gets the owner's sign-in for the agency panel.</p>
+            <p class="part-note"><span data-for="agency" data-i18n="partYouNote">If we accept the application, this person gets the owner's sign-in for the agency panel.</span><span data-for="hotel" data-i18n="partYouNoteHotel">If we accept the application, this person gets the owner's sign-in for the hotel's vendor panel.</span></p>
             <div class="field-row">
               <div class="field">
                 <label for="contactName" data-i18n="lblName">Your name *</label>
@@ -142,7 +197,7 @@
               </div>
               <div class="doc" data-kind="tourism_license" data-max="1">
                 <div class="doc-text">
-                  <strong data-i18n="docTourism">Tourism license or TOAB membership</strong>
+                  <strong><span data-for="agency" data-i18n="docTourism">Tourism license or TOAB membership</span><span data-for="hotel" data-i18n="docTourismHotel">Hotel registration or tourism license</span></strong>
                   <span data-i18n="docTourismHint">If you have one. It helps us review faster.</span>
                   <ul class="doc-files" aria-live="polite"></ul>
                 </div>
@@ -151,7 +206,7 @@
               <div class="doc" data-kind="other" data-max="2">
                 <div class="doc-text">
                   <strong data-i18n="docOther">Anything else</strong>
-                  <span data-i18n="docOtherHint">For example a brochure or photos from past trips.</span>
+                  <span><span data-for="agency" data-i18n="docOtherHint">For example a brochure or photos from past trips.</span><span data-for="hotel" data-i18n="docOtherHintHotel">For example photos of your rooms or a price list.</span></span>
                   <ul class="doc-files" aria-live="polite"></ul>
                 </div>
                 <label class="btn btn-outline doc-pick"><span data-i18n="docAdd">Add file</span><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden></label>
@@ -167,7 +222,7 @@
             </div>
             <label class="agree">
               <input type="checkbox" id="agreedToTerms" name="agreedToTerms" value="true">
-              <span data-i18n="agreeText">I confirm these details are true, that I can act for this agency, and that Plejar may check them with the issuing offices.</span>
+              <span><span data-for="agency" data-i18n="agreeText">I confirm these details are true, that I can act for this agency, and that Plejar may check them with the issuing offices.</span><span data-for="hotel" data-i18n="agreeTextHotel">I confirm these details are true, that I can act for this hotel, and that Plejar may check them with the issuing offices.</span></span>
             </label>
             <p class="form-error" id="applyError" role="alert" hidden></p>
             <button type="submit" class="btn btn-dark btn-block apply-submit" id="applySubmit" data-i18n="applySubmit">Send application</button>
@@ -178,7 +233,7 @@
           <div class="member-card" id="memberCard">
             <div class="mc-top">
               <span class="mc-logo">plejar<span class="logo-dot"></span></span>
-              <span class="mc-kind" data-i18n="cardKind">Member agency</span>
+              <span class="mc-kind"><span data-for="agency" data-i18n="cardKind">Member agency</span><span data-for="hotel" data-i18n="cardKindHotel">Member hotel</span></span>
             </div>
             <p class="mc-name" id="mcName" data-empty="Your agency" data-i18n-attr="data-empty:cardEmptyName">Your agency</p>
             <p class="mc-place" id="mcPlace"></p>
@@ -243,6 +298,7 @@
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
+  <script src="/js/picker-only.js"></script>
   <script src="/js/i18n.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/apply.js"></script>

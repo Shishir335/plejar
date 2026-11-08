@@ -1,5 +1,6 @@
 const AgentLead = require('../models/agentLeadModel');
 const Agency = require('../models/agencyModel');
+const Hotel = require('../models/hotelModel');
 const User = require('../models/userModel');
 const VendorCategory = require('../models/vendorCategoryModel');
 const catchAsync = require('../utils/catchAsync');
@@ -61,7 +62,7 @@ exports.listApplications = catchAsync(async (req, res) => {
       .sort({ unreadReply: -1, createdAt: q.sort === 'oldest' ? 1 : -1 })
       .skip(page.skip)
       .limit(page.limit)
-      .select('reference source agencyName contactName phone email regions district status unreadReply documents.kind createdAt decidedAt agency')
+      .select('reference source vendorType hotel.stayType agencyName contactName phone email regions district status unreadReply documents.kind createdAt decidedAt agency')
       .populate('agency', 'name')
       .lean(),
     AgentLead.countDocuments(filter)
@@ -90,7 +91,8 @@ exports.getApplication = catchAsync(async (req, res, next) => {
   await lead.populate([
     { path: 'categories', select: 'name active' },
     { path: 'decidedBy', select: 'name' },
-    { path: 'agency', select: 'name status verified' },
+    { path: 'agency', select: 'name status verified kind' },
+    { path: 'hotelListing', select: 'name status' },
     { path: 'applicant', select: 'name email phone' }
   ]);
 
@@ -191,11 +193,34 @@ const credentialsFor = (req, owner, agency, password) => {
     loginURL,
     vendorId,
     temporary: true,
-    emailDraft: credentialsEmail({ name: owner.name, agencyName: agency.name, email: owner.email, password, loginURL, vendorId })
+    emailDraft: credentialsEmail({ name: owner.name, agencyName: agency.name, email: owner.email, password, loginURL, vendorId, hotel: agency.kind === 'hotel' })
   };
 };
 
-// Accept the agency: create it, carry the documents over, and invite the applicant as its owner
+// A hotel's draft listing, from what it told us when applying. Plejar staff add photos and publish it.
+const draftHotel = (lead, agency, userId) => {
+  const h = lead.hotel || {};
+  return new Hotel({
+    name: lead.agencyName,
+    type: h.stayType || 'hotel',
+    description: (lead.about || '').slice(0, 3000),
+    address: (lead.officeAddress || '').slice(0, 200),
+    phone: lead.phone,
+    website: lead.website,
+    starRating: h.starRating || null,
+    pricePerNight: h.pricePerNight || 0,
+    rooms: h.rooms || null,
+    checkIn: h.checkIn || '',
+    checkOut: h.checkOut || '',
+    agency: agency._id,
+    sourceLead: lead._id,
+    status: 'draft',
+    createdBy: userId
+  });
+};
+
+// Accept the agency or hotel: create it, carry the documents over, and invite the applicant as its owner.
+// A hotel also gets a draft listing.
 exports.approve = catchAsync(async (req, res, next) => {
   const lead = await findLead(req.params.id, next, '+documents.file');
   if (!lead || decidedAlready(lead, next)) return;
@@ -216,13 +241,16 @@ exports.approve = catchAsync(async (req, res, next) => {
   const wantedCategories = req.body.categories !== undefined ? [].concat(req.body.categories) : lead.categories.map(String);
   const categories = (await VendorCategory.find({ _id: { $in: wantedCategories.filter(validId) } }).select('_id')).map(c => c._id);
 
+  const isHotel = lead.vendorType === 'hotel';
   const agency = new Agency({
+    kind: isHotel ? 'hotel' : 'agency',
     name: lead.agencyName,
+    address: isHotel ? (lead.officeAddress || '').slice(0, 200) : undefined,
     description: lead.about,
     phone: lead.phone,
     email: lead.email,
     website: lead.website,
-    regions: toList(lead.regions),
+    regions: isHotel ? [] : toList(lead.regions),
     tradeLicenseNumber: lead.tradeLicenseNumber,
     categories,
     sourceLead: lead._id,
@@ -282,6 +310,24 @@ exports.approve = catchAsync(async (req, res, next) => {
     throw err;
   }
 
+  let hotel = null;
+  if (isHotel) {
+    try {
+      hotel = await draftHotel(lead, agency, req.user._id).save();
+    } catch (err) {
+      // Put things back as they were, so the application can be approved again
+      if (existing) {
+        owner.agency = undefined;
+        owner.agencyRole = undefined;
+        await owner.save({ validateBeforeSave: false });
+      } else await User.findByIdAndDelete(owner._id);
+      await Agency.findByIdAndDelete(agency._id);
+      await removePrivateFolder(agency._id);
+      throw err;
+    }
+    lead.hotelListing = hotel._id;
+  }
+
   lead.status = 'approved';
   lead.agency = agency._id;
   lead.unreadReply = false;
@@ -291,7 +337,7 @@ exports.approve = catchAsync(async (req, res, next) => {
 
   await logActivity(req, {
     action: 'agency.created',
-    summary: `Membership application${lead.reference ? ` ${lead.reference}` : ''} approved${agency.verified ? ' and verified' : ''}; vendor account created for ${owner.name}`,
+    summary: `${isHotel ? 'Hotel' : 'Membership'} application${lead.reference ? ` ${lead.reference}` : ''} approved${agency.verified ? ' and verified' : ''}; vendor account created for ${owner.name}${hotel ? ', with a draft hotel listing' : ''}`,
     agency: agency._id
   });
 
@@ -300,7 +346,7 @@ exports.approve = catchAsync(async (req, res, next) => {
   let emailSent = null;
   if (!existing && (req.body.send === true || req.body.send === 'true')) {
     try {
-      await new Email(owner, credentials.loginURL, { agencyName: agency.name, vendorCode: credentials.vendorId, email: owner.email, password, temporary: true, kind: 'new' }).sendVendorLogin(credentials.emailDraft.subject);
+      await new Email(owner, credentials.loginURL, { agencyName: agency.name, vendorCode: credentials.vendorId, email: owner.email, password, temporary: true, kind: 'new', hotel: isHotel }).sendVendorLogin(credentials.emailDraft.subject);
       emailSent = true;
       owner.credentialsSentAt = new Date();
       await owner.save({ validateBeforeSave: false });
@@ -312,7 +358,7 @@ exports.approve = catchAsync(async (req, res, next) => {
   // An existing account keeps its password, so the email only says the vendor panel is open
   if (existing && (req.body.send === true || req.body.send === 'true')) {
     try {
-      await new Email(owner, `${req.protocol}://${req.get('host')}/agent`, { agencyName: agency.name, email: owner.email }).sendVendorAccepted();
+      await new Email(owner, `${req.protocol}://${req.get('host')}/agent`, { agencyName: agency.name, email: owner.email, hotel: isHotel }).sendVendorAccepted();
       emailSent = true;
     } catch (err) {
       console.warn(`[MAIL WARNING] Acceptance email to ${owner.email} not sent:`, err.message);
@@ -326,13 +372,15 @@ exports.approve = catchAsync(async (req, res, next) => {
     const told = { true: ` They were emailed at ${owner.email}.`, false: " The email couldn't be sent, so let them know yourself." }[emailSent] || '';
     message = `${agency.name} is now a member. ${owner.name} already has a Plejar account, so they sign in to the vendor panel with their usual email and password.${told}`;
   }
+  if (hotel) message += ' Its hotel listing was saved as a draft: add photos and publish it from Hotels.';
 
   res.status(201).json({
     status: 'success',
     message,
     data: {
       application: lead,
-      agency: { _id: agency._id, name: agency.name, verified: agency.verified },
+      agency: { _id: agency._id, name: agency.name, verified: agency.verified, kind: agency.kind },
+      hotel: hotel && { _id: hotel._id, name: hotel.name, status: hotel.status },
       emailSent,
       credentials
     }

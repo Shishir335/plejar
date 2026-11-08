@@ -39,6 +39,12 @@ const hotelSchema = new mongoose.Schema(
     checkIn: { type: String, trim: true, maxlength: 10, default: '' },
     checkOut: { type: String, trim: true, maxlength: 10, default: '' },
 
+    rooms: { type: Number, min: [1, 'Enter how many rooms there are'], default: null },
+
+    // The hotel's own vendor account, when the hotel joined through /apply. Plejar still publishes the listing.
+    agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', index: true },
+    sourceLead: { type: mongoose.Schema.ObjectId, ref: 'AgentLead' },
+
     featured: { type: Boolean, default: false },
     status: { type: String, enum: ['draft', 'published', 'hidden'], default: 'draft', index: true },
     viewCount: { type: Number, default: 0 },

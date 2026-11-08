@@ -1,4 +1,5 @@
 const AgentLead = require('../models/agentLeadModel');
+const { STAY_TYPES } = require('../models/hotelModel');
 const User = require('../models/userModel');
 const VendorCategory = require('../models/vendorCategoryModel');
 const catchAsync = require('../utils/catchAsync');
@@ -16,6 +17,29 @@ const OPEN_STATUSES = ['new', 'reviewing', 'needs_info', 'contacted'];
 const text = value => {
   const first = Array.isArray(value) ? value[0] : value;
   return first == null ? '' : String(first).trim();
+};
+
+// "" stays empty; anything else must be a whole number
+const whole = value => (value === '' ? undefined : Number(value));
+
+// What a hotel tells us on top of the shared fields; its draft listing starts from these
+const readHotel = b => ({
+  stayType: text(b.stayType),
+  rooms: whole(text(b.rooms)),
+  starRating: whole(text(b.starRating)),
+  pricePerNight: whole(text(b.pricePerNight).replace(/[,\s]/g, '')),
+  checkIn: text(b.checkIn),
+  checkOut: text(b.checkOut)
+});
+
+const hotelProblem = (hotel, values) => {
+  if (!values.officeAddress) return "Enter the hotel's address.";
+  if (!STAY_TYPES.includes(hotel.stayType)) return 'Choose the kind of stay.';
+  if (hotel.pricePerNight === undefined) return 'Enter the lowest price per night.';
+  if (!Number.isInteger(hotel.pricePerNight) || hotel.pricePerNight < 0) return 'Enter the price per night in taka, for example 3500.';
+  if (hotel.rooms !== undefined && !Number.isInteger(hotel.rooms)) return 'Enter how many rooms you have, for example 24.';
+  if (hotel.starRating !== undefined && ![1, 2, 3, 4, 5].includes(hotel.starRating)) return 'Choose a star rating from 1 to 5.';
+  return null;
 };
 
 const folderFor = lead => `application-${lead._id}`;
@@ -48,6 +72,7 @@ const mail = async (lead, url, send) => {
 // What the applicant may see about their own application (never internal notes or who reviewed it)
 const publicView = lead => ({
   reference: lead.reference,
+  vendorType: lead.vendorType || 'agency',
   agencyName: lead.agencyName,
   contactName: lead.contactName,
   status: lead.status === 'contacted' ? 'reviewing' : lead.status,
@@ -65,9 +90,12 @@ exports.listCategories = catchAsync(async (req, res) => {
   res.status(200).json({ status: 'success', data: { categories } });
 });
 
-// PUBLIC: A tour agency applies for membership
+// PUBLIC: A tour agency or a hotel applies for membership (vendorType: agency | hotel)
 exports.createApplication = catchAsync(async (req, res, next) => {
   const b = req.body;
+  const vendorType = text(b.vendorType) || 'agency';
+  if (!AgentLead.VENDOR_TYPES.includes(vendorType)) return next(new AppError('Choose whether you are a tour agency or a hotel.', 400));
+  const isHotel = vendorType === 'hotel';
   const values = {
     agencyName: text(b.agencyName),
     tradeLicenseNumber: text(b.tradeLicenseNumber),
@@ -85,11 +113,18 @@ exports.createApplication = catchAsync(async (req, res, next) => {
     message: text(b.message)
   };
 
-  if (!values.agencyName) return next(new AppError('Enter your agency name.', 400));
+  if (!values.agencyName) return next(new AppError(isHotel ? 'Enter your hotel name.' : 'Enter your agency name.', 400));
   if (!values.tradeLicenseNumber) return next(new AppError('Enter your trade license number.', 400));
   if (!values.contactName) return next(new AppError('Enter your name.', 400));
   if (!BD_PHONE.test(values.phone)) return next(new AppError('Enter a Bangladeshi mobile number, for example 01712345678.', 400));
-  if (values.yearStarted !== undefined && !Number.isInteger(values.yearStarted)) return next(new AppError('Enter the year your agency started, for example 2018.', 400));
+  if (values.yearStarted !== undefined && !Number.isInteger(values.yearStarted)) return next(new AppError(`Enter the year your ${isHotel ? 'hotel' : 'agency'} started, for example 2018.`, 400));
+  const hotel = isHotel ? readHotel(b) : undefined;
+  if (isHotel) {
+    const problem = hotelProblem(hotel, values);
+    if (problem) return next(new AppError(problem, 400));
+    // A hotel isn't asked where it runs tours or what kinds of tours
+    values.regions = '';
+  }
 
   const files = req.files || {};
   if (!files.trade_license || !files.trade_license.length) return next(new AppError('Upload a photo or PDF of your trade license.', 400));
@@ -105,7 +140,7 @@ exports.createApplication = catchAsync(async (req, res, next) => {
     ]
   }).select('_id');
   if (open) {
-    return next(new AppError('We already have an application for this agency that is being reviewed. Check it with the reference number we emailed you.', 409));
+    return next(new AppError(`We already have an application for this ${isHotel ? 'hotel' : 'agency'} that is being reviewed. Check it with the reference number we emailed you.`, 409));
   }
   // One person, one login: someone who already uses Plejar applies with the same email, and the
   // vendor role is added to that account when an admin accepts. Only one agency per account, though.
@@ -118,12 +153,12 @@ exports.createApplication = catchAsync(async (req, res, next) => {
   }
 
   // Only categories the admin has switched on
-  const wanted = [].concat(b.categories || []).map(String).filter(id => /^[a-f\d]{24}$/i.test(id));
+  const wanted = isHotel ? [] : [].concat(b.categories || []).map(String).filter(id => /^[a-f\d]{24}$/i.test(id));
   const categories = wanted.length
     ? (await VendorCategory.find({ _id: { $in: wanted }, active: true }).select('_id')).map(c => c._id)
     : [];
 
-  const lead = new AgentLead({ ...values, categories, agreedToTerms: true, agreedAt: new Date(), ipAddress: req.ip || '' });
+  const lead = new AgentLead({ ...values, vendorType, ...(isHotel ? { hotel } : {}), categories, agreedToTerms: true, agreedAt: new Date(), ipAddress: req.ip || '' });
   await lead.validate();
   try {
     lead.documents = await storeFiles(files, lead);

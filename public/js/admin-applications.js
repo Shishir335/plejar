@@ -67,7 +67,7 @@ async function loadApplications(page = AP.page) {
   } else {
     document.getElementById('applicationsTableBody').innerHTML = rows.map(r => `
       <tr class="row-link" onclick="openApplication('${E(r._id)}')">
-        <td><span class="lead-main">${E(r.agencyName)}</span><span class="lead-sub">${r.reference ? E(r.reference) : 'From the old contact form'}${r.source === 'app' ? ' · from the app' : ''}</span></td>
+        <td><span class="lead-main">${E(r.agencyName)}${r.vendorType === 'hotel' ? ' <span class="tag">Hotel</span>' : ''}</span><span class="lead-sub">${r.reference ? E(r.reference) : 'From the old contact form'}${r.source === 'app' ? ' · from the app' : ''}</span></td>
         <td><span class="lead-main">${E(r.contactName)}</span><span class="lead-sub">${E(r.phone)}</span></td>
         <td><span class="lead-sub" style="margin-top:0">${E([r.district, r.regions].filter(Boolean).join(': ')) || '—'}</span></td>
         <td>${r.documentCount
@@ -143,8 +143,24 @@ function applicationChecks(app, checks) {
   return notes.map(([kind, text]) => `<div class="callout ${cls[kind]}"><div>${E(text)}</div></div>`).join('');
 }
 
+const STAY_NAMES = { hotel: 'Hotel', resort: 'Resort', cottage: 'Cottage', guest_house: 'Guest house', homestay: 'Homestay', eco_resort: 'Eco resort', houseboat: 'Houseboat' };
+
+// The draft listing an approved hotel got, opened in Content > Hotels
+async function openHotelListing(id) {
+  closeModal('approveModal');
+  const a = AP.detail.application;
+  const search = document.getElementById('hSearch');
+  if (search) search.value = (a.hotelListing && a.hotelListing.name) || a.agencyName || '';
+  switchTab('content');
+  switchContentSub('hotels');
+  await loadHotels(1);
+  if (C.hotels.some(h => h._id === id)) openHotel(id);
+}
+
 function renderApplication() {
   const { application: a, checks, statusURL, appOptions = {} } = AP.detail;
+  const isHotel = a.vendorType === 'hotel';
+  const h = a.hotel || {};
   const opt = (group, key) => ((appOptions[group] || {})[key]) || key || '';
   const biz = a.business || {};
   // Applications from the app's 3-step form carry business details too
@@ -180,10 +196,11 @@ function renderApplication() {
         : owner.lastLoginAt
           ? `${owner.name} has signed in (last sign-in ${fmtDateTime(owner.lastLoginAt)}).`
           : `${owner.name} hasn't signed in yet.`;
-    outcome = `<div class="callout callout-ok"><div><strong>Accepted ${E(fmtDate(a.decidedAt))}${a.decidedBy ? ` by ${E(a.decidedBy.name)}` : ''}</strong>The agency is now a vendor. ${E(signIn)}</div>
+    outcome = `<div class="callout callout-ok"><div><strong>Accepted ${E(fmtDate(a.decidedAt))}${a.decidedBy ? ` by ${E(a.decidedBy.name)}` : ''}</strong>The ${isHotel ? 'hotel' : 'agency'} is now a vendor.${a.hotelListing && a.hotelListing.status === 'draft' ? ' Its listing is still a draft: add photos and a map position, then publish it.' : ''} ${E(signIn)}</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         ${owner && isMoneyAdmin() ? `<button class="btn btn-secondary btn-sm" onclick="openOwnerPassword()">${owner.mustChangePassword || owner.accountStatus === 'invited' ? 'Set password' : 'Change password'}</button>` : ''}
         ${a.agency ? `<button class="btn btn-secondary btn-sm" onclick="openVendor('${E(a.agency._id)}')">Open vendor</button>` : ''}
+        ${a.hotelListing ? `<button class="btn btn-secondary btn-sm" onclick="openHotelListing('${E(a.hotelListing._id)}')">Open hotel listing (${E(a.hotelListing.status)})</button>` : ''}
       </div></div>`;
   } else if (a.status === 'rejected') {
     outcome = `<div class="callout callout-error"><div><strong>Rejected ${E(fmtDate(a.decidedAt))}${a.decidedBy ? ` by ${E(a.decidedBy.name)}` : ''}</strong>Reason given: ${E(a.rejectedReason)}</div></div>`;
@@ -208,7 +225,7 @@ function renderApplication() {
         <div>
           <h2>${E(a.agencyName)}</h2>
           <p>${a.reference ? `${E(a.reference)}, ` : ''}received ${E(fmtDateTime(a.createdAt))}</p>
-          <p class="profile-badges"><span class="badge ${APPLICATION_BADGES[a.status]}">${E(APPLICATION_LABELS[a.status])}</span></p>
+          <p class="profile-badges"><span class="badge ${APPLICATION_BADGES[a.status]}">${E(APPLICATION_LABELS[a.status])}</span>${isHotel ? ' <span class="tag">Hotel</span>' : ''}</p>
         </div>
       </div>
       <div class="profile-actions">${actions}</div>
@@ -218,14 +235,19 @@ function renderApplication() {
 
     <div class="detail-grid">
       <div class="detail-card">
-        <h3>Agency</h3>
+        <h3>${isHotel ? 'Hotel' : 'Agency'}</h3>
         <dl class="kv">
+          ${isHotel ? appRow('Kind of stay', E(STAY_NAMES[h.stayType] || h.stayType || '')) : ''}
+          ${isHotel ? appRow('Lowest price a night', h.pricePerNight != null ? E(`৳${Number(h.pricePerNight).toLocaleString('en-US')}`) : '') : ''}
+          ${isHotel ? appRow('Rooms', h.rooms ? E(String(h.rooms)) : '') : ''}
+          ${isHotel ? appRow('Star rating', h.starRating ? E('★'.repeat(h.starRating)) : '') : ''}
+          ${isHotel ? appRow('Check-in / out', E([h.checkIn, h.checkOut].filter(Boolean).join(' / '))) : ''}
           ${appRow('Trade license number', E(a.tradeLicenseNumber))}
           ${appRow('Started', a.yearStarted ? E(String(a.yearStarted)) : '')}
           ${appRow('Team size', E(TEAM_LABELS[a.teamSize] || ''))}
-          ${appRow('Office', E([a.officeAddress, a.district].filter(Boolean).join(', ')))}
-          ${appRow('Tours in', E(a.regions))}
-          ${appRow('Kinds of tours', categories)}
+          ${appRow(isHotel ? 'Address' : 'Office', E([a.officeAddress, a.district].filter(Boolean).join(', ')))}
+          ${isHotel ? '' : appRow('Tours in', E(a.regions))}
+          ${isHotel ? '' : appRow('Kinds of tours', categories)}
           ${appRow('Facebook or website', leadLink(a.website))}
           ${appRow('About', a.about ? `<span class="pre">${E(a.about)}</span>` : '')}
         </dl>
@@ -345,8 +367,9 @@ async function openApproveModal() {
   const acct = AP.detail.checks && AP.detail.checks.account;
   const own = acct && a.applicant && String(a.applicant._id || a.applicant) === String(acct._id);
   const confirmAccount = acct && !acct.agency && !own;
-  document.getElementById('approveLead').innerHTML = `<strong>${E(a.agencyName)}</strong><br>Owner: ${E(a.contactName)} (${E(a.email)})${acct ? '' : '<br>A new account with a temporary password is created.'}`;
-  AP.approveLabel = acct ? 'Accept agency' : 'Accept and create account';
+  const isHotel = a.vendorType === 'hotel';
+  document.getElementById('approveLead').innerHTML = `<strong>${E(a.agencyName)}</strong>${isHotel ? ' <span class="tag">Hotel</span>' : ''}<br>Owner: ${E(a.contactName)} (${E(a.email)})${acct ? '' : '<br>A new account with a temporary password is created.'}${isHotel ? '<br>A draft hotel listing is created from the application, for you to add photos to and publish.' : ''}`;
+  AP.approveLabel = acct ? (isHotel ? 'Accept hotel' : 'Accept agency') : 'Accept and create account';
   document.getElementById('apVerify').checked = true;
   document.getElementById('apUseExistingRow').hidden = !confirmAccount;
   document.getElementById('apUseExisting').checked = false;
@@ -362,7 +385,8 @@ async function openApproveModal() {
 
   const chosen = new Set((a.categories || []).map(c => c._id));
   const categories = (await ensureCategories()).filter(c => c.active || chosen.has(c._id));
-  document.getElementById('apCategoriesGroup').hidden = !categories.length;
+  // Tour categories don't apply to a hotel
+  document.getElementById('apCategoriesGroup').hidden = !categories.length || isHotel;
   document.getElementById('apCategories').innerHTML = categories.map(c => `
     <label class="check"><input type="checkbox" name="apCategory" value="${E(c._id)}" ${chosen.has(c._id) ? 'checked' : ''}> ${E(c.name)}</label>`).join('');
   openModal('approveModal');
@@ -389,6 +413,7 @@ async function submitApprove(e) {
       ${credentialsBox(data.data.credentials)}
       <div style="display:flex; gap:8px; margin-top: 16px;">
         <button class="btn btn-primary" onclick="closeModal('approveModal'); openVendor('${E(data.data.agency._id)}')">Open vendor</button>
+        ${data.data.hotel ? `<button class="btn btn-secondary" onclick="openHotelListing('${E(data.data.hotel._id)}')">Open hotel listing</button>` : ''}
         <button class="btn btn-secondary" onclick="closeModal('approveModal'); reloadApplication();">Done</button>
       </div>`;
     loadVendorSummary();

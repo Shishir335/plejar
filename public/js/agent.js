@@ -25,6 +25,9 @@ const state = {
 };
 
 const isOwner = () => state.me && state.me.agencyRole === 'owner';
+// A hotel or resort that joined through /apply: it has its listing instead of the tour pages
+const isHotelAccount = () => Boolean(state.agency && state.agency.kind === 'hotel');
+const TOUR_VIEWS = ['events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'wall', 'followers'];
 
 // ---------- Helpers ----------
 
@@ -210,8 +213,10 @@ $('logoutBtn').addEventListener('click', async () => {
 
 function showView(view) {
   if (!isOwner() && (view === 'team' || view === 'verification')) view = 'overview';
+  if (isHotelAccount() ? TOUR_VIEWS.includes(view) : view === 'hotel') view = 'overview';
   document.querySelectorAll('[data-view-pane]').forEach(p => { p.hidden = p.id !== `view-${view}`; });
   document.querySelectorAll('.side-nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  if (view === 'hotel') loadHotels();
   if (view === 'events') loadEvents();
   if (view === 'registrations') loadRegistrationsView();
   if (view === 'announcements') loadAnnouncements();
@@ -258,6 +263,7 @@ document.addEventListener('click', e => {
   if (name === 'toggle-pin') togglePin(id);
   if (name === 'set-registration') setRegistration(id, action.dataset.status);
   if (name === 'go') showView(action.dataset.view);
+  if (name === 'save-hotel') saveHotel(id);
   if (name === 'resend') resendInvite(id);
   if (name === 'remove-member') removeMember(id);
   if (name === 'copy') copyField(action.dataset.target);
@@ -272,6 +278,7 @@ async function boot() {
     state.me = data.me;
     state.agency = data.agency;
     state.stats = data.stats;
+    state.hotels = data.hotels || [];
   } catch (err) {
     if (err.status === 401) return showLogin();
     if (err.status === 403) {
@@ -287,15 +294,20 @@ async function boot() {
   $('passwordView').hidden = true;
   $('panelView').hidden = false;
   document.querySelectorAll('[data-owner-only]').forEach(el => { el.hidden = !isOwner(); });
+  const kind = isHotelAccount() ? 'hotel' : 'agency';
+  document.querySelectorAll('[data-for]').forEach(el => { if (el.dataset.for !== kind) el.hidden = true; else if (!el.hasAttribute('data-owner-only')) el.hidden = false; });
   renderSide();
   renderOverview();
   renderProfileForm();
 
   const start = (window.location.hash || '#overview').slice(1);
-  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'wall', 'followers', 'profile', 'team', 'verification'];
-  refreshMessagesBadge();
-  setInterval(refreshMessagesBadge, 60000);
-  connectChatSocket();
+  const views = ['overview', 'hotel', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'wall', 'followers', 'profile', 'team', 'verification'];
+  // Hotels have no tour chats
+  if (!isHotelAccount()) {
+    refreshMessagesBadge();
+    setInterval(refreshMessagesBadge, 60000);
+    connectChatSocket();
+  }
   showView(views.includes(start) ? start : (start === 'packages' ? 'events' : 'overview'));
 }
 
@@ -309,7 +321,7 @@ function renderSide() {
   const a = state.agency;
   $('sideAgency').innerHTML = `
     ${logoHTML(a)}
-    <div><strong>${escapeHTML(a.name)}</strong><small>${a.verified ? 'Verified vendor' : 'Not verified yet'}</small></div>
+    <div><strong>${escapeHTML(a.name)}</strong><small>${isHotelAccount() ? 'Hotel · ' : ''}${a.verified ? 'Verified vendor' : 'Not verified yet'}</small></div>
   `;
   $('sideUserName').textContent = state.me.name;
   $('sideUserRole').textContent = isOwner() ? 'Owner' : 'Team member';
@@ -325,22 +337,33 @@ function renderOverview() {
   $('statRegistrations').textContent = s.openRegistrations;
   $('statAnnouncements').textContent = s.announcements;
   $('statTeam').textContent = s.teamSize;
-  renderNextEvents();
+  const hotel = isHotelAccount();
+  if (hotel) renderHotelSummary();
+  else renderNextEvents();
 
   const v = a.verification || { status: 'none' };
   let callout = '';
   if (a.verified) {
-    callout = '<div class="callout callout-ok"><div><strong>Your agency is verified</strong>Travelers see the verified mark on your profile and tour events.</div></div>';
+    callout = hotel
+      ? '<div class="callout callout-ok"><div><strong>Your hotel is verified</strong>Plejar has checked your trade license and the owner\'s national ID.</div></div>'
+      : '<div class="callout callout-ok"><div><strong>Your agency is verified</strong>Travelers see the verified mark on your profile and tour events.</div></div>';
   } else if (v.status === 'pending') {
     callout = '<div class="callout callout-warn"><div><strong>Verification in review</strong>Plejar is checking your documents. This usually takes 1 to 2 working days.</div></div>';
   } else if (v.status === 'rejected') {
     callout = `<div class="callout callout-error"><div><strong>Verification needs changes</strong>${escapeHTML(v.note || 'Check your documents and submit again.')}</div>${isOwner() ? '<button class="btn btn-quiet btn-sm" data-action="go" data-view="verification">Update documents</button>' : ''}</div>`;
   } else if (isOwner()) {
-    callout = '<div class="callout callout-warn"><div><strong>Get the verified mark</strong>Upload your trade license and NID so travelers know your agency is real.</div><button class="btn btn-quiet btn-sm" data-action="go" data-view="verification">Start verification</button></div>';
+    callout = `<div class="callout callout-warn"><div><strong>Get the verified mark</strong>Upload your trade license and NID so travelers know your ${hotel ? 'hotel' : 'agency'} is real.</div><button class="btn btn-quiet btn-sm" data-action="go" data-view="verification">Start verification</button></div>`;
   }
   $('overviewCallout').innerHTML = callout;
 
-  const checks = [
+  const listing = (state.hotels || [])[0];
+  const checks = hotel ? [
+    { done: Boolean(a.logo), label: 'Add a logo', view: 'profile' },
+    { done: Boolean(listing && listing.description && listing.description.length >= 40), label: 'Describe your hotel', view: 'hotel' },
+    { done: Boolean(listing && listing.checkIn && listing.checkOut), label: 'Add check-in and check-out times', view: 'hotel' },
+    { done: Boolean(listing && listing.phone), label: 'Add a phone number for guests', view: 'hotel' },
+    { done: Boolean(listing && listing.status === 'published'), label: 'Plejar publishes your listing', view: 'hotel' }
+  ] : [
     { done: Boolean(a.logo), label: 'Add a logo', view: 'profile' },
     { done: Boolean(a.cover), label: 'Add a cover photo', view: 'profile' },
     { done: Boolean(a.description && a.description.length >= 40), label: 'Describe your agency', view: 'profile' },
@@ -353,6 +376,136 @@ function renderOverview() {
       <span>${c.done ? '✓' : '○'} ${escapeHTML(c.label)}</span>
       ${c.done ? '<span class="badge badge-published">Done</span>' : `<button class="btn btn-quiet btn-sm" data-action="go" data-view="${c.view}">Do this</button>`}
     </li>`).join('');
+}
+
+// ---------- Your hotel (hotel accounts) ----------
+
+const STAY_LABEL = { hotel: 'Hotel', resort: 'Resort', cottage: 'Cottage', guest_house: 'Guest house', homestay: 'Homestay', eco_resort: 'Eco resort', houseboat: 'Houseboat' };
+const HOTEL_STATUS = {
+  draft: { badge: 'badge-draft', text: 'Being prepared', note: "Plejar's team is preparing your listing. It goes live in the app once they add photos and publish it." },
+  published: { badge: 'badge-published', text: 'Live', note: 'Guests can find your hotel in the Plejar app.' },
+  hidden: { badge: 'badge-hidden', text: 'Hidden', note: 'Guests cannot see this listing right now. Contact Plejar to show it again.' }
+};
+
+function renderHotelSummary() {
+  const box = $('hotelSummary');
+  const hotels = state.hotels || [];
+  box.innerHTML = hotels.length ? hotels.map(h => {
+    const st = HOTEL_STATUS[h.status] || HOTEL_STATUS.draft;
+    return `<li>
+      <span><strong>${escapeHTML(h.name)}</strong><span class="cell-sub">${escapeHTML(STAY_LABEL[h.type] || 'Hotel')} · from ${taka(h.pricePerNight)} a night</span></span>
+      <span class="badge ${st.badge}">${st.text}</span>
+    </li>`;
+  }).join('') : "<li><span>Plejar hasn't set up your listing yet.</span></li>";
+}
+
+async function loadHotels() {
+  const box = $('hotelList');
+  try {
+    const { data } = await api('/api/v1/agency/me/hotels');
+    state.hotels = data.hotels;
+    renderHotels();
+    renderOverview();
+  } catch (err) {
+    box.innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
+  }
+}
+
+function renderHotels() {
+  const box = $('hotelList');
+  const hotels = state.hotels || [];
+  if (!hotels.length) {
+    box.innerHTML = "<div class=\"card\"><p class=\"muted\">Plejar hasn't set up your listing yet. It will show here once our team creates it.</p></div>";
+    return;
+  }
+  const readOnly = !isOwner();
+  const v = value => escapeHTML(value == null ? '' : String(value));
+  box.innerHTML = hotels.map(h => {
+    const st = HOTEL_STATUS[h.status] || HOTEL_STATUS.draft;
+    const photos = (h.photos || []).slice(0, 4).map(src => `<img src="${escapeHTML(src)}" alt="" style="width:96px;height:72px;object-fit:cover;border-radius:10px">`).join('');
+    return `
+    <form class="card" data-hotel="${escapeHTML(h._id)}" novalidate>
+      <div class="page-head" style="margin-bottom:8px">
+        <div>
+          <h2 style="margin:0">${escapeHTML(h.name)}</h2>
+          <p class="muted" style="margin:4px 0 0">${escapeHTML(STAY_LABEL[h.type] || 'Hotel')}${h.starRating ? ` · ${h.starRating} star` : ''}</p>
+        </div>
+        <span class="badge ${st.badge}">${st.text}</span>
+      </div>
+      <div class="callout ${h.status === 'published' ? 'callout-ok' : 'callout-warn'}"><div>${escapeHTML(st.note)}</div></div>
+      ${photos ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">${photos}</div>` : '<p class="muted">No photos yet. Plejar\'s team adds them.</p>'}
+      ${readOnly ? '<div class="alert alert-warn">Only the owner can edit these details.</div>' : ''}
+      <div class="field-row">
+        <div class="field">
+          <label for="hPrice-${v(h._id)}">Lowest price per night (৳) *</label>
+          <input id="hPrice-${v(h._id)}" name="pricePerNight" type="number" min="0" step="1" inputmode="numeric" value="${v(h.pricePerNight)}">
+        </div>
+        <div class="field">
+          <label for="hRooms-${v(h._id)}">Number of rooms</label>
+          <input id="hRooms-${v(h._id)}" name="rooms" type="number" min="1" max="5000" step="1" inputmode="numeric" value="${v(h.rooms)}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="hIn-${v(h._id)}">Check-in time</label>
+          <input id="hIn-${v(h._id)}" name="checkIn" type="time" value="${v(h.checkIn)}">
+        </div>
+        <div class="field">
+          <label for="hOut-${v(h._id)}">Check-out time</label>
+          <input id="hOut-${v(h._id)}" name="checkOut" type="time" value="${v(h.checkOut)}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="hPhone-${v(h._id)}">Phone for guests</label>
+          <input id="hPhone-${v(h._id)}" name="phone" type="tel" maxlength="30" value="${v(h.phone)}">
+        </div>
+        <div class="field">
+          <label for="hWeb-${v(h._id)}">Facebook page or website</label>
+          <input id="hWeb-${v(h._id)}" name="website" type="text" maxlength="200" value="${v(h.website)}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="hAddress-${v(h._id)}">Address</label>
+        <input id="hAddress-${v(h._id)}" name="address" type="text" maxlength="200" value="${v(h.address)}">
+      </div>
+      <div class="field">
+        <label for="hAbout-${v(h._id)}">About your hotel</label>
+        <textarea id="hAbout-${v(h._id)}" name="description" rows="4" maxlength="3000">${v(h.description)}</textarea>
+      </div>
+      <div class="alert alert-error" data-hotel-error role="alert" hidden></div>
+      ${readOnly ? '' : `<button type="button" class="btn btn-primary" data-action="save-hotel" data-id="${v(h._id)}">Save details</button>`}
+    </form>`;
+  }).join('');
+  if (readOnly) box.querySelectorAll('input, textarea').forEach(el => { el.disabled = true; });
+}
+
+async function saveHotel(id) {
+  const form = document.querySelector(`form[data-hotel="${CSS.escape(id)}"]`);
+  if (!form) return;
+  const error = form.querySelector('[data-hotel-error]');
+  error.hidden = true;
+  const body = {};
+  ['pricePerNight', 'rooms', 'checkIn', 'checkOut', 'phone', 'website', 'address', 'description'].forEach(name => { body[name] = form[name].value.trim(); });
+  if (!/^\d+$/.test(body.pricePerNight.replace(/[,\s]/g, ''))) {
+    error.textContent = 'Enter the lowest price per night in taka, for example 3500.';
+    error.hidden = false;
+    return form.pricePerNight.focus();
+  }
+  const btn = form.querySelector('[data-action="save-hotel"]');
+  setBusy(btn, true);
+  try {
+    const { data } = await api(`/api/v1/agency/me/hotels/${encodeURIComponent(id)}`, { method: 'PATCH', body });
+    state.hotels = state.hotels.map(h => (h._id === id ? data.hotel : h));
+    renderHotels();
+    renderOverview();
+    toast('Hotel details saved.');
+  } catch (err) {
+    error.textContent = err.message;
+    error.hidden = false;
+  } finally {
+    if (btn.isConnected) setBusy(btn, false);
+  }
 }
 
 // ---------- Profile ----------
@@ -408,7 +561,7 @@ $('profileForm').addEventListener('submit', async e => {
   e.preventDefault();
   const form = e.target;
   showAlert('profileError', '');
-  if (!form.name.value.trim()) return showAlert('profileError', 'Enter your agency name.');
+  if (!form.name.value.trim()) return showAlert('profileError', isHotelAccount() ? 'Enter your hotel name.' : 'Enter your agency name.');
 
   const fd = new FormData(form);
   if (!form.logo.files.length) fd.delete('logo');
