@@ -8,6 +8,7 @@ const { escapeRegex, pageParams, paged } = require('../utils/query');
 const { logActivity } = require('../utils/activity');
 const { saveContentImage, removeContentImage, removeContentFolder } = require('../utils/uploads');
 const { placeView, priceView, hotelCard, savedSet } = require('../utils/tourCards');
+const { applyHotelExtras, extrasView, isVerified, hotelReviewSummary, hotelReviewRows } = require('../utils/hotelExtras');
 
 // Hotels for the app ("Hotels Near You" on the Tours screen) and their management in the admin panel
 
@@ -89,7 +90,12 @@ exports.listHotels = catchAsync(async (req, res, next) => {
 exports.getHotel = catchAsync(async (req, res, next) => {
   const hotel = validId(req.params.id) ? await Hotel.findOne({ _id: req.params.id, status: 'published' }).populate(PLACE) : null;
   if (!hotel) return next(new AppError('This hotel is not available.', 404));
-  const saved = await savedSet(req.user, 'hotel', [hotel._id]);
+  const [saved, verified, summary, latest] = await Promise.all([
+    savedSet(req.user, 'hotel', [hotel._id]),
+    isVerified(hotel),
+    hotelReviewSummary(hotel._id),
+    hotelReviewRows(hotel._id, { limit: 3 })
+  ]);
   await Hotel.updateOne({ _id: hotel._id }, { $inc: { viewCount: 1 } });
   if (req.user) await RecentView.updateOne({ user: req.user._id, kind: 'hotel', item: hotel._id }, { $set: { viewedAt: new Date() } }, { upsert: true });
   res.status(200).json({
@@ -117,10 +123,29 @@ exports.getHotel = catchAsync(async (req, res, next) => {
           photos: r.photos
         })),
         policies: hotel.policies || {},
+        verified,
+        ...extrasView(hotel),
+        // Reviews from guests who booked through Plejar
+        reviews: { ...summary, latest },
         canRequestStay: Boolean(hotel.agency) && (hotel.roomTypes || []).some(r => r.active !== false)
       }
     }
   });
+});
+
+// GET /hotels/:id/reviews?page&rating — every guest review, newest first
+exports.hotelReviews = catchAsync(async (req, res, next) => {
+  const hotel = validId(req.params.id) ? await Hotel.findOne({ _id: req.params.id, status: 'published' }).select('_id') : null;
+  if (!hotel) return next(new AppError('This hotel is not available.', 404));
+  const stars = Number(req.query.rating);
+  const rating = stars >= 1 && stars <= 5 ? stars : undefined;
+  const page = pageParams(req.query);
+  const [reviews, summary] = await Promise.all([
+    hotelReviewRows(hotel._id, { skip: page.skip, limit: page.limit, rating }),
+    hotelReviewSummary(hotel._id)
+  ]);
+  const total = rating ? summary.breakdown[rating] : summary.count;
+  res.status(200).json({ status: 'success', data: { summary, reviews, ...paged(total, page) } });
 });
 
 // ---------- Admin ----------
@@ -181,6 +206,7 @@ const applyHotelForm = async (hotel, b) => {
   if (b.website !== undefined) hotel.website = text(b.website, 200);
   if (b.checkIn !== undefined) hotel.checkIn = text(b.checkIn, 10);
   if (b.checkOut !== undefined) hotel.checkOut = text(b.checkOut, 10);
+  applyHotelExtras(hotel, b);
   if (b.featured !== undefined) hotel.featured = b.featured === true || b.featured === 'true';
   if (b.status !== undefined) {
     if (!['draft', 'published', 'hidden'].includes(b.status)) throw new AppError('Choose draft, published or hidden.', 400);
@@ -209,6 +235,7 @@ const adminHotelView = h => ({
   destinationId: h.destination ? h.destination._id || h.destination : null,
   regularPrice: h.regularPrice,
   pricePerNight: h.pricePerNight,
+  ...extrasView(h),
   viewCount: h.viewCount,
   updatedAt: h.updatedAt
 });

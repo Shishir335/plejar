@@ -1618,6 +1618,16 @@
           <div class="form-group"><label class="form-label" for="htCheckOut">Check-out</label><input id="htCheckOut" class="form-input" maxlength="10" placeholder="12:00"></div>
           <div class="form-group"><label class="form-label" for="htStatus">Status</label><select id="htStatus" class="form-select"><option value="draft">Draft</option><option value="published">Published</option><option value="hidden">Hidden</option></select></div>
         </div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htBreakfast">Breakfast</label><select id="htBreakfast" class="form-select"><option value="">Not served</option><option value="included">Included in the price</option><option value="extra">Available at extra cost</option></select></div>
+          <div class="form-group"><label class="form-label" for="htBreakfastPhoto">Breakfast photo</label><select id="htBreakfastPhoto" class="form-select"></select></div>
+          <div class="form-group"><label class="form-label" for="htCentre">From the centre (km)</label><input id="htCentre" class="form-input" type="number" min="0" max="1000" step="0.1" placeholder="0.3"></div>
+        </div>
+        <div class="form-group"><span class="form-label">Also available</span><div style="display:flex; gap:14px; flex-wrap:wrap;"><label class="check"><input type="checkbox" class="htMeal" value="lunch"> Lunch</label><label class="check"><input type="checkbox" class="htMeal" value="dinner"> Dinner</label><label class="check"><input type="checkbox" class="htMeal" value="snacks"> Snacks</label><label class="check"><input type="checkbox" class="htMeal" value="room_service"> Room service</label></div></div>
+        <div class="field-row">
+          <div class="form-group"><label class="form-label" for="htFoodFacilities">Food &amp; drink at the hotel (one per line)</label><textarea id="htFoodFacilities" class="form-input" rows="3" placeholder="Packed lunches&#10;Coffee house on site"></textarea></div>
+          <div class="form-group"><label class="form-label" for="htNearby">Places nearby: kind, name, metres (one per line)</label><textarea id="htNearby" class="form-input" rows="3" placeholder="restaurant, Ethos Vegetarian, 150&#10;cafe, Tre Coffee, 100"></textarea><span class="form-hint">Kinds: restaurant, cafe, grocery, attraction, transport.</span></div>
+        </div>
         <label class="check" style="display:flex; gap:8px; align-items:center; margin-bottom: 14px;"><input type="checkbox" id="htFeatured"> Featured (shown first when the app has no location)</label>
         <div class="form-group"><label class="form-label" for="htPhotos">Add photos</label><input id="htPhotos" type="file" multiple accept="image/jpeg,image/png,image/webp" class="form-input"></div>
         <div id="htPhotosNow" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 12px;"></div>

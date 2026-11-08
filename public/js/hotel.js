@@ -713,7 +713,60 @@ function renderDetails() {
   $('dAmenityOther').value = (h.amenities || []).filter(a => !AMENITIES.includes(a)).join(', ');
   const p = h.policies || {};
   ['cancellation', 'children', 'pets', 'smoking', 'other'].forEach(k => { f[k].value = p[k] || ''; });
+  renderDining(h);
   showAlert('detailsError', '');
+}
+
+// ---------- Food & drink, and around the hotel ----------
+
+const MEALS = [['lunch', 'Lunch'], ['dinner', 'Dinner'], ['snacks', 'Snacks'], ['room_service', 'Room service']];
+const NEARBY_KINDS = [['restaurant', 'Restaurant'], ['cafe', 'Cafe or bar'], ['grocery', 'Supermarket or grocery'], ['attraction', 'Sight or attraction'], ['transport', 'Bus, train or airport']];
+
+function nearbyRow(n = {}) {
+  const row = document.createElement('div');
+  row.className = 'row row-3 nearby-row';
+  row.innerHTML = `
+    <div class="field"><label>What it is</label><select data-k="category">${NEARBY_KINDS.map(([v, l]) => `<option value="${v}" ${n.category === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    <div class="field"><label>Name</label><input data-k="name" type="text" maxlength="80" value="${E(n.name || '')}" placeholder="Tre Coffee"></div>
+    <div class="field"><label>Distance (metres)</label><div style="display:flex;gap:8px"><input data-k="distance" type="number" min="0" max="100000" inputmode="numeric" value="${n.distance == null ? '' : E(n.distance)}" placeholder="150"><button type="button" class="btn" data-remove aria-label="Remove this place">Remove</button></div></div>`;
+  row.querySelector('[data-remove]').addEventListener('click', () => row.remove());
+  return row;
+}
+
+function renderDining(h) {
+  const d = h.dining || {};
+  $('dBreakfast').value = d.breakfast || '';
+  const photos = h.photos || [];
+  $('breakfastPhotos').innerHTML = photos.length
+    ? [['', 'None']].concat(photos.map(p => [p, ''])).map(([url, label]) => `<label class="chip"><input type="radio" name="breakfastPhoto" value="${E(url)}" ${(d.breakfastPhoto || '') === url ? 'checked' : ''}>${url ? `<img src="${E(url)}" alt="" style="width:56px;height:40px;object-fit:cover;border-radius:6px">` : `<span>${label}</span>`}</label>`).join('')
+    : '<span class="muted">No photos yet.</span>';
+  const meals = new Set(d.meals || []);
+  $('mealChips').innerHTML = MEALS.map(([v, l]) => `<label class="chip"><input type="checkbox" value="${v}" ${meals.has(v) ? 'checked' : ''}><span>${l}</span></label>`).join('');
+  $('dFoodFacilities').value = (d.facilities || []).join('\n');
+  $('dCentre').value = h.centreDistanceKm == null ? '' : h.centreDistanceKm;
+  $('nearbyRows').replaceChildren(...(h.nearby || []).map(nearbyRow));
+}
+
+$('nearbyAdd').addEventListener('click', () => {
+  const row = nearbyRow();
+  $('nearbyRows').append(row);
+  row.querySelector('[data-k="name"]').focus();
+});
+
+function diningBody() {
+  const picked = document.querySelector('#breakfastPhotos input:checked');
+  return {
+    dining: {
+      breakfast: $('dBreakfast').value,
+      breakfastPhoto: picked ? picked.value : '',
+      meals: [...document.querySelectorAll('#mealChips input:checked')].map(i => i.value),
+      facilities: $('dFoodFacilities').value.split('\n').map(s => s.trim()).filter(Boolean)
+    },
+    centreDistanceKm: $('dCentre').value.trim(),
+    nearby: [...document.querySelectorAll('#nearbyRows .nearby-row')]
+      .map(r => ({ category: r.querySelector('[data-k="category"]').value, name: r.querySelector('[data-k="name"]').value.trim(), distance: r.querySelector('[data-k="distance"]').value.trim() }))
+      .filter(n => n.name)
+  };
 }
 
 $('detailsForm').addEventListener('submit', async e => {
@@ -736,7 +789,8 @@ $('detailsForm').addEventListener('submit', async e => {
     checkOut: f.checkOut.value,
     rooms,
     amenities,
-    policies: Object.fromEntries(['cancellation', 'children', 'pets', 'smoking', 'other'].map(k => [k, f[k].value.trim()]))
+    policies: Object.fromEntries(['cancellation', 'children', 'pets', 'smoking', 'other'].map(k => [k, f[k].value.trim()])),
+    ...diningBody()
   };
   if (!$('basePriceField').hidden) body.pricePerNight = f.pricePerNight.value.trim();
   const btn = $('detailsSave');

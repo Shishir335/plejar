@@ -314,6 +314,15 @@ async function openHotel(id) {
   set('htCheckOut', h && h.checkOut);
   set('htStatus', (h && h.status) || 'draft');
   document.getElementById('htFeatured').checked = Boolean(h && h.featured);
+  const dining = (h && h.dining) || {};
+  set('htBreakfast', dining.breakfast || '');
+  document.getElementById('htBreakfastPhoto').innerHTML = '<option value="">None</option>' + ((h && h.photos) || [])
+    .map((p, i) => `<option value="${E(p)}">Photo ${i + 1}${i === 0 ? ' (cover)' : ''}</option>`).join('');
+  set('htBreakfastPhoto', dining.breakfastPhoto || '');
+  document.querySelectorAll('.htMeal').forEach(c => { c.checked = (dining.meals || []).includes(c.value); });
+  set('htFoodFacilities', (dining.facilities || []).join('\n'));
+  set('htCentre', h && h.centreDistanceKm);
+  set('htNearby', ((h && h.nearby) || []).map(n => [n.category, n.name, n.distance == null ? '' : n.distance].join(', ')).join('\n'));
   renderHotelPhotos(h);
   openModal('hotelModal');
 }
@@ -329,7 +338,19 @@ async function saveHotel(e) {
     starRating: val('htStars'), ratingAverage: val('htRating'), ratingCount: val('htRatingCount'), ratingSource: val('htRatingSource').trim(),
     highlights: val('htHighlights'), amenities: val('htAmenities'), description: val('htDescription'),
     phone: val('htPhone').trim(), website: val('htWebsite').trim(), checkIn: val('htCheckIn').trim(), checkOut: val('htCheckOut').trim(),
-    status: val('htStatus'), featured: document.getElementById('htFeatured').checked
+    status: val('htStatus'), featured: document.getElementById('htFeatured').checked,
+    dining: JSON.stringify({
+      breakfast: val('htBreakfast'),
+      breakfastPhoto: val('htBreakfastPhoto'),
+      meals: [...document.querySelectorAll('.htMeal:checked')].map(c => c.value),
+      facilities: val('htFoodFacilities').split('\n').map(s => s.trim()).filter(Boolean)
+    }),
+    centreDistanceKm: val('htCentre').trim(),
+    nearby: JSON.stringify(val('htNearby').split('\n').map(s => s.trim()).filter(Boolean).map(line => {
+      const parts = line.split(',').map(s => s.trim());
+      const distance = /^\d+$/.test(parts[parts.length - 1] || '') && parts.length > 2 ? parts.pop() : '';
+      return { category: (parts.shift() || '').toLowerCase(), name: parts.join(', '), distance };
+    }))
   };
   Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
   if (C.removePhotos.size) fd.append('removePhotos', [...C.removePhotos].join(','));

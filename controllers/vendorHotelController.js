@@ -9,6 +9,7 @@ const AppError = require('../utils/appError');
 const { logActivity } = require('../utils/activity');
 const { validId, pageParams, paged } = require('../utils/query');
 const { saveContentImage, removeContentImage } = require('../utils/uploads');
+const { applyHotelExtras, extrasView } = require('../utils/hotelExtras');
 
 const MAX_PHOTOS = 12;
 const MAX_ROOM_PHOTOS = 6;
@@ -83,6 +84,7 @@ const hotelView = h => ({
   amenities: h.amenities,
   policies: h.policies || {},
   roomTypes: (h.roomTypes || []).map(roomView),
+  ...extrasView(h),
   hasMapPosition: Boolean(h.location && h.location.coordinates && h.location.coordinates.length === 2),
   updatedAt: h.updatedAt
 });
@@ -168,6 +170,7 @@ exports.updateHotel = catchAsync(async (req, res) => {
       if (has(b.policies, key)) hotel.set(`policies.${key}`, text(b.policies[key], key === 'cancellation' || key === 'other' ? 1000 : 500));
     });
   }
+  applyHotelExtras(hotel, b);
   await hotel.save();
   await logActivity(req, { action: 'hotel.updated', summary: `Updated the details of ${hotel.name} from the hotel panel`, agency: req.agency._id });
   res.status(200).json({ status: 'success', data: { hotel: hotelView(hotel) } });

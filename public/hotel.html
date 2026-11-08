@@ -222,6 +222,44 @@
             </div>
           </div>
           <div class="card">
+            <h2>Food &amp; drink</h2>
+            <p class="muted">Breakfast and meals guests can have at the hotel.</p>
+            <div class="row">
+              <div class="field">
+                <label for="dBreakfast">Breakfast</label>
+                <select id="dBreakfast" name="breakfast">
+                  <option value="">Not served</option>
+                  <option value="included">Included in the price</option>
+                  <option value="extra">Available at extra cost</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Breakfast photo</label>
+              <div class="chips" id="breakfastPhotos"></div>
+              <span class="hint">Pick one of your photos to show with breakfast. Add photos on the Photos page first.</span>
+            </div>
+            <div class="field">
+              <label>Also available</label>
+              <div class="chips" id="mealChips"></div>
+            </div>
+            <div class="field">
+              <label for="dFoodFacilities">Food &amp; drink at the hotel</label>
+              <textarea id="dFoodFacilities" rows="3" placeholder="Packed lunches&#10;Coffee house on site&#10;Kid meals"></textarea>
+              <span class="hint">One per line, up to 12.</span>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Around the hotel</h2>
+            <p class="muted">Restaurants, cafes, shops and sights a short walk away, so guests know what is close.</p>
+            <div class="field" style="max-width:260px">
+              <label for="dCentre">Distance from the city centre (km)</label>
+              <input id="dCentre" type="number" min="0" max="1000" step="0.1" inputmode="decimal" placeholder="0.3">
+            </div>
+            <div id="nearbyRows"></div>
+            <button type="button" class="btn" id="nearbyAdd">Add a place</button>
+          </div>
+          <div class="card">
             <h2>Policies</h2>
             <p class="muted">House rules guests see before they ask for a stay.</p>
             <div class="field"><label for="pCancellation">Cancellation</label><textarea id="pCancellation" name="cancellation" rows="3" maxlength="1000" placeholder="Free cancellation up to 3 days before check-in. After that, the first night is charged."></textarea></div>

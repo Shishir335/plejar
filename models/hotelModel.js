@@ -69,6 +69,26 @@ const hotelSchema = new mongoose.Schema(
       other: { type: String, trim: true, maxlength: 1000, default: '' }
     },
 
+    // Breakfast and dining. The breakfast photo is one of the hotel's photos.
+    dining: {
+      breakfast: { type: String, enum: ['', 'included', 'extra'], default: '' },
+      breakfastPhoto: { type: String, trim: true, maxlength: 500, default: '' },
+      meals: { type: [String], default: [] },
+      facilities: { type: [String], default: [] }
+    },
+    // Places a short walk away: restaurants, cafes, shops and sights, with the distance in metres
+    nearby: {
+      type: [
+        new mongoose.Schema({
+          category: { type: String, enum: ['restaurant', 'cafe', 'grocery', 'attraction', 'transport'], required: true },
+          name: { type: String, required: true, trim: true, maxlength: 80 },
+          distance: { type: Number, min: 0, max: 100000, default: null }
+        }, { _id: false })
+      ],
+      default: []
+    },
+    centreDistanceKm: { type: Number, min: 0, max: 1000, default: null },
+
     // The hotel's own vendor account, when the hotel joined through /apply. Plejar still publishes the listing.
     agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', index: true },
     sourceLead: { type: mongoose.Schema.ObjectId, ref: 'AgentLead' },
@@ -83,6 +103,13 @@ const hotelSchema = new mongoose.Schema(
 
 hotelSchema.index({ location: '2dsphere' }, { sparse: true });
 hotelSchema.index({ status: 1, featured: -1, name: 1 });
+
+// A breakfast photo that was removed from the hotel's photos is no longer shown
+hotelSchema.pre('save', function () {
+  if (this.dining && this.dining.breakfastPhoto && !(this.photos || []).includes(this.dining.breakfastPhoto)) {
+    this.dining.breakfastPhoto = '';
+  }
+});
 
 hotelSchema.virtual('discountPercent').get(function () {
   if (!this.regularPrice || this.pricePerNight >= this.regularPrice) return 0;

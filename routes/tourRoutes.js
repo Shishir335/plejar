@@ -26,6 +26,7 @@ tourRouter.route('/:id/save').post(protect, tours.save('tour')).delete(protect, 
 const hotelRouter = express.Router();
 hotelRouter.get('/nearby', optionalAuth, hotels.nearby);
 hotelRouter.get('/', optionalAuth, hotels.listHotels);
+hotelRouter.get('/:id/reviews', hotels.hotelReviews);
 // A traveler's stay requests to hotels, and asking for a stay
 hotelRouter.get('/stay-requests', protect, stays.mine);
 hotelRouter.post('/stay-requests/:id/cancel', protect, stays.cancel);
