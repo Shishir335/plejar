@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hotel panel — Plejar</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="/css/hotel.css">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+</head>
+<body>
+
+  <!-- Sign in -->
+  <main class="auth" id="loginView" hidden>
+    <div class="auth-art">
+      <div>
+        <span class="brand">plejar<span class="brand-dot"></span> <small>for hotels</small></span>
+        <h2>Your rooms, in front of every traveler planning a trip.</h2>
+        <p>Keep your rooms, rates and photos up to date, and answer stay requests from the Plejar app.</p>
+      </div>
+    </div>
+    <div class="auth-side">
+      <form class="auth-card" id="loginForm" novalidate>
+        <h1>Hotel sign in</h1>
+        <p class="sub">For hotels, resorts and guest houses on Plejar.</p>
+        <div class="alert alert-error" id="loginError" role="alert" hidden></div>
+        <div class="alert alert-ok" id="loginNotice" role="status" hidden></div>
+        <div class="field">
+          <label for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="loginSubmit">Sign in</button>
+        <div class="auth-links">
+          <a href="#" id="forgotLink">Forgot your password?</a>
+          <span>New hotel? <a href="/apply?type=hotel">Apply to join Plejar</a></span>
+          <span>Tour agency? <a href="/agent">Sign in here</a></span>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <!-- First sign-in: replace the temporary password -->
+  <main class="auth" id="passwordView" hidden>
+    <div class="auth-art">
+      <div>
+        <span class="brand">plejar<span class="brand-dot"></span> <small>for hotels</small></span>
+        <h2>Welcome to Plejar.</h2>
+        <p>One last step before you open your hotel panel.</p>
+      </div>
+    </div>
+    <div class="auth-side">
+      <form class="auth-card" id="passwordForm" novalidate>
+        <h1>Choose your own password</h1>
+        <p class="sub">You signed in with the temporary password Plejar sent you. Pick a new one that only you know.</p>
+        <div class="alert alert-error" id="passwordError" role="alert" hidden></div>
+        <div class="field" id="currentPasswordField">
+          <label for="pwCurrent">Temporary password</label>
+          <input id="pwCurrent" type="password" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="pwNew">New password</label>
+          <input id="pwNew" type="password" autocomplete="new-password" minlength="8">
+          <span class="hint">At least 8 characters.</span>
+        </div>
+        <div class="field">
+          <label for="pwConfirm">New password again</label>
+          <input id="pwConfirm" type="password" autocomplete="new-password" minlength="8">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="passwordSubmit">Save password and continue</button>
+        <div class="auth-links"><a href="#" data-action="logout">Sign out</a></div>
+      </form>
+    </div>
+  </main>
+
+  <!-- Panel -->
+  <div id="panelView" hidden>
+    <header class="top">
+      <div class="top-inner">
+        <div class="top-row">
+          <a href="/" class="brand">plejar<span class="brand-dot"></span> <small>for hotels</small></a>
+          <div class="top-hotel"><strong id="topHotel"></strong><span id="topStatus"></span></div>
+          <div class="top-user"><span id="topUser"></span><button class="btn btn-ghost btn-sm" data-action="logout">Sign out</button></div>
+        </div>
+        <nav class="tabs" aria-label="Hotel panel">
+          <button class="tab" data-view="dashboard">Dashboard</button>
+          <button class="tab" data-view="requests">Stay requests <span class="count" id="pendingCount" hidden>0</span></button>
+          <button class="tab" data-view="rooms">Rooms &amp; rates</button>
+          <button class="tab" data-view="photos">Photos</button>
+          <button class="tab" data-view="details">Details &amp; policies</button>
+          <button class="tab" data-view="account">Account</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="alert alert-warn" id="noHotel" hidden>Plejar hasn't set up your hotel listing yet. It shows here once our team creates it.</div>
+
+      <!-- Dashboard -->
+      <section data-pane="dashboard" hidden>
+        <div class="card hero" id="hero"></div>
+        <div class="stats">
+          <button class="stat" data-action="go" data-view="requests"><span>Waiting for your answer</span><strong id="statPending">0</strong></button>
+          <button class="stat" data-action="go" data-view="requests" data-filter="upcoming"><span>Upcoming stays</span><strong id="statUpcoming">0</strong></button>
+          <button class="stat" data-action="go" data-view="rooms"><span>Room types</span><strong id="statRooms">0</strong></button>
+          <button class="stat" data-action="go" data-view="photos"><span>Photos</span><strong id="statPhotos">0</strong></button>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <h2>Get your listing ready</h2>
+            <p class="muted">Complete listings get more stay requests.</p>
+            <ul class="steps" id="setupSteps"></ul>
+          </div>
+          <div class="card">
+            <h2>Next arrivals</h2>
+            <p class="muted">Accepted stays, soonest first.</p>
+            <ul class="list-plain" id="nextArrivals"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stay requests -->
+      <section data-pane="requests" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Stay requests</h1>
+            <p>Travelers ask for a room from your page in the Plejar app. Accept or decline each one; the guest is told straight away. Payment is between you and the guest.</p>
+          </div>
+        </div>
+        <div class="seg" role="tablist" id="requestFilter">
+          <button data-filter="pending" class="active">Waiting <span id="segPending"></span></button>
+          <button data-filter="upcoming">Upcoming <span id="segUpcoming"></span></button>
+          <button data-filter="past">Past</button>
+          <button data-filter="all">All</button>
+        </div>
+        <div id="requestList"></div>
+        <div style="text-align:center"><button class="btn btn-ghost" id="moreRequests" hidden>Show more</button></div>
+      </section>
+
+      <!-- Rooms -->
+      <section data-pane="rooms" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Rooms &amp; rates</h1>
+            <p>Each room type shows on your page with its price per night. Your lowest active price is the "from" price travelers see.</p>
+          </div>
+          <button class="btn btn-primary" data-action="new-room">Add a room type</button>
+        </div>
+        <div class="rooms" id="roomList"></div>
+      </section>
+
+      <!-- Photos -->
+      <section data-pane="photos" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Photos</h1>
+            <p>Up to 12 photos of the property. The first one is your cover. Room photos are added with each room type.</p>
+          </div>
+        </div>
+        <label class="drop" id="photoDrop">
+          <strong>Add photos</strong>
+          <span class="muted" style="display:block">Drop them here or choose files. JPG, PNG or WebP, up to 5 MB each, 6 at a time.</span>
+          <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        </label>
+        <div class="photos" id="photoGrid"></div>
+      </section>
+
+      <!-- Details & policies -->
+      <section data-pane="details" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Details &amp; policies</h1>
+            <p>What guests read on your page. Changes show in the app as soon as you save. To change the hotel's name, kind of stay, star rating or map position, contact Plejar.</p>
+          </div>
+        </div>
+        <form id="detailsForm" novalidate>
+          <div class="card">
+            <h2>About the hotel</h2>
+            <p class="muted">A few lines on where you are and what makes a stay with you special.</p>
+            <div class="field">
+              <label for="dDescription">Description</label>
+              <textarea id="dDescription" name="description" rows="5" maxlength="3000"></textarea>
+            </div>
+            <div class="field">
+              <label for="dHighlights">Highlights</label>
+              <textarea id="dHighlights" name="highlights" rows="3" placeholder="Free breakfast&#10;Lake-view balconies&#10;5 minutes from the beach"></textarea>
+              <span class="hint">One per line, up to 6. They show as short points on your page.</span>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Contact and stay</h2>
+            <div class="row">
+              <div class="field"><label for="dPhone">Phone for guests</label><input id="dPhone" name="phone" type="tel" maxlength="30"></div>
+              <div class="field"><label for="dWebsite">Facebook page or website</label><input id="dWebsite" name="website" type="text" maxlength="200"></div>
+            </div>
+            <div class="field"><label for="dAddress">Address</label><input id="dAddress" name="address" type="text" maxlength="200"></div>
+            <div class="row row-3">
+              <div class="field"><label for="dCheckIn">Check-in from</label><input id="dCheckIn" name="checkIn" type="time"></div>
+              <div class="field"><label for="dCheckOut">Check-out by</label><input id="dCheckOut" name="checkOut" type="time"></div>
+              <div class="field"><label for="dRooms">Rooms in total</label><input id="dRooms" name="rooms" type="number" min="1" max="5000" inputmode="numeric"></div>
+            </div>
+            <div class="field" id="basePriceField">
+              <label for="dPrice">Lowest price per night (৳)</label>
+              <input id="dPrice" name="pricePerNight" type="number" min="0" inputmode="numeric">
+              <span class="hint">Once you add room types, this comes from your cheapest room.</span>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Amenities</h2>
+            <p class="muted">Tick what the hotel offers. Add anything missing below.</p>
+            <div class="chips" id="amenityChips"></div>
+            <div class="field" style="margin-top:14px">
+              <label for="dAmenityOther">Other amenities</label>
+              <input id="dAmenityOther" type="text" placeholder="Bonfire area, Boat rides" maxlength="400">
+              <span class="hint">Separate with commas.</span>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Policies</h2>
+            <p class="muted">House rules guests see before they ask for a stay.</p>
+            <div class="field"><label for="pCancellation">Cancellation</label><textarea id="pCancellation" name="cancellation" rows="3" maxlength="1000" placeholder="Free cancellation up to 3 days before check-in. After that, the first night is charged."></textarea></div>
+            <div class="row">
+              <div class="field"><label for="pChildren">Children and extra beds</label><textarea id="pChildren" name="children" rows="3" maxlength="500" placeholder="Children under 6 stay free. Extra bed ৳800 a night."></textarea></div>
+              <div class="field"><label for="pPets">Pets</label><textarea id="pPets" name="pets" rows="3" maxlength="300" placeholder="Pets are not allowed."></textarea></div>
+            </div>
+            <div class="row">
+              <div class="field"><label for="pSmoking">Smoking</label><textarea id="pSmoking" name="smoking" rows="2" maxlength="300" placeholder="No smoking in the rooms."></textarea></div>
+              <div class="field"><label for="pOther">Anything else</label><textarea id="pOther" name="other" rows="2" maxlength="1000" placeholder="Couples are asked to show a marriage certificate or NID."></textarea></div>
+            </div>
+          </div>
+          <div class="alert alert-error" id="detailsError" role="alert" hidden></div>
+          <div class="savebar"><button type="submit" class="btn btn-primary" id="detailsSave">Save changes</button></div>
+        </form>
+      </section>
+
+      <!-- Account -->
+      <section data-pane="account" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Account</h1>
+            <p>Your business on Plejar, the people who can use this panel, and your documents.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <form class="card" id="profileForm" novalidate>
+            <h2>Business profile</h2>
+            <p class="muted" id="profileNote">Only the owner can change these.</p>
+            <div class="field">
+              <span class="label">Logo</span>
+              <div class="logo-row"><div class="logo-box" id="logoBox"></div><input id="logoInput" name="logo" type="file" accept="image/jpeg,image/png,image/webp"></div>
+            </div>
+            <div class="field"><label for="aName">Business name</label><input id="aName" name="name" type="text" maxlength="120"></div>
+            <div class="row">
+              <div class="field"><label for="aPhone">Phone</label><input id="aPhone" name="phone" type="tel" maxlength="30"></div>
+              <div class="field"><label for="aEmail">Email</label><input id="aEmail" name="email" type="email" maxlength="120"></div>
+            </div>
+            <div class="field"><label for="aLicense">Trade license number</label><input id="aLicense" name="tradeLicenseNumber" type="text" maxlength="60"></div>
+            <div class="alert alert-error" id="profileError" role="alert" hidden></div>
+            <button type="submit" class="btn btn-dark" id="profileSave">Save profile</button>
+          </form>
+          <div>
+            <div class="card" id="verificationCard">
+              <h2>Verification</h2>
+              <div id="verificationBox" style="margin-top:10px"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="teamCard">
+          <h2>Team</h2>
+          <p class="muted">People who can answer stay requests and update rooms, photos and details. Only the owner manages the team.</p>
+          <table class="table">
+            <thead><tr><th>Name</th><th>Role</th><th><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody id="teamBody"></tbody>
+          </table>
+          <form id="inviteForm" novalidate style="margin-top:18px" hidden>
+            <div class="row">
+              <div class="field"><label for="iName">Name</label><input id="iName" name="name" type="text" maxlength="80"></div>
+              <div class="field"><label for="iEmail">Email</label><input id="iEmail" name="email" type="email" maxlength="120"></div>
+            </div>
+            <div class="alert alert-error" id="inviteError" role="alert" hidden></div>
+            <div id="inviteResult"></div>
+            <button type="submit" class="btn btn-ghost" id="inviteSubmit">Invite to the team</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Room type editor -->
+  <dialog id="roomDialog">
+    <form id="roomForm" novalidate>
+      <div class="dlg-head"><h2 id="roomTitle">Add a room type</h2><button type="button" class="dlg-x" data-action="close-dialog" aria-label="Close">&times;</button></div>
+      <div class="dlg-body">
+        <div class="field"><label for="rName">Room name *</label><input id="rName" name="name" type="text" maxlength="60" placeholder="Deluxe double with lake view"></div>
+        <div class="row">
+          <div class="field"><label for="rPrice">Price per night (৳) *</label><input id="rPrice" name="pricePerNight" type="number" min="0" inputmode="numeric" placeholder="4500"></div>
+          <div class="field"><label for="rRegular">Regular price (৳)</label><input id="rRegular" name="regularPrice" type="number" min="0" inputmode="numeric" placeholder="Only for a discount"><span class="hint">Shown struck through when higher than the price.</span></div>
+        </div>
+        <div class="row row-3">
+          <div class="field"><label for="rGuests">Guests per room</label><input id="rGuests" name="maxGuests" type="number" min="1" max="20" inputmode="numeric" value="2"></div>
+          <div class="field"><label for="rCount">Rooms of this type</label><input id="rCount" name="count" type="number" min="1" max="500" inputmode="numeric" value="1"></div>
+          <div class="field"><label for="rSize">Size (sq ft)</label><input id="rSize" name="sizeSqft" type="number" min="0" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label for="rBeds">Beds</label><input id="rBeds" name="beds" type="text" maxlength="60" placeholder="1 king bed, or 2 single beds"></div>
+        <div class="field"><label for="rDescription">About the room</label><textarea id="rDescription" name="description" rows="3" maxlength="600"></textarea></div>
+        <div class="field"><label for="rAmenities">Room amenities</label><input id="rAmenities" name="amenities" type="text" maxlength="600" placeholder="Air conditioning, Hot water, Balcony, TV"><span class="hint">Separate with commas.</span></div>
+        <div class="field">
+          <span class="label">Photos</span>
+          <div class="thumbs" id="roomThumbs"></div>
+          <input id="rPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple style="margin-top:8px">
+          <span class="hint">Up to 6 photos of this room.</span>
+        </div>
+        <label class="check"><input type="checkbox" id="rActive" checked> Guests can request this room</label>
+        <div class="alert alert-error" id="roomError" role="alert" hidden style="margin-top:14px"></div>
+      </div>
+      <div class="dlg-foot">
+        <button type="button" class="btn btn-danger" id="roomDelete" hidden>Remove room type</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn btn-ghost" data-action="close-dialog">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="roomSave">Save room type</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Answer a stay request -->
+  <dialog id="answerDialog">
+    <form id="answerForm" novalidate>
+      <div class="dlg-head"><h2 id="answerTitle">Accept this stay</h2><button type="button" class="dlg-x" data-action="close-dialog" aria-label="Close">&times;</button></div>
+      <div class="dlg-body">
+        <p id="answerSummary" class="muted" style="margin-bottom:14px"></p>
+        <div class="field">
+          <label for="answerNote" id="answerNoteLabel">Message to the guest</label>
+          <textarea id="answerNote" rows="4" maxlength="1000"></textarea>
+          <span class="hint" id="answerHint"></span>
+        </div>
+        <div class="alert alert-error" id="answerError" role="alert" hidden></div>
+      </div>
+      <div class="dlg-foot">
+        <button type="button" class="btn btn-ghost" data-action="close-dialog">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="answerSubmit">Accept</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+  <script src="/js/picker-only.js"></script>
+  <script src="/js/hotel.js"></script>
+</body>
+</html>

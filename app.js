@@ -33,6 +33,7 @@ const bookingRouter = require('./routes/bookingRoutes');
 const reviewRouter = require('./routes/reviewRoutes');
 const complaintRouter = require('./routes/complaintRoutes');
 const agencyRouter = require('./routes/agencyRoutes');
+const hotelPanelRouter = require('./routes/hotelPanelRoutes');
 const adminAgencyRouter = require('./routes/adminAgencyRoutes');
 const adminUserRouter = require('./routes/adminUserRoutes');
 const adminVendorRouter = require('./routes/adminVendorRoutes');
@@ -194,6 +195,7 @@ app.get(['/', '/home'], sendPage('index.html'));
 app.get(['/admin', '/admin/dashboard'], sendPage('admin.html'));
 app.get('/reset-password', sendPage('reset-password.html'));
 app.get(['/agent', '/agent/dashboard', '/vendor', '/vendor/dashboard'], sendPage('agent.html'));
+app.get(['/hotel', '/hotel/dashboard'], sendPage('hotel.html'));
 app.get(['/apply', '/apply/status'], sendPage('apply.html'));
 app.get('/accept-invite', sendPage('accept-invite.html'));
 
@@ -222,7 +224,7 @@ app.get('/api-docs.json', (req, res) => {
 
 // API CACHING (see utils/cache.js)
 app.use('/api', privateByDefault);
-app.use(['/api/v1/admin', '/api/v1/agency'], clearAfterWrite);
+app.use(['/api/v1/admin', '/api/v1/agency', '/api/v1/hotel-panel'], clearAfterWrite);
 
 // Read routes get smaller images. Not /admin, /agency or /users, whose panels send photo URLs back.
 app.use([
@@ -272,6 +274,7 @@ app.use('/api/v1/complaints', complaintRouter);
 app.use('/api/v1/chats', chatRoutes.traveler);
 app.use('/api/v1/agency/me/chats', chatRoutes.agency);
 app.use('/api/v1/agency', agencyRouter);
+app.use('/api/v1/hotel-panel', hotelPanelRouter);
 // Everything under /api/v1/admin is for administrators, managers and developers
 app.use('/api/v1/admin/support-chats', chatRoutes.support);
 app.use('/api/v1/admin', authController.protect, authController.restrictTo('admin', 'manager', 'dev'));

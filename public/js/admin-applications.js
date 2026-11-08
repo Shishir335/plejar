@@ -370,6 +370,7 @@ async function openApproveModal() {
   const isHotel = a.vendorType === 'hotel';
   document.getElementById('approveLead').innerHTML = `<strong>${E(a.agencyName)}</strong>${isHotel ? ' <span class="tag">Hotel</span>' : ''}<br>Owner: ${E(a.contactName)} (${E(a.email)})${acct ? '' : '<br>A new account with a temporary password is created.'}${isHotel ? '<br>A draft hotel listing is created from the application, for you to add photos to and publish.' : ''}`;
   AP.approveLabel = acct ? (isHotel ? 'Accept hotel' : 'Accept agency') : 'Accept and create account';
+  document.getElementById('approveTitle').textContent = isHotel ? 'Accept this hotel' : 'Accept this agency';
   document.getElementById('apVerify').checked = true;
   document.getElementById('apUseExistingRow').hidden = !confirmAccount;
   document.getElementById('apUseExisting').checked = false;

@@ -7,7 +7,7 @@ const AppError = require('../utils/appError');
 const { escapeRegex, pageParams, paged } = require('../utils/query');
 const { logActivity } = require('../utils/activity');
 const { saveContentImage, removeContentImage, removeContentFolder } = require('../utils/uploads');
-const { placeView, hotelCard, savedSet } = require('../utils/tourCards');
+const { placeView, priceView, hotelCard, savedSet } = require('../utils/tourCards');
 
 // Hotels for the app ("Hotels Near You" on the Tours screen) and their management in the admin panel
 
@@ -102,7 +102,22 @@ exports.getHotel = catchAsync(async (req, res, next) => {
         phone: hotel.phone,
         website: hotel.website,
         checkIn: hotel.checkIn,
-        checkOut: hotel.checkOut
+        checkOut: hotel.checkOut,
+        // Room types and house rules the hotel manages itself; stays can be requested when it has its own account
+        roomTypes: (hotel.roomTypes || []).filter(r => r.active !== false).map(r => ({
+          _id: r._id,
+          name: r.name,
+          description: r.description,
+          price: { ...priceView(r.pricePerNight, r.regularPrice), per: 'night' },
+          maxGuests: r.maxGuests,
+          beds: r.beds,
+          sizeSqft: r.sizeSqft,
+          rooms: r.count,
+          amenities: r.amenities,
+          photos: r.photos
+        })),
+        policies: hotel.policies || {},
+        canRequestStay: Boolean(hotel.agency) && (hotel.roomTypes || []).some(r => r.active !== false)
       }
     }
   });

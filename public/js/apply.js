@@ -186,7 +186,10 @@ async function handleApply(e) {
   submit.disabled = true;
   submit.textContent = t('sendingApplication');
   try {
-    const res = await fetch('/api/v1/applications', { method: 'POST', body });
+    // Never leave the button spinning: give up after 2 minutes (big files on a slow connection take a while)
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    const res = await fetch('/api/v1/applications', { method: 'POST', body, signal: controller.signal }).finally(() => clearTimeout(timer));
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const key = res.status === 409 ? (hotel ? 'errDuplicateHotel' : 'errDuplicate') : res.status === 429 ? 'errTooMany' : 'errApplyFailed';

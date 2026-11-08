@@ -1,0 +1,26 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  p #{guestName} would like to stay at #{hotelName}.
+  table(role='presentation', border='0', cellpadding='0', cellspacing='0', style='margin:0 0 16px;border:1px solid #d8e2da;border-radius:8px;')
+    tbody
+      tr
+        td(style='padding:8px 12px;color:#6f8279;') Room
+        td(style='padding:8px 12px;font-weight:bold;') #{roomName}
+      tr
+        td(style='padding:8px 12px;color:#6f8279;') Dates
+        td(style='padding:8px 12px;font-weight:bold;') #{dates} (#{nights} night#{nights === 1 ? '' : 's'})
+      tr
+        td(style='padding:8px 12px;color:#6f8279;') Rooms and guests
+        td(style='padding:8px 12px;font-weight:bold;') #{rooms} room#{rooms === 1 ? '' : 's'}, #{guests} guest#{guests === 1 ? '' : 's'}
+  table.btn.btn-primary(role='presentation', border='0', cellpadding='0', cellspacing='0')
+    tbody
+      tr
+        td(align='left')
+          table(role='presentation', border='0', cellpadding='0', cellspacing='0')
+            tbody
+              tr
+                td
+                  a(href=`${url}`, target='_blank') Answer the request
+  p Accept or decline it from your hotel panel. The guest is told straight away.

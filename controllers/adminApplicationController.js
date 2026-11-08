@@ -156,7 +156,7 @@ exports.requestInfo = catchAsync(async (req, res, next) => {
   const emailSent = await mail(lead, statusURL(req, lead), m => { m.data.note = note; return m.sendApplicationInfoRequested(); });
   res.status(200).json({
     status: 'success',
-    message: emailSent ? `Request sent to ${lead.email}.` : 'Request saved. Email isn\'t set up, so let the applicant know another way.',
+    message: emailSent ? `Request sent to ${lead.email}.` : emailSent === null ? `Request saved. The email to ${lead.email} is still sending.` : 'Request saved. Email isn\'t set up, so let the applicant know another way.',
     data: { application: lead, emailSent }
   });
 });
@@ -177,14 +177,14 @@ exports.reject = catchAsync(async (req, res, next) => {
   const emailSent = await mail(lead, '', m => { m.data.note = lead.rejectedReason; return m.sendApplicationRejected(); });
   res.status(200).json({
     status: 'success',
-    message: emailSent ? `Application rejected and ${lead.email} was told why.` : 'Application rejected. Email isn\'t set up, so let the applicant know another way.',
+    message: emailSent ? `Application rejected and ${lead.email} was told why.` : emailSent === null ? `Application rejected. The email to ${lead.email} is still sending.` : 'Application rejected. Email isn\'t set up, so let the applicant know another way.',
     data: { application: lead, emailSent }
   });
 });
 
 // Sign-in details for the admin to email to the vendor (the password is never stored in readable form)
 const credentialsFor = (req, owner, agency, password) => {
-  const loginURL = `${req.protocol}://${req.get('host')}/agent`;
+  const loginURL = `${req.protocol}://${req.get('host')}/${agency.kind === 'hotel' ? 'hotel' : 'agent'}`;
   const vendorId = vendorCode(agency);
   return {
     name: owner.name,
@@ -358,7 +358,7 @@ exports.approve = catchAsync(async (req, res, next) => {
   // An existing account keeps its password, so the email only says the vendor panel is open
   if (existing && (req.body.send === true || req.body.send === 'true')) {
     try {
-      await new Email(owner, `${req.protocol}://${req.get('host')}/agent`, { agencyName: agency.name, email: owner.email, hotel: isHotel }).sendVendorAccepted();
+      await new Email(owner, `${req.protocol}://${req.get('host')}/${isHotel ? 'hotel' : 'agent'}`, { agencyName: agency.name, email: owner.email, hotel: isHotel }).sendVendorAccepted();
       emailSent = true;
     } catch (err) {
       console.warn(`[MAIL WARNING] Acceptance email to ${owner.email} not sent:`, err.message);

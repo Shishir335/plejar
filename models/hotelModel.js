@@ -41,6 +41,34 @@ const hotelSchema = new mongoose.Schema(
 
     rooms: { type: Number, min: [1, 'Enter how many rooms there are'], default: null },
 
+    // Room types the hotel manages from its own panel (/hotel). Travelers request a stay in one of them.
+    roomTypes: {
+      type: [
+        new mongoose.Schema({
+          name: { type: String, required: [true, 'Name the room type'], trim: true, maxlength: [60, 'Keep the room name under 60 characters'] },
+          description: { type: String, trim: true, maxlength: [600, 'Keep the room description under 600 characters'], default: '' },
+          pricePerNight: { type: Number, required: [true, 'Enter the price per night'], min: [0, 'The price cannot be negative'] },
+          regularPrice: { type: Number, min: 0, default: null },
+          maxGuests: { type: Number, min: [1, 'At least 1 guest'], max: [20, 'Up to 20 guests a room'], default: 2 },
+          beds: { type: String, trim: true, maxlength: 60, default: '' },
+          sizeSqft: { type: Number, min: 0, max: 20000, default: null },
+          count: { type: Number, min: [1, 'At least 1 room of this type'], max: 500, default: 1 },
+          amenities: { type: [String], default: [] },
+          photos: { type: [String], default: [] },
+          active: { type: Boolean, default: true }
+        }, { timestamps: true })
+      ],
+      default: []
+    },
+    // House rules guests see before they ask for a stay
+    policies: {
+      cancellation: { type: String, trim: true, maxlength: 1000, default: '' },
+      children: { type: String, trim: true, maxlength: 500, default: '' },
+      pets: { type: String, trim: true, maxlength: 300, default: '' },
+      smoking: { type: String, trim: true, maxlength: 300, default: '' },
+      other: { type: String, trim: true, maxlength: 1000, default: '' }
+    },
+
     // The hotel's own vendor account, when the hotel joined through /apply. Plejar still publishes the listing.
     agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', index: true },
     sourceLead: { type: mongoose.Schema.ObjectId, ref: 'AgentLead' },

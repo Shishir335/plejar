@@ -15,8 +15,12 @@ module.exports = class Email {
     }
 
     newTransport() {
+        // Give up quickly when the mail server can't be reached (some hosts block SMTP),
+        // instead of nodemailer's default of minutes
+        const limits = { connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000 };
         if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
             return nodemailer.createTransport({
+                ...limits,
                 service: 'gmail',
                 auth: {
                     user: process.env.GMAIL_USER.trim(),
@@ -28,6 +32,7 @@ module.exports = class Email {
         if (process.env.NODE_ENV === 'production') {
             if (process.env.SENDGRID_USERNAME && process.env.SENDGRID_USERNAME.includes('brevo')) {
                 return nodemailer.createTransport({
+                    ...limits,
                     host: 'smtp-relay.brevo.com',
                     port: 587,
                     auth: {
@@ -37,6 +42,7 @@ module.exports = class Email {
                 });
             }
             return nodemailer.createTransport({
+                ...limits,
                 service: 'SendGrid',
                 auth: {
                     user: process.env.SENDGRID_USERNAME,
@@ -46,6 +52,7 @@ module.exports = class Email {
         }
 
         return nodemailer.createTransport({
+            ...limits,
             host: process.env.EMAIL_HOST || 'sandbox.smtp.mailtrap.io',
             port: process.env.EMAIL_PORT || 2525,
             auth: {
@@ -106,6 +113,10 @@ module.exports = class Email {
     // Accepted onto an account the person already has: no new password to send
     async sendVendorAccepted() {
         await this.send('vendorAccepted', `${this.data.agencyName} is now a ${process.env.APP_NAME || 'Plejar'} member agency`);
+    }
+
+    async sendStayRequest() {
+        await this.send('stayRequest', `New stay request for ${this.data.hotelName}`);
     }
 
     async sendVendorLogin(subject) {

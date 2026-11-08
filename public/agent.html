@@ -36,6 +36,9 @@
       <p style="margin-top: 18px; font-size: 0.84rem; color: var(--ink-faint); text-align: center;">
         New agency? <a href="/apply">Apply for membership</a>.
       </p>
+      <p style="margin-top: 6px; font-size: 0.84rem; color: var(--ink-faint); text-align: center;">
+        Hotel or resort? <a href="/hotel">Sign in to the hotel panel</a>.
+      </p>
     </form>
   </main>
 
@@ -71,17 +74,16 @@
       <div class="side-agency" id="sideAgency"></div>
       <nav class="side-nav" aria-label="Agency panel">
         <button data-view="overview" class="active">Overview</button>
-        <button data-view="hotel" data-for="hotel" hidden>Your hotel</button>
-        <button data-view="events" data-for="agency">Tour events</button>
-        <button data-view="registrations" data-for="agency">Registrations</button>
-        <button data-view="messages" data-for="agency">Messages <span class="nav-badge" id="messagesBadge" hidden>0</span></button>
-        <button data-view="guides" data-for="agency">Guides</button>
-        <button data-view="announcements" data-for="agency">Announcements</button>
-        <button data-view="ads" data-for="agency">Tour ads</button>
-        <button data-view="notifications" data-for="agency">Notifications</button>
-        <button data-view="wall" data-for="agency">Wall</button>
-        <button data-view="followers" data-for="agency">Followers</button>
-        <button data-view="profile"><span data-for="agency">Agency profile</span><span data-for="hotel" hidden>Hotel profile</span></button>
+        <button data-view="events">Tour events</button>
+        <button data-view="registrations">Registrations</button>
+        <button data-view="messages">Messages <span class="nav-badge" id="messagesBadge" hidden>0</span></button>
+        <button data-view="guides">Guides</button>
+        <button data-view="announcements">Announcements</button>
+        <button data-view="ads">Tour ads</button>
+        <button data-view="notifications">Notifications</button>
+        <button data-view="wall">Wall</button>
+        <button data-view="followers">Followers</button>
+        <button data-view="profile">Agency profile</button>
         <button data-view="team" data-owner-only>Team</button>
         <button data-view="verification" data-owner-only>Verification</button>
       </nav>
@@ -98,24 +100,18 @@
         <div class="page-head">
           <div>
             <h1 id="overviewTitle">Overview</h1>
-            <p><span data-for="agency">Here's how your agency looks on Plejar right now.</span><span data-for="hotel" hidden>Here's how your hotel looks on Plejar right now.</span></p>
+            <p>Here's how your agency looks on Plejar right now.</p>
           </div>
-          <button class="btn btn-primary" data-action="new-event" data-for="agency">Create a tour event</button>
-          <button class="btn btn-primary" data-action="go" data-view="hotel" data-for="hotel" hidden>See your hotel listing</button>
+          <button class="btn btn-primary" data-action="new-event">Create a tour event</button>
         </div>
         <div id="overviewCallout"></div>
-        <div class="card" id="hotelSummaryCard" data-for="hotel" hidden>
-          <h2>Your hotel listing</h2>
-          <p class="muted">Plejar's team adds photos and publishes your listing in the app.</p>
-          <ul class="doc-list" id="hotelSummary"></ul>
-        </div>
-        <dl class="stats" data-for="agency">
+        <dl class="stats">
           <div class="stat"><dt>Upcoming events</dt><dd id="statUpcoming">0</dd></div>
           <div class="stat"><dt>Open registrations</dt><dd id="statRegistrations">0</dd></div>
           <div class="stat"><dt>Announcements</dt><dd id="statAnnouncements">0</dd></div>
           <div class="stat"><dt>Team members</dt><dd id="statTeam">0</dd></div>
         </dl>
-        <div class="card" id="nextEventsCard" data-for="agency">
+        <div class="card" id="nextEventsCard">
           <h2>Coming up</h2>
           <p class="muted">Your next published tour events.</p>
           <ul class="doc-list" id="nextEvents"></ul>
@@ -125,17 +121,6 @@
           <p class="muted">A complete profile helps travelers trust you.</p>
           <ul class="doc-list" id="profileChecklist"></ul>
         </div>
-      </section>
-
-      <!-- A hotel account's listing -->
-      <section id="view-hotel" data-view-pane hidden>
-        <div class="page-head">
-          <div>
-            <h1>Your hotel</h1>
-            <p>Your listing in the Plejar app. Plejar's team adds the photos and publishes it; you keep the everyday details up to date.</p>
-          </div>
-        </div>
-        <div id="hotelList"></div>
       </section>
 
       <!-- The agency's wall -->
@@ -202,10 +187,10 @@
       <section id="view-profile" data-view-pane hidden>
         <div class="page-head">
           <div>
-            <h1><span data-for="agency">Agency profile</span><span data-for="hotel" hidden>Hotel profile</span></h1>
-            <p><span data-for="agency">This is what travelers see on your agency page.</span><span data-for="hotel" hidden>Your hotel's vendor account on Plejar. The details guests see are under Your hotel.</span></p>
+            <h1>Agency profile</h1>
+            <p>This is what travelers see on your agency page.</p>
           </div>
-          <button class="btn btn-quiet" data-action="go" data-view="wall" data-for="agency">See your wall</button>
+          <button class="btn btn-quiet" data-action="go" data-view="wall">See your wall</button>
         </div>
         <div class="alert alert-warn" id="profileStaffNote" hidden>Only the owner can edit the profile.</div>
         <form class="card" id="profileForm" novalidate>
@@ -238,10 +223,10 @@
             <span class="hint">One line, shown under your name.</span>
           </div>
           <div class="field">
-            <label for="pfDescription"><span data-for="agency">About your agency</span><span data-for="hotel" hidden>About your hotel</span></label>
+            <label for="pfDescription">About your agency</label>
             <textarea id="pfDescription" name="description" maxlength="1500" rows="4" placeholder="What kind of trips you run, since when, what makes your trips different"></textarea>
           </div>
-          <div class="field" data-for="agency">
+          <div class="field">
             <label for="pfRegions">Where you run tours</label>
             <input id="pfRegions" name="regions" type="text" placeholder="Sajek, Bandarban, Cox's Bazar">
             <span class="hint">Separate places with commas.</span>
@@ -490,7 +475,7 @@
         <div class="page-head">
           <div>
             <h1>Verification</h1>
-            <p><span data-for="agency">Verified agencies get a mark on their profile and tour events.</span><span data-for="hotel" hidden>Keep your hotel's documents up to date here.</span> Plejar checks your trade license and the owner's national ID.</p>
+            <p>Verified agencies get a mark on their profile and tour events. Plejar checks your trade license and the owner's national ID.</p>
           </div>
         </div>
         <div id="verificationStatus"></div>

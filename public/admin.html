@@ -1358,7 +1358,7 @@
   <!-- Reason Modal (delete, hide, reject) -->
   <div id="approveModal" class="modal-overlay">
     <div class="modal-card">
-      <div class="modal-head"><h3>Accept this agency</h3><button class="modal-x" onclick="closeModal('approveModal')" aria-label="Close">&times;</button></div>
+      <div class="modal-head"><h3 id="approveTitle">Accept this agency</h3><button class="modal-x" onclick="closeModal('approveModal')" aria-label="Close">&times;</button></div>
       <form id="approveForm" onsubmit="submitApprove(event)" novalidate>
         <p class="modal-lead" id="approveLead"></p>
         <div class="check-list" style="margin-bottom: 16px;">

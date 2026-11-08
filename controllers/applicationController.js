@@ -58,15 +58,21 @@ const storeFiles = (files, lead) => {
   })));
 };
 
-// Mail problems must never lose an application, so failures are only logged
-const mail = async (lead, url, send) => {
-  try {
-    await send(new Email({ email: lead.email, name: lead.contactName }, url, { agencyName: lead.agencyName, reference: lead.reference }));
-    return true;
-  } catch (err) {
-    console.warn(`[MAIL WARNING] Application email to ${lead.email} not sent:`, err.message);
-    return false;
-  }
+// Mail problems must never lose an application, so failures are only logged. A slow mail server
+// mustn't keep the applicant waiting either: after a few seconds we answer without it (null) and
+// the email carries on in the background.
+const MAIL_WAIT_MS = 6000;
+const mail = (lead, url, send) => {
+  const sending = (async () => {
+    try {
+      await send(new Email({ email: lead.email, name: lead.contactName }, url, { agencyName: lead.agencyName, reference: lead.reference }));
+      return true;
+    } catch (err) {
+      console.warn(`[MAIL WARNING] Application email to ${lead.email} not sent:`, err.message);
+      return false;
+    }
+  })();
+  return Promise.race([sending, new Promise(resolve => setTimeout(() => resolve(null), MAIL_WAIT_MS))]);
 };
 
 // What the applicant may see about their own application (never internal notes or who reviewed it)

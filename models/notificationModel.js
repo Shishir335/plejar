@@ -8,6 +8,8 @@ const KINDS = [
   'chat_message',
   // About the traveler's own bookings
   'booking_requested', 'booking_confirmed', 'booking_cancelled', 'booking_completed', 'trip_reminder', 'points_earned', 'referral_reward',
+  // A hotel answering the traveler's stay request
+  'stay_accepted', 'stay_declined',
   // From other travelers
   'post_reaction', 'post_comment', 'comment_reply', 'comment_reaction', 'post_share', 'new_follower',
   // From Plejar
@@ -39,6 +41,9 @@ const notificationSchema = new mongoose.Schema(
     chat: { type: mongoose.Schema.ObjectId, ref: 'ChatRoom' },
     // The booking an update is about
     booking: { type: mongoose.Schema.ObjectId, ref: 'Booking' },
+    // The hotel stay request an update is about
+    stayRequest: { type: mongoose.Schema.ObjectId, ref: 'StayRequest' },
+    hotel: { type: mongoose.Schema.ObjectId, ref: 'Hotel' },
     readAt: Date
   },
   { timestamps: true }
@@ -73,6 +78,8 @@ notificationSchema.post('save', function (doc) {
         postId: doc.post ? String(doc.post) : '',
         conversationId: doc.conversation ? String(doc.conversation) : '',
         chatId: doc.chat ? String(doc.chat) : '',
+        stayRequestId: doc.stayRequest ? String(doc.stayRequest) : '',
+        hotelId: doc.hotel ? String(doc.hotel) : '',
         route: pushRoute(doc)
       }
     }).catch(err => {

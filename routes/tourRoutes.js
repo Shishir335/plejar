@@ -5,6 +5,7 @@ const hotels = require('../controllers/hotelController');
 const promotions = require('../controllers/promotionController');
 const chat = require('../controllers/chatController');
 const guides = require('../controllers/guideController');
+const stays = require('../controllers/stayController');
 
 // The app's Tours tab (anyone can browse; hearts, searches and recently viewed need sign-in)
 const tourRouter = express.Router();
@@ -25,7 +26,11 @@ tourRouter.route('/:id/save').post(protect, tours.save('tour')).delete(protect, 
 const hotelRouter = express.Router();
 hotelRouter.get('/nearby', optionalAuth, hotels.nearby);
 hotelRouter.get('/', optionalAuth, hotels.listHotels);
+// A traveler's stay requests to hotels, and asking for a stay
+hotelRouter.get('/stay-requests', protect, stays.mine);
+hotelRouter.post('/stay-requests/:id/cancel', protect, stays.cancel);
 hotelRouter.get('/:id', optionalAuth, hotels.getHotel);
+hotelRouter.post('/:id/stay-requests', protect, stays.create);
 hotelRouter.route('/:id/save').post(protect, tours.save('hotel')).delete(protect, tours.unsave('hotel'));
 
 // Banners at the top of the Tours screen

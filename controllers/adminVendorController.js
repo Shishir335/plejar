@@ -479,16 +479,16 @@ exports.setMemberPassword = catchAsync(async (req, res, next) => {
     agency: agency._id
   });
 
-  const loginURL = `${req.protocol}://${req.get('host')}/agent`;
+  const loginURL = `${req.protocol}://${req.get('host')}/${agency.kind === 'hotel' ? 'hotel' : 'agent'}`;
   const kind = wasNew && member.agencyRole === 'owner' ? 'new' : 'changed';
   const vendorId = vendorCode(agency);
-  const emailDraft = credentialsEmail({ name: member.name, agencyName: agency.name, email: member.email, password, loginURL, kind, temporary: requireChange, vendorId });
+  const emailDraft = credentialsEmail({ name: member.name, agencyName: agency.name, email: member.email, password, loginURL, kind, temporary: requireChange, vendorId, hotel: agency.kind === 'hotel' });
 
   // "Send login details": email them straight away (the admin still gets them, in case email fails)
   let emailSent = null;
   if (req.body.send === true || req.body.send === 'true') {
     try {
-      await new Email(member, loginURL, { agencyName: agency.name, vendorCode: vendorId, email: member.email, password, temporary: requireChange, kind }).sendVendorLogin(emailDraft.subject);
+      await new Email(member, loginURL, { agencyName: agency.name, vendorCode: vendorId, email: member.email, password, temporary: requireChange, kind, hotel: agency.kind === 'hotel' }).sendVendorLogin(emailDraft.subject);
       emailSent = true;
       member.credentialsSentAt = new Date();
       await member.save({ validateBeforeSave: false });
