@@ -7,8 +7,15 @@
 const $ = id => document.getElementById(id);
 const PANEL = '/api/v1/hotel-panel';
 
+// The hotel panel keeps its own sign-in, apart from the tour panel's 'plezar_token',
+// so a tour agency account and a hotel account can be signed in in the same browser.
+const TOKEN_KEY = 'plejar_hotel_token';
+const SHARED_TOKEN_KEY = 'plezar_token';
+const readStored = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
+const removeStored = key => { try { localStorage.removeItem(key); } catch (e) { /* ignore */ } };
+
 const state = {
-  token: (() => { try { return localStorage.getItem('plezar_token'); } catch (e) { return null; } })(),
+  token: readStored(TOKEN_KEY),
   me: null,
   agency: null,
   hotel: null,
@@ -96,7 +103,12 @@ function setBusy(button, busy, label) {
 
 function saveToken(token) {
   state.token = token;
-  try { localStorage.setItem('plezar_token', token); } catch (e) { /* the cookie still signs you in */ }
+  try { localStorage.setItem(TOKEN_KEY, token); } catch (e) { /* kept in memory for this visit */ }
+}
+
+function clearToken() {
+  state.token = null;
+  removeStored(TOKEN_KEY);
 }
 
 // ---------- Sign in ----------
@@ -179,30 +191,40 @@ $('passwordForm').addEventListener('submit', async e => {
 
 async function logout() {
   await api('/api/v1/users/logout').catch(() => {});
-  state.token = null;
-  try { localStorage.removeItem('plezar_token'); } catch (e) { /* ignore */ }
+  clearToken();
   showLogin('You have signed out.');
 }
 
 // ---------- Boot ----------
 
 async function boot() {
+  // Never fall back to the shared cookie: it may belong to a tour account signed in elsewhere.
+  // Hotels signed in before the panels were split have their token under the shared key;
+  // take it over only if it turns out to be a hotel account.
+  let shared = false;
+  if (!state.token) {
+    state.token = readStored(SHARED_TOKEN_KEY);
+    shared = Boolean(state.token);
+    if (!shared) return showLogin();
+  }
   let account;
   try {
     account = (await api('/api/v1/agency/me')).data;
   } catch (err) {
-    if (err.status === 401) return showLogin();
-    if (err.status === 403) {
-      await api('/api/v1/users/logout').catch(() => {});
-      return showLogin(err.message);
-    }
+    if (shared) state.token = null; else if (err.status === 401 || err.status === 403) clearToken();
+    if (err.status === 401 || shared) return showLogin();
+    if (err.status === 403) return showLogin(err.message);
     return showLogin('Could not load your hotel. Reload the page to try again.');
   }
-  // Tour agencies have their own panel. Don't bounce them there: this browser may
-  // simply still be signed in to a tour account, so let them sign in to a hotel here.
   if (account.agency.kind !== 'hotel') {
-    const name = account.agency.name ? ` (${account.agency.name})` : '';
-    return showLogin(`This browser is signed in to a tour agency account${name}. Sign in with your hotel account below, or use the tour agency link at the bottom.`);
+    // A tour agency account: leave its sign-in alone for the tour panel.
+    if (shared) { state.token = null; return showLogin(); }
+    clearToken();
+    return showLogin('That is a tour agency account. Sign in to it at /agent, or sign in with your hotel account here.');
+  }
+  if (shared) {
+    saveToken(state.token);
+    removeStored(SHARED_TOKEN_KEY);
   }
   state.me = account.me;
   if (state.me.mustChangePassword) return showPasswordStep();

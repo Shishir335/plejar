@@ -269,6 +269,8 @@ document.addEventListener('click', e => {
 // ---------- Boot ----------
 
 async function boot() {
+  // Never fall back to the shared cookie: it may belong to a hotel account signed in at /hotel.
+  if (!state.token) return showLogin();
   try {
     const { data } = await api('/api/v1/agency/me');
     state.me = data.me;
@@ -284,6 +286,13 @@ async function boot() {
   }
 
   if (isHotelAccount()) {
+    // Hotels have their own panel and their own saved sign-in, so a tour account
+    // and a hotel account can both stay signed in in this browser.
+    try {
+      localStorage.setItem('plejar_hotel_token', state.token);
+      localStorage.removeItem('plezar_token');
+    } catch (e) { /* the hotel panel will ask them to sign in */ }
+    state.token = null;
     window.location.replace('/hotel');
     return;
   }
