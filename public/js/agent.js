@@ -297,6 +297,10 @@ async function boot() {
     return;
   }
   if (state.me.mustChangePassword) return showPasswordStep();
+  // Same account runs a hotel too: one sign-in opens both panels
+  try {
+    if (state.me.otherVendor && !localStorage.getItem('plejar_hotel_token')) localStorage.setItem('plejar_hotel_token', state.token);
+  } catch (e) { /* they sign in at /hotel */ }
 
   $('loginView').hidden = true;
   $('passwordView').hidden = true;
@@ -327,6 +331,10 @@ function renderSide() {
     <div><strong>${escapeHTML(a.name)}</strong><small>${a.verified ? 'Verified vendor' : 'Not verified yet'}</small></div>
   `;
   $('sideUserName').textContent = state.me.name;
+  // The same account also runs a hotel
+  const other = state.me.otherVendor;
+  $('otherPanel').hidden = !other;
+  if (other) $('otherPanel').title = `Open ${other.name} in the hotel panel`;
   $('sideUserRole').textContent = isOwner() ? 'Owner' : 'Team member';
 }
 

@@ -9,6 +9,7 @@ const { sendInvite } = require('../utils/invites');
 const { logActivity } = require('../utils/activity');
 const { saveAgencyImage, removeAgencyImage } = require('../utils/uploads');
 const { addRole } = require('../utils/roles');
+const membership = require('../utils/vendorMembership');
 const {
   toList,
   pick,
@@ -62,8 +63,8 @@ exports.listAgencies = catchAsync(async (req, res, next) => {
   const ids = agencies.map(a => a._id);
 
   const [owners, memberCounts, pkgCounts] = await Promise.all([
-    User.find({ agency: { $in: ids }, agencyRole: 'owner' }).select('name email accountStatus agency').lean(),
-    User.aggregate([{ $match: { agency: { $in: ids } } }, { $group: { _id: '$agency', count: { $sum: 1 } } }]),
+    User.find(membership.ownersOfAny(ids)).select('name email accountStatus agency agencyRole hotelAgency hotelAgencyRole').lean(),
+    User.aggregate(membership.memberCountPipeline(ids)),
     Package.aggregate([
       { $match: { agency: { $in: ids } } },
       { $group: { _id: '$agency', total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$status', 'published'] }, 1, 0] } } } }
@@ -71,7 +72,7 @@ exports.listAgencies = catchAsync(async (req, res, next) => {
   ]);
 
   const byId = (rows, key = '_id') => Object.fromEntries(rows.map(r => [String(r[key]), r]));
-  const ownerMap = byId(owners, 'agency');
+  const ownerMap = membership.ownersById(owners);
   const memberMap = byId(memberCounts);
   const pkgMap = byId(pkgCounts);
 
@@ -108,7 +109,7 @@ exports.getAgency = catchAsync(async (req, res, next) => {
   if (!agency) return;
 
   const [members, packages, counts] = await Promise.all([
-    User.find({ agency: agency._id }).sort({ agencyRole: 1, name: 1 }),
+    User.find(membership.memberOf(agency._id)).sort({ agencyRole: 1, name: 1 }),
     Package.find({ agency: agency._id }).sort({ updatedAt: -1 }),
     packageCounts(agency._id)
   ]);
@@ -118,7 +119,7 @@ exports.getAgency = catchAsync(async (req, res, next) => {
     data: {
       agency,
       verification: verificationView(agency),
-      members: members.map(teamView),
+      members: members.map(u => teamView(u, agency._id)),
       packages,
       stats: { packages: counts, teamSize: members.length }
     }
@@ -290,7 +291,7 @@ exports.resendInvite = catchAsync(async (req, res, next) => {
   const agency = await findAgency(req.params.id, next);
   if (!agency) return;
 
-  const member = await User.findOne({ _id: req.params.userId, agency: agency._id });
+  const member = await User.findOne({ _id: req.params.userId, ...membership.memberOf(agency._id) });
   if (!member) return next(new AppError('No member found with that ID for this agency.', 404));
   if (member.accountStatus !== 'invited') {
     return next(new AppError('This person has already accepted their invite.', 400));

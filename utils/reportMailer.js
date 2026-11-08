@@ -1,10 +1,11 @@
 const User = require('../models/userModel');
+const { ownerOf } = require('./vendorMembership');
 const Email = require('./email');
 const { buildReport } = require('./vendorReport');
 
 // Who a vendor's report goes to: the owner, and the agency's public email if asked and different
 const reportRecipients = async (agency, alsoToAgencyEmail) => {
-  const owner = await User.findOne({ agency: agency._id, agencyRole: 'owner' }).select('name email');
+  const owner = await User.findOne(ownerOf(agency._id)).select('name email');
   const list = owner ? [{ name: owner.name, email: owner.email }] : [];
   if (alsoToAgencyEmail && agency.email && !list.some(r => r.email === agency.email)) list.push({ name: agency.name, email: agency.email });
   return list;

@@ -20,6 +20,7 @@ const Email = require('../utils/email');
 const { reportPeriod, buildReport, reportText } = require('../utils/vendorReport');
 const { sendReport, reportRecipients } = require('../utils/reportMailer');
 const { planProblems } = require('../utils/tourPlan');
+const membership = require('../utils/vendorMembership');
 
 const findVendor = async (id, next, select) => {
   if (!validId(id)) {
@@ -127,8 +128,8 @@ exports.listVendors = catchAsync(async (req, res, next) => {
   const ids = agencies.map(a => a._id);
 
   const [owners, members, pkgs, bookings, ratings] = await Promise.all([
-    User.find({ agency: { $in: ids }, agencyRole: 'owner' }).select('name email accountStatus agency').lean(),
-    User.aggregate([{ $match: { agency: { $in: ids } } }, { $group: { _id: '$agency', count: { $sum: 1 } } }]),
+    User.find(membership.ownersOfAny(ids)).select('name email accountStatus agency agencyRole hotelAgency hotelAgencyRole').lean(),
+    User.aggregate(membership.memberCountPipeline(ids)),
     Package.aggregate([{ $match: { agency: { $in: ids } } }, { $group: { _id: '$agency', total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$status', 'published'] }, 1, 0] } } } }]),
     Booking.aggregate([
       { $match: { agency: { $in: ids } } },
@@ -143,7 +144,7 @@ exports.listVendors = catchAsync(async (req, res, next) => {
     Review.aggregate([{ $match: { agency: { $in: ids }, status: 'visible' } }, { $group: { _id: '$agency', avg: { $avg: '$rating' }, count: { $sum: 1 } } }])
   ]);
   const by = (rows, key = '_id') => Object.fromEntries(rows.map(r => [String(r[key]), r]));
-  const ownerMap = by(owners, 'agency'); const memberMap = by(members); const pkgMap = by(pkgs); const bookingMap = by(bookings); const ratingMap = by(ratings);
+  const ownerMap = membership.ownersById(owners); const memberMap = by(members); const pkgMap = by(pkgs); const bookingMap = by(bookings); const ratingMap = by(ratings);
 
   const rows = agencies.map(a => {
     const k = String(a._id);
@@ -183,7 +184,7 @@ exports.getVendor = catchAsync(async (req, res, next) => {
   await agency.populate('categories', 'name');
 
   const [members, packages, counts, earnings, ratings, defaultRate, bookingCount, complaintCount] = await Promise.all([
-    User.find({ agency: agency._id }).sort({ agencyRole: 1, name: 1 }),
+    User.find(membership.memberOf(agency._id)).sort({ agencyRole: 1, name: 1 }),
     Package.find({ agency: agency._id }).sort({ updatedAt: -1 }).populate('itinerary.stops.destinationRef', 'name slug'),
     packageCounts(agency._id),
     earningsFor(agency._id),
@@ -203,7 +204,7 @@ exports.getVendor = catchAsync(async (req, res, next) => {
       verification: verificationView(agency),
       contract: contractView(agency),
       commission: { rate: isCustom(agency) ? agency.commissionRate : defaultRate, custom: isCustom(agency), defaultRate },
-      members: members.map(teamView),
+      members: members.map(u => teamView(u, agency._id)),
       vendorId: vendorCode(agency),
       packages: packages.map(p => ({ ...p.toObject(), planMissing: planProblems(p) })),
       earnings,
@@ -446,7 +447,7 @@ exports.getEarnings = catchAsync(async (req, res, next) => {
 exports.setMemberPassword = catchAsync(async (req, res, next) => {
   const agency = await findVendor(req.params.id, next, 'name');
   if (!agency) return;
-  const member = validId(req.params.userId) ? await User.findOne({ _id: req.params.userId, agency: agency._id }) : null;
+  const member = validId(req.params.userId) ? await User.findOne({ _id: req.params.userId, ...membership.memberOf(agency._id) }) : null;
   if (!member) return next(new AppError('No member found with that ID for this vendor.', 404));
 
   const generate = req.body.generate === true || req.body.generate === 'true';

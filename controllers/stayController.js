@@ -7,6 +7,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const Email = require('../utils/email');
 const { validId, pageParams, paged } = require('../utils/query');
+const membership = require('../utils/vendorMembership');
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_NIGHTS = 30;
@@ -87,7 +88,7 @@ exports.create = catchAsync(async (req, res, next) => {
   });
 
   // Tell the hotel's team by email; a slow or blocked mail server never holds up the guest
-  User.find({ agency: hotel.agency, deletedAt: null }).select('name email').lean().then(team => Promise.all(team.filter(u => u.email).map(u =>
+  User.find({ ...membership.memberOf(hotel.agency), deletedAt: null }).select('name email').lean().then(team => Promise.all(team.filter(u => u.email).map(u =>
     new Email(u, `${req.protocol}://${req.get('host')}/hotel#requests`, {
       hotelName: hotel.name, guestName: request.guestName, roomName: room.name, nights, rooms, guests,
       dates: `${checkIn.toISOString().slice(0, 10)} to ${checkOut.toISOString().slice(0, 10)}`

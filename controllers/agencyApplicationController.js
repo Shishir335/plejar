@@ -6,6 +6,7 @@ const AppError = require('../utils/appError');
 const { savePrivateDocument, removePrivateFolder } = require('../utils/uploads');
 const { normalizePhone } = require('../utils/registration');
 const { OPEN_STATUSES, folderFor, statusURL, mail } = require('./applicationController');
+const membership = require('../utils/vendorMembership');
 const { contactInfo } = require('./helpController');
 
 /**
@@ -84,7 +85,7 @@ exports.overview = catchAsync(async (req, res) => {
     contactInfo(),
     req.user ? AgentLead.find({ applicant: req.user._id }).sort({ createdAt: -1 }).limit(5) : []
   ]);
-  const open = mine.find(l => OPEN_STATUSES.includes(l.status));
+  const open = mine.find(l => OPEN_STATUSES.includes(l.status) && l.vendorType !== 'hotel');
   res.status(200).json({
     status: 'success',
     data: {
@@ -170,13 +171,15 @@ const agencyStep = async (b, user) => {
   // The contact email becomes the owner's vendor login. Your own email is fine (your account then
   // works in the vendor panel too); someone else's account isn't.
   if (!errors.email) {
-    const account = await User.findOne({ email: values.email }).setOptions({ includeInactive: true }).select('_id agency');
+    const account = await User.findOne({ email: values.email }).setOptions({ includeInactive: true }).select('_id agency hotelAgency');
     if (account && !(user && String(account._id) === String(user._id))) errors.email = "This email belongs to another Plejar account. Use your own email or your agency's business email.";
-    else if (account && account.agency) errors.email = 'Your account already belongs to an agency on Plejar.';
+    // The app applies for tour agencies; an account that runs a hotel can add one tour agency
+    else if (account && await membership.cannotLink(account, 'agency')) errors.email = 'Your account already belongs to a tour agency on Plejar.';
   }
   if (!errors.email || user) {
     const open = await AgentLead.findOne({
       status: { $in: OPEN_STATUSES },
+      vendorType: { $ne: 'hotel' },
       $or: [{ email: values.email }, ...(user ? [{ applicant: user._id }] : [])]
     }).select('reference');
     if (open) errors.agencyName = `You already have an application being reviewed (${open.reference}). Follow it in My Account.`;

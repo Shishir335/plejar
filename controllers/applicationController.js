@@ -7,6 +7,7 @@ const AppError = require('../utils/appError');
 const Email = require('../utils/email');
 const { escapeRegex } = require('../utils/query');
 const { savePrivateDocument, removePrivateFolder } = require('../utils/uploads');
+const membership = require('../utils/vendorMembership');
 
 // Bangladeshi mobile numbers: 01XXXXXXXXX, optionally with +880 / 880 prefix
 const BD_PHONE = /^(?:\+?880|0)1[3-9]\d{8}$/;
@@ -137,9 +138,10 @@ exports.createApplication = catchAsync(async (req, res, next) => {
   if (!files.nid || !files.nid.length) return next(new AppError("Upload the owner's national ID card.", 400));
   if (text(b.agreedToTerms) !== 'true') return next(new AppError('Please confirm the details are true and agree to the member terms.', 400));
 
-  // One open application per agency
+  // One open application per agency or hotel. The same person can apply for a tour agency and a hotel.
   const open = await AgentLead.findOne({
     status: { $in: OPEN_STATUSES },
+    vendorType: isHotel ? 'hotel' : { $ne: 'hotel' },
     $or: [
       { email: values.email },
       { tradeLicenseNumber: { $regex: `^${escapeRegex(values.tradeLicenseNumber)}$`, $options: 'i' } }
@@ -149,10 +151,13 @@ exports.createApplication = catchAsync(async (req, res, next) => {
     return next(new AppError(`We already have an application for this ${isHotel ? 'hotel' : 'agency'} that is being reviewed. Check it with the reference number we emailed you.`, 409));
   }
   // One person, one login: someone who already uses Plejar applies with the same email, and the
-  // vendor role is added to that account when an admin accepts. Only one agency per account, though.
-  const account = await User.findOne({ email: values.email }).setOptions({ includeInactive: true }).select('agency status deletedAt active');
-  if (account && account.agency) {
-    return next(new AppError('This email already belongs to an agency on Plejar. Apply with a different email, or contact us if you want to change agencies.', 409));
+  // vendor role is added to that account when an admin accepts. One tour agency and one hotel per account.
+  const account = await User.findOne({ email: values.email }).setOptions({ includeInactive: true }).select('agency hotelAgency status deletedAt active');
+  const taken = account ? await membership.cannotLink(account, isHotel ? 'hotel' : 'agency') : null;
+  if (taken) {
+    return next(new AppError(taken === 'both'
+      ? 'This email already has a tour agency and a hotel on Plejar. Apply with a different email, or contact us if you want to make a change.'
+      : `This email already has a ${isHotel ? 'hotel' : 'tour agency'} on Plejar. One email can run one tour agency and one hotel. Apply with a different email, or contact us if you want to make a change.`, 409));
   }
   if (account && (account.deletedAt || account.active === false || account.status !== 'active')) {
     return next(new AppError("The Plejar account with this email isn't active. Contact Plejar support, or apply with a different email.", 409));

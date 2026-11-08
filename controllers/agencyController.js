@@ -1,3 +1,4 @@
+const membership = require('../utils/vendorMembership');
 const Agency = require('../models/agencyModel');
 const Package = require('../models/packageModel');
 const Hotel = require('../models/hotelModel');
@@ -65,6 +66,21 @@ exports.requireAgent = catchAsync(async (req, res, next) => {
     return next(new AppError('This area is for vendor accounts only.', 403));
   }
 
+  // Someone with a tour agency and a hotel: the hotel panel works on the hotel, everything else on
+  // the tour agency. Only this request sees the swap; it is never saved (see utils/vendorMembership.js).
+  // (?panel=hotel covers plain links, such as opening a verification document)
+  const forHotel = req.baseUrl === '/api/v1/hotel-panel' || req.get('X-Plejar-Panel') === 'hotel' || req.query.panel === 'hotel';
+  // The other business this person runs, so each panel can link to the other one
+  req.otherVendorId = req.user.hotelAgency ? (forHotel ? req.user.agency : req.user.hotelAgency) : null;
+  if (forHotel && req.user.hotelAgency) {
+    req.user.agency = req.user.hotelAgency;
+    req.user.agencyRole = req.user.hotelAgencyRole;
+    if (typeof req.user.unmarkModified === 'function') {
+      req.user.unmarkModified('agency');
+      req.user.unmarkModified('agencyRole');
+    }
+  }
+
   const agency = await Agency.findById(req.user.agency);
   const blocked = await agencyBlockedReason(agency);
   if (blocked) {
@@ -104,7 +120,7 @@ exports.getMyAgency = catchAsync(async (req, res, next) => {
   const now = new Date();
   const [packages, teamSize, upcomingEvents, openRegistrations, announcements] = await Promise.all([
     packageCounts(req.agency._id),
-    User.countDocuments({ agency: req.agency._id }),
+    User.countDocuments(membership.memberOf(req.agency._id)),
     Package.countDocuments({ agency: req.agency._id, status: 'published', startDate: { $gte: now } }),
     Booking.countDocuments({ agency: req.agency._id, status: { $in: HOLDS_SEAT }, travelDate: { $gte: now } }),
     Announcement.countDocuments({ agency: req.agency._id, status: 'published' })
@@ -119,7 +135,9 @@ exports.getMyAgency = catchAsync(async (req, res, next) => {
         name: req.user.name,
         email: req.user.email,
         agencyRole: req.user.agencyRole,
-        mustChangePassword: Boolean(req.user.mustChangePassword)
+        mustChangePassword: Boolean(req.user.mustChangePassword),
+        // Set when the same account also runs a hotel (on /agent) or a tour agency (on /hotel)
+        otherVendor: req.otherVendorId ? await Agency.findById(req.otherVendorId).select('name kind').lean() : null
       },
       stats: { packages, teamSize, upcomingEvents, openRegistrations, announcements },
       // A hotel account's listings, for the panel's overview
@@ -447,11 +465,11 @@ exports.listEventRegistrations = catchAsync(async (req, res, next) => {
 
 // ---------- Team ----------
 
-const teamView = u => ({
+const teamView = (u, agencyId) => ({
   id: u._id,
   name: u.name,
   email: u.email,
-  agencyRole: u.agencyRole,
+  agencyRole: agencyId ? membership.roleIn(u, agencyId) : u.agencyRole,
   accountStatus: u.accountStatus,
   mustChangePassword: Boolean(u.mustChangePassword),
   lastLoginAt: u.lastLoginAt,
@@ -461,8 +479,10 @@ const teamView = u => ({
 exports.teamView = teamView;
 
 exports.listTeam = catchAsync(async (req, res, next) => {
-  const members = await User.find({ agency: req.agency._id }).sort({ agencyRole: 1, name: 1 });
-  res.status(200).json({ status: 'success', data: { members: members.map(teamView) } });
+  const members = await User.find(membership.memberOf(req.agency._id)).sort({ name: 1 });
+  const view = members.map(u => teamView(u, req.agency._id));
+  view.sort((a, b) => (a.agencyRole === 'owner' ? 0 : 1) - (b.agencyRole === 'owner' ? 0 : 1));
+  res.status(200).json({ status: 'success', data: { members: view } });
 });
 
 exports.inviteStaff = catchAsync(async (req, res, next) => {
@@ -475,21 +495,22 @@ exports.inviteStaff = catchAsync(async (req, res, next) => {
   // Someone who already uses Plejar (as a traveler, say) joins with the account they have
   const existing = await User.findOne({ email });
   if (existing) {
-    if (existing.agency) {
-      return next(new AppError(String(existing.agency) === String(req.agency._id) ? 'This person is already on your team.' : 'This person already belongs to another agency on Plejar.', 400));
+    if (membership.isIn(existing, req.agency._id)) return next(new AppError('This person is already on your team.', 400));
+    // One tour agency and one hotel per account
+    if (await membership.cannotLink(existing, req.agency.kind || 'agency')) {
+      return next(new AppError(`This person already belongs to another ${req.agency.kind === 'hotel' ? 'hotel' : 'agency'} on Plejar.`, 400));
     }
     if (existing.deletedAt || existing.status !== 'active') {
       return next(new AppError('This Plejar account can\'t be added right now. Use a different email.', 400));
     }
     addRole(existing, 'agent');
-    existing.agency = req.agency._id;
-    existing.agencyRole = 'staff';
+    await membership.link(existing, req.agency, 'staff');
     await existing.save({ validateBeforeSave: false });
     await logActivity(req, { action: 'team.added', summary: `Added ${existing.name} (existing Plejar account) to the team`, agency: req.agency._id });
     return res.status(201).json({
       status: 'success',
       message: `${existing.name} already has a Plejar account, so they were added straight away. They sign in to the vendor panel with their usual email and password.`,
-      data: { member: teamView(existing), inviteURL: null, emailSent: false, existingAccount: true }
+      data: { member: teamView(existing, req.agency._id), inviteURL: null, emailSent: false, existingAccount: true }
     });
   }
 
@@ -513,7 +534,7 @@ exports.inviteStaff = catchAsync(async (req, res, next) => {
 });
 
 const findTeamMember = async (req, next) => {
-  const member = await User.findOne({ _id: req.params.userId, agency: req.agency._id });
+  const member = await User.findOne({ _id: req.params.userId, ...membership.memberOf(req.agency._id) });
   if (!member) {
     next(new AppError('No team member found with that ID.', 404));
     return null;
@@ -539,17 +560,16 @@ exports.resendStaffInvite = catchAsync(async (req, res, next) => {
 exports.removeStaff = catchAsync(async (req, res, next) => {
   const member = await findTeamMember(req, next);
   if (!member) return;
-  if (member.agencyRole === 'owner') {
+  if (membership.roleIn(member, req.agency._id) === 'owner') {
     return next(new AppError('The agency owner cannot be removed.', 400));
   }
 
   // Invited people never set a password, so drop the account; others keep their account and other roles
-  if (member.accountStatus === 'invited') {
+  // (and their other agency or hotel, if they have one)
+  if (member.accountStatus === 'invited' && !member.hotelAgency) {
     await User.findByIdAndDelete(member._id);
   } else {
-    removeRole(member, 'agent');
-    member.agency = null;
-    member.agencyRole = null;
+    if (!membership.unlink(member, req.agency._id)) removeRole(member, 'agent');
     await member.save({ validateBeforeSave: false });
   }
   await logActivity(req, { action: 'team.removed', summary: `Removed ${member.name} from the team`, agency: req.agency._id });

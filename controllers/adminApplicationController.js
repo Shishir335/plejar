@@ -12,6 +12,7 @@ const { escapeRegex, pageParams, paged, validId } = require('../utils/query');
 const { hasPrivateDocument, sendPrivateDocument, copyPrivateDocument, removePrivateFolder } = require('../utils/uploads');
 const { OPEN_STATUSES, folderFor, statusURL, mail } = require('./applicationController');
 const { addRole } = require('../utils/roles');
+const membership = require('../utils/vendorMembership');
 
 const ATTENTION = { $or: [{ status: 'new' }, { unreadReply: true }] };
 
@@ -108,7 +109,7 @@ exports.getApplication = catchAsync(async (req, res, next) => {
   ]);
 
   const owner = lead.agency
-    ? await User.findOne({ agency: lead.agency._id || lead.agency, agencyRole: 'owner' }).select('name email mustChangePassword accountStatus lastLoginAt').lean()
+    ? await User.findOne(membership.ownerOf(lead.agency._id || lead.agency)).select('name email mustChangePassword accountStatus lastLoginAt').lean()
     : null;
 
   res.status(200).json({
@@ -227,9 +228,16 @@ exports.approve = catchAsync(async (req, res, next) => {
 
   // One person can be a traveler and a vendor: an existing account becomes the owner when it's the
   // traveler who applied from the app, or when the admin says so (useExistingAccount)
+  const isHotel = lead.vendorType === 'hotel';
   const existing = await User.findOne({ email: lead.email });
   if (existing) {
-    if (existing.agency) return next(new AppError(`${lead.email} already belongs to an agency. Ask the applicant for another email.`, 400));
+    // One tour agency and one hotel per account
+    const taken = await membership.cannotLink(existing, isHotel ? 'hotel' : 'agency');
+    if (taken) {
+      return next(new AppError(taken === 'both'
+        ? `${lead.email} already has a tour agency and a hotel. Ask the applicant for another email.`
+        : `${lead.email} already has a ${isHotel ? 'hotel' : 'tour agency'}. Ask the applicant for another email.`, 400));
+    }
     if (existing.deletedAt || existing.status !== 'active') return next(new AppError(`The account for ${lead.email} is suspended or removed. Ask the applicant for another email.`, 400));
     const ownApplication = lead.applicant && String(lead.applicant) === String(existing._id);
     if (!ownApplication && !(req.body.useExistingAccount === true || req.body.useExistingAccount === 'true')) {
@@ -241,7 +249,6 @@ exports.approve = catchAsync(async (req, res, next) => {
   const wantedCategories = req.body.categories !== undefined ? [].concat(req.body.categories) : lead.categories.map(String);
   const categories = (await VendorCategory.find({ _id: { $in: wantedCategories.filter(validId) } }).select('_id')).map(c => c._id);
 
-  const isHotel = lead.vendorType === 'hotel';
   const agency = new Agency({
     kind: isHotel ? 'hotel' : 'agency',
     name: lead.agencyName,
@@ -290,8 +297,7 @@ exports.approve = catchAsync(async (req, res, next) => {
     if (existing) {
       owner = existing;
       addRole(owner, 'agent');
-      owner.agency = agency._id;
-      owner.agencyRole = 'owner';
+      await membership.link(owner, agency, 'owner');
       await owner.save({ validateBeforeSave: false });
     } else owner = await User.create({
       name: lead.contactName,
@@ -317,8 +323,7 @@ exports.approve = catchAsync(async (req, res, next) => {
     } catch (err) {
       // Put things back as they were, so the application can be approved again
       if (existing) {
-        owner.agency = undefined;
-        owner.agencyRole = undefined;
+        membership.unlink(owner, agency._id);
         await owner.save({ validateBeforeSave: false });
       } else await User.findByIdAndDelete(owner._id);
       await Agency.findByIdAndDelete(agency._id);
@@ -370,7 +375,7 @@ exports.approve = catchAsync(async (req, res, next) => {
   if (emailSent === false) message = `${agency.name} is now a member, but the email couldn't be sent (email isn't set up on the server). Send the details below to ${owner.name} yourself.`;
   if (existing) {
     const told = { true: ` They were emailed at ${owner.email}.`, false: " The email couldn't be sent, so let them know yourself." }[emailSent] || '';
-    message = `${agency.name} is now a member. ${owner.name} already has a Plejar account, so they sign in to the vendor panel with their usual email and password.${told}`;
+    message = `${agency.name} is now a member. ${owner.name} already has a Plejar account, so they sign in to the ${isHotel ? 'hotel panel (/hotel)' : 'tour agency panel (/agent)'} with their usual email and password.${told}`;
   }
   if (hotel) message += ' Its hotel listing was saved as a draft: add photos and publish it from Hotels.';
 

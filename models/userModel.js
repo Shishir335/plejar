@@ -45,6 +45,18 @@ const userSchema = new mongoose.Schema({
         enum: ['owner', 'staff'],
         default: null
     },
+    // A hotel the same person also runs. Only set when `agency` is their tour agency: one account
+    // can have one tour agency (/agent) and one hotel (/hotel). See utils/vendorMembership.js
+    hotelAgency: {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Agency',
+        default: null
+    },
+    hotelAgencyRole: {
+        type: String,
+        enum: ['owner', 'staff'],
+        default: null
+    },
 
     // Account standing, managed by the master admin
     status: {
@@ -224,6 +236,7 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
 userSchema.index({ phone: 1 });
 userSchema.index({ roles: 1 });
+userSchema.index({ hotelAgency: 1 }, { partialFilterExpression: { hotelAgency: { $type: 'objectId' } } });
 userSchema.index({ referralCode: 1 }, { unique: true, partialFilterExpression: { referralCode: { $type: 'string' } } });
 userSchema.index({ referredBy: 1 });
 userSchema.index({ 'fcmTokens.token': 1 });

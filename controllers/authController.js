@@ -156,9 +156,11 @@ exports.login = catchAsync(async (req, res, next) => {
     }
 
     // 5) someone who is only part of a suspended agency cannot sign in (other roles still can)
+    // (someone with a tour agency and a hotel can still sign in while either one is active)
     if (hasRole(user, 'agent') && rolesOf(user).length === 1) {
         const agency = await Agency.findById(user.agency);
-        const agencyBlocked = await agencyBlockedReason(agency);
+        let agencyBlocked = await agencyBlockedReason(agency);
+        if (agencyBlocked && user.hotelAgency && !(await agencyBlockedReason(await Agency.findById(user.hotelAgency)))) agencyBlocked = null;
         if (agencyBlocked) {
             await recordLogin(req, { user, email, success: false, reason: 'agency_not_active' });
             return next(new AppError(agencyBlocked, 403));

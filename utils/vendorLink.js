@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Agency = require('../models/agencyModel');
 const User = require('../models/userModel');
+const { ownerOf } = require('./vendorMembership');
 
 /**
  * The Vendor role only means something together with an agency: the vendor panel opens that
@@ -20,7 +21,7 @@ const linkVendorAgency = async (user, { agency, agencyRole } = {}) => {
   const moving = user.agency && String(user.agency) !== String(target._id);
   if (moving && user.agencyRole === 'owner') return "This person owns their current agency, so they can't move to another one.";
 
-  const otherOwner = await User.findOne({ agency: target._id, agencyRole: 'owner', _id: { $ne: user._id } }).select('name').lean();
+  const otherOwner = await User.findOne({ ...ownerOf(target._id), _id: { $ne: user._id } }).select('name').lean();
   // Not chosen: the owner if the agency has none, staff otherwise; someone already there keeps their role
   const firstRole = otherOwner ? 'staff' : 'owner';
   const role = agencyRole || (moving || !user.agencyRole ? firstRole : user.agencyRole);

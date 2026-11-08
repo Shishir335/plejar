@@ -56,7 +56,8 @@ const fmtTime = v => {
 const initials = name => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 
 async function api(path, { method = 'GET', body, form } = {}) {
-  const headers = {};
+  // Tells the server to use the hotel when this account also runs a tour agency
+  const headers = { 'X-Plejar-Panel': 'hotel' };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
   let payload;
   if (form) payload = form;
@@ -224,7 +225,12 @@ async function boot() {
   }
   if (shared) {
     saveToken(state.token);
-    removeStored(SHARED_TOKEN_KEY);
+    // Leave it for the tour panel when the same account runs a tour agency too
+    if (!account.me.otherVendor) removeStored(SHARED_TOKEN_KEY);
+  }
+  // Same account runs a tour agency too: one sign-in opens both panels
+  if (account.me.otherVendor && !readStored(SHARED_TOKEN_KEY)) {
+    try { localStorage.setItem(SHARED_TOKEN_KEY, state.token); } catch (e) { /* they sign in at /agent */ }
   }
   state.me = account.me;
   if (state.me.mustChangePassword) return showPasswordStep();
@@ -241,7 +247,8 @@ async function boot() {
 
 async function loadPanel() {
   const { data } = await api(`${PANEL}/me`);
-  state.me = data.me;
+  // Keep what only /agency/me knows (the tour agency this account may also run)
+  state.me = { ...data.me, otherVendor: state.me ? state.me.otherVendor : null };
   state.agency = data.agency;
   state.hotel = data.hotel;
   state.counts = data.counts;
@@ -253,6 +260,10 @@ function renderTop() {
   $('topHotel').textContent = h ? h.name : state.agency.name;
   $('topStatus').innerHTML = h ? `<span class="pill pill-${E(h.status)}">${E(HOTEL_STATUS[h.status].label)}</span>` : '';
   $('topUser').textContent = `${state.me.name} · ${isOwner() ? 'Owner' : 'Team'}`;
+  // The same account also runs a tour agency
+  const other = state.me.otherVendor;
+  $('otherPanel').hidden = !other;
+  if (other) $('otherPanel').title = `Open ${other.name} in the tour agency panel`;
   const pending = state.counts.pendingRequests || 0;
   $('pendingCount').textContent = pending;
   $('pendingCount').hidden = !pending;
@@ -877,7 +888,7 @@ async function loadVerification() {
       <p><span class="pill pill-${E(status)}">${E({ approved: 'Verified', pending: 'In review', rejected: 'Changes needed', none: 'Not verified' }[status])}</span></p>
       <p class="muted" style="margin:10px 0">${E(text)}</p>
       <ul class="list-plain">${(v.documents || []).map(d => `
-        <li><span>${E(DOC_LABELS[d.kind] || d.kind)}<span class="sub">${E(d.originalName || 'file')}</span></span><a href="/api/v1/agency/me/documents/${E(d.id)}" target="_blank" rel="noopener">View</a></li>`).join('')}</ul>`;
+        <li><span>${E(DOC_LABELS[d.kind] || d.kind)}<span class="sub">${E(d.originalName || 'file')}</span></span><a href="/api/v1/agency/me/documents/${E(d.id)}?panel=hotel" target="_blank" rel="noopener">View</a></li>`).join('')}</ul>`;
   } catch (err) {
     box.innerHTML = `<p class="muted">${E(err.message)}</p>`;
   }
