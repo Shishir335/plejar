@@ -31,6 +31,7 @@ hotelRouter.get('/:id/reviews', hotels.hotelReviews);
 hotelRouter.get('/stay-requests', protect, stays.mine);
 hotelRouter.post('/stay-requests/:id/cancel', protect, stays.cancel);
 hotelRouter.get('/:id', optionalAuth, hotels.getHotel);
+hotelRouter.get('/:id/availability', stays.availability);
 hotelRouter.post('/:id/stay-requests', protect, stays.create);
 hotelRouter.route('/:id/save').post(protect, tours.save('hotel')).delete(protect, tours.unsave('hotel'));
 

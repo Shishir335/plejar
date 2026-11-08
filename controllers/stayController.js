@@ -8,10 +8,12 @@ const AppError = require('../utils/appError');
 const Email = require('../utils/email');
 const { validId, pageParams, paged } = require('../utils/query');
 const membership = require('../utils/vendorMembership');
+const { itemsOf, availability } = require('../utils/stayAvailability');
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_NIGHTS = 30;
 const MAX_PENDING = 3;
+const MAX_ROOM_TYPES = 10;
 const text = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
 const day = value => {
   const v = text(value, 10);
@@ -22,13 +24,31 @@ const day = value => {
 const todayUTC = () => new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date())}T00:00:00Z`);
 const BD_PHONE = /^(?:\+?88)?01[3-9]\d{8}$/;
 
+// Each room type in a request with its quantity and what it costs for the stay
+const itemsView = r => itemsOf(r).map(i => ({
+  roomType: i.roomType,
+  roomName: i.roomName,
+  pricePerNight: i.pricePerNight,
+  quantity: i.quantity || 1,
+  total: (i.pricePerNight || 0) * (i.quantity || 1) * (r.nights || 1)
+}));
+exports.itemsView = itemsView;
+
+// "2 × Deluxe, 1 × Normal" (just "Deluxe" for one room of one type)
+const roomsSummary = items => (items.length === 1 && items[0].quantity === 1
+  ? items[0].roomName
+  : items.map(i => `${i.quantity} × ${i.roomName}`).join(', '));
+exports.roomsSummary = roomsSummary;
+
 const myView = r => ({
   _id: r._id,
   status: r.status,
   hotel: r.hotel && r.hotel._id ? { _id: r.hotel._id, name: r.hotel.name, photo: (r.hotel.photos || [])[0] || '', address: r.hotel.address, phone: r.hotel.phone } : r.hotel,
+  items: itemsView(r),
   roomType: r.roomType,
   roomName: r.roomName,
   pricePerNight: r.pricePerNight,
+  nightlyTotal: r.nightlyTotal || (r.pricePerNight || 0) * (r.rooms || 1),
   checkIn: r.checkIn,
   checkOut: r.checkOut,
   nights: r.nights,
@@ -43,54 +63,102 @@ const myView = r => ({
   canCancel: r.status === 'pending' || (r.status === 'accepted' && new Date(r.checkIn) > todayUTC())
 });
 
-// POST /api/v1/hotels/:id/stay-requests { roomType, checkIn, checkOut, rooms, guests, note, phone }
+// GET /api/v1/hotels/:id/availability?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD
+// Each active room type with how many rooms it has (count) and how many are free for those dates (available)
+exports.availability = catchAsync(async (req, res, next) => {
+  const hotel = validId(req.params.id) ? await Hotel.findOne({ _id: req.params.id, status: 'published' }).select('roomTypes') : null;
+  if (!hotel) return next(new AppError('This hotel is not available.', 404));
+  const dates = stayDates(req.query);
+  if (dates.error) return next(new AppError(dates.error, 400));
+  res.status(200).json({ status: 'success', data: { checkIn: req.query.checkIn, checkOut: req.query.checkOut, nights: dates.nights, rooms: await availability(hotel, dates.checkIn, dates.checkOut) } });
+});
+
+const stayDates = b => {
+  const checkIn = day(b.checkIn);
+  const checkOut = day(b.checkOut);
+  if (!checkIn || !checkOut) return { error: 'Choose your check-in and check-out dates.' };
+  if (checkIn < todayUTC()) return { error: 'Check-in can be today at the earliest.' };
+  const nights = Math.round((checkOut - checkIn) / 86400000);
+  if (nights < 1) return { error: 'Check-out must be at least one night after check-in.' };
+  if (nights > MAX_NIGHTS) return { error: `You can ask for up to ${MAX_NIGHTS} nights at a time.` };
+  return { checkIn, checkOut, nights };
+};
+
+// POST /api/v1/hotels/:id/stay-requests
+//   { items: [{ roomType, quantity }], checkIn, checkOut, guests, note, phone }
+//   (older app versions send { roomType, rooms } for a single room type, which still works)
 exports.create = catchAsync(async (req, res, next) => {
   const hotel = validId(req.params.id) ? await Hotel.findOne({ _id: req.params.id, status: 'published' }) : null;
   if (!hotel) return next(new AppError('This hotel is not available.', 404));
   if (!hotel.agency) return next(new AppError('This hotel takes bookings by phone. Call them to ask for a room.', 400));
   const b = req.body || {};
 
-  const room = validId(b.roomType) ? hotel.roomTypes.id(b.roomType) : null;
-  if (!room || room.active === false) return next(new AppError('Choose a room type.', 400));
-  const checkIn = day(b.checkIn);
-  const checkOut = day(b.checkOut);
-  if (!checkIn || !checkOut) return next(new AppError('Choose your check-in and check-out dates.', 400));
-  if (checkIn < todayUTC()) return next(new AppError('Check-in can be today at the earliest.', 400));
-  const nights = Math.round((checkOut - checkIn) / 86400000);
-  if (nights < 1) return next(new AppError('Check-out must be at least one night after check-in.', 400));
-  if (nights > MAX_NIGHTS) return next(new AppError(`You can ask for up to ${MAX_NIGHTS} nights at a time.`, 400));
-  const rooms = Number(b.rooms || 1);
+  // The rooms asked for, with the same room type added up if it appears twice
+  const asked = Array.isArray(b.items) ? b.items : [{ roomType: b.roomType, quantity: b.rooms || 1 }];
+  const wanted = new Map();
+  for (const line of asked) {
+    const room = line && validId(line.roomType) ? hotel.roomTypes.id(line.roomType) : null;
+    if (!room || room.active === false) return next(new AppError(asked.length > 1 ? 'One of those room types is no longer available. Choose again.' : 'Choose a room type.', 400));
+    const quantity = Number(line.quantity == null ? 1 : line.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) return next(new AppError(`Choose how many ${room.name} rooms you need.`, 400));
+    const id = String(room._id);
+    wanted.set(id, { room, quantity: ((wanted.get(id) || {}).quantity || 0) + quantity });
+  }
+  if (!wanted.size) return next(new AppError('Choose a room type.', 400));
+  if (wanted.size > MAX_ROOM_TYPES) return next(new AppError(`You can ask for up to ${MAX_ROOM_TYPES} room types at a time.`, 400));
+
+  const dates = stayDates(b);
+  if (dates.error) return next(new AppError(dates.error, 400));
+  const { checkIn, checkOut, nights } = dates;
+
+  // Only rooms not held by accepted stays on those dates can be asked for
+  const free = Object.fromEntries((await availability(hotel, checkIn, checkOut)).map(a => [String(a._id), a]));
+  for (const [id, { room, quantity }] of wanted) {
+    const left = free[id] ? free[id].available : 0;
+    if (quantity > left) {
+      return next(new AppError(left
+        ? `Only ${left} ${room.name} room${left === 1 ? ' is' : 's are'} free for those dates. Choose fewer.`
+        : `${room.name} is fully booked for those dates. Choose other dates or another room type.`, 400));
+    }
+  }
+
+  const items = [...wanted.values()].map(({ room, quantity }) => ({ roomType: room._id, roomName: room.name, pricePerNight: room.pricePerNight, quantity }));
+  const rooms = items.reduce((n, i) => n + i.quantity, 0);
+  const fits = [...wanted.values()].reduce((n, { room, quantity }) => n + (room.maxGuests || 1) * quantity, 0);
   const guests = Number(b.guests || 1);
-  if (!Number.isInteger(rooms) || rooms < 1 || rooms > Math.min(room.count || 1, 20)) return next(new AppError(`This room type has ${room.count || 1} room${(room.count || 1) === 1 ? '' : 's'}. Choose fewer rooms.`, 400));
-  if (!Number.isInteger(guests) || guests < 1 || guests > room.maxGuests * rooms) return next(new AppError(`${room.name} fits ${room.maxGuests} guest${room.maxGuests === 1 ? '' : 's'} a room. Add a room or choose fewer guests.`, 400));
+  if (!Number.isInteger(guests) || guests < 1) return next(new AppError('Enter how many guests are staying.', 400));
+  if (guests > fits) return next(new AppError(`Those rooms fit ${fits} guest${fits === 1 ? '' : 's'}. Add a room or choose fewer guests.`, 400));
   const phone = text(b.phone || req.user.phone, 20).replace(/[\s-]/g, '');
   if (!BD_PHONE.test(phone)) return next(new AppError('Enter a mobile number the hotel can call, for example 01712345678.', 400));
 
   const pending = await StayRequest.countDocuments({ user: req.user._id, hotel: hotel._id, status: 'pending' });
   if (pending >= MAX_PENDING) return next(new AppError('You already have requests waiting for this hotel. Wait for their answer, or cancel one first.', 429));
 
+  const nightlyTotal = items.reduce((n, i) => n + i.pricePerNight * i.quantity, 0);
+  const summary = roomsSummary(items);
   const request = await StayRequest.create({
     hotel: hotel._id,
     agency: hotel.agency,
     user: req.user._id,
-    roomType: room._id,
-    roomName: room.name,
-    pricePerNight: room.pricePerNight,
+    items,
+    roomType: items[0].roomType,
+    roomName: summary.length > 120 ? `${summary.slice(0, 119)}…` : summary,
+    pricePerNight: items[0].pricePerNight,
+    nightlyTotal,
     checkIn,
     checkOut,
     nights,
     rooms,
     guests,
-    estimatedTotal: room.pricePerNight * nights * rooms,
+    estimatedTotal: nightlyTotal * nights,
     guestName: text(req.user.name, 80),
     phone,
     note: text(b.note, 1000)
   });
-
   // Tell the hotel's team by email; a slow or blocked mail server never holds up the guest
   User.find({ ...membership.memberOf(hotel.agency), deletedAt: null }).select('name email').lean().then(team => Promise.all(team.filter(u => u.email).map(u =>
     new Email(u, `${req.protocol}://${req.get('host')}/hotel#requests`, {
-      hotelName: hotel.name, guestName: request.guestName, roomName: room.name, nights, rooms, guests,
+      hotelName: hotel.name, guestName: request.guestName, roomName: summary, nights, rooms, guests,
       dates: `${checkIn.toISOString().slice(0, 10)} to ${checkOut.toISOString().slice(0, 10)}`
     }).sendStayRequest().catch(err => console.warn(`[MAIL WARNING] Stay request email to ${u.email} not sent:`, err.message))
   ))).catch(() => {});

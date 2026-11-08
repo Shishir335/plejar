@@ -10,6 +10,8 @@ const { logActivity } = require('../utils/activity');
 const { validId, pageParams, paged } = require('../utils/query');
 const { saveContentImage, removeContentImage, copyContentImage } = require('../utils/uploads');
 const { applyHotelExtras, extrasView } = require('../utils/hotelExtras');
+const { itemsOf, bookedRooms } = require('../utils/stayAvailability');
+const { itemsView } = require('./stayController');
 
 const MAX_PHOTOS = 12;
 const MAX_ROOM_PHOTOS = 6;
@@ -94,6 +96,8 @@ exports.roomView = roomView;
 const requestView = r => ({
   _id: r._id,
   status: r.status,
+  items: itemsView(r),
+  nightlyTotal: r.nightlyTotal || (r.pricePerNight || 0) * (r.rooms || 1),
   roomType: r.roomType,
   roomName: r.roomName,
   pricePerNight: r.pricePerNight,
@@ -345,6 +349,20 @@ exports.decideRequest = catchAsync(async (req, res) => {
   if (request.status !== 'pending') throw new AppError(request.status === 'cancelled' ? 'The guest cancelled this request.' : `This request was already ${request.status}.`, 400);
   const note = text(b.note, 1000);
   if (decision === 'declined' && !note) throw new AppError('Tell the guest why, for example "Fully booked on those dates".', 400);
+
+  // Accepting holds the rooms, so they must still be free: other stays may have been accepted since
+  if (decision === 'accepted') {
+    const booked = await bookedRooms(req.hotel._id, request.checkIn, request.checkOut, { exclude: request._id });
+    for (const item of itemsOf(request)) {
+      const room = req.hotel.roomTypes.id(item.roomType);
+      const left = Math.max(((room && room.count) || 0) - (booked[String(item.roomType)] || 0), 0);
+      if ((item.quantity || 1) > left) {
+        throw new AppError(left
+          ? `Only ${left} ${item.roomName} room${left === 1 ? ' is' : 's are'} free on those dates, and the guest asked for ${item.quantity}. Decline, or call the guest to change the request.`
+          : `${item.roomName} is fully booked on those dates${room ? '' : ' (or the room type was removed)'}. Decline the request, or call the guest.`, 409);
+      }
+    }
+  }
 
   request.status = decision;
   request.hotelNote = note;

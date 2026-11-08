@@ -380,7 +380,7 @@ async function renderDashboard() {
   try {
     const { data } = await api(`${PANEL}/requests?status=upcoming&limit=5`);
     box.innerHTML = data.requests.length ? data.requests.map(r => `
-      <li><span><strong>${E(r.guestName || 'Guest')}</strong><span class="sub">${E(r.roomName)} · ${plural(r.rooms, 'room')}, ${plural(r.guests, 'guest')}</span></span>
+      <li><span><strong>${E(r.guestName || 'Guest')}</strong><span class="sub">${E(roomsText(r))} · ${plural(r.guests, 'guest')}</span></span>
       <span style="text-align:right;white-space:nowrap">${E(fmtDay(r.checkIn))}<span class="sub">${plural(r.nights, 'night')}</span></span></li>`).join('')
       : '<li class="muted">No accepted stays coming up.</li>';
   } catch (err) {
@@ -425,6 +425,10 @@ const EMPTY_REQUESTS = {
   all: ['No stay requests yet', 'Travelers ask for a room from your page in the Plejar app once your listing is live.']
 };
 
+// The rooms in a request: one line per room type ("2 × Deluxe"); older requests have just one
+const requestItems = r => (r.items && r.items.length ? r.items : [{ roomName: r.roomName, quantity: r.rooms || 1, pricePerNight: r.pricePerNight }]);
+const roomsText = r => requestItems(r).map(i => `${i.quantity} × ${i.roomName || 'Room'}`).join(', ');
+
 function requestCard(r) {
   const checkIn = new Date(r.checkIn);
   return `
@@ -437,10 +441,10 @@ function requestCard(r) {
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h3>${E(r.guestName || 'Guest')}</h3><span class="pill pill-${E(r.status)}">${E(REQUEST_LABEL[r.status] || r.status)}</span></div>
         <div class="req-facts">
           <span>${E(fmtDay(r.checkIn, { weekday: 'short' }))} → ${E(fmtDay(r.checkOut, { weekday: 'short' }))}</span>
-          <span>${E(r.roomName || 'Room')} × ${r.rooms}</span>
-          <span>${plural(r.guests, 'guest')}</span>
-          <span>About ${taka(r.estimatedTotal)} (${taka(r.pricePerNight)} a night)</span>
+          <span>${plural(r.rooms, 'room')}, ${plural(r.guests, 'guest')}</span>
+          <span>About ${taka(r.estimatedTotal)} (${taka(r.nightlyTotal || r.pricePerNight * r.rooms)} a night)</span>
         </div>
+        <ul class="req-rooms">${requestItems(r).map(i => `<li><strong>${Number(i.quantity)} × ${E(i.roomName || 'Room')}</strong> <span>${taka(i.pricePerNight)} a night each</span></li>`).join('')}</ul>
         <div class="req-facts">
           ${r.phone ? `<a href="tel:${E(r.phone)}">${E(r.phone)}</a>` : ''}
           ${r.email ? `<a href="mailto:${E(r.email)}">${E(r.email)}</a>` : ''}
@@ -472,7 +476,7 @@ function openAnswer(id, decision) {
   state.answering = { id, decision };
   const accept = decision === 'accept';
   $('answerTitle').textContent = accept ? 'Accept this stay' : 'Decline this stay';
-  $('answerSummary').textContent = `${r.guestName || 'Guest'}: ${r.roomName} × ${r.rooms}, ${fmtDay(r.checkIn)} to ${fmtDay(r.checkOut)} (${plural(r.nights, 'night')}), ${plural(r.guests, 'guest')}.`;
+  $('answerSummary').textContent = `${r.guestName || 'Guest'}: ${roomsText(r)}, ${fmtDay(r.checkIn)} to ${fmtDay(r.checkOut)} (${plural(r.nights, 'night')}), ${plural(r.guests, 'guest')}.`;
   $('answerNoteLabel').textContent = accept ? 'Message to the guest (optional)' : 'Why are you declining? *';
   $('answerHint').textContent = accept ? 'For example how to pay an advance, or directions.' : 'The guest sees this, for example "Fully booked on those dates".';
   $('answerNote').value = '';
@@ -529,7 +533,7 @@ function renderRooms() {
         <h3>${E(r.name)}</h3>
         <div class="room-price">${taka(r.pricePerNight)}${r.regularPrice ? `<s>${taka(r.regularPrice)}</s>` : ''} <small>a night</small></div>
         <div class="room-facts">${plural(r.maxGuests, 'guest')} a room${r.beds ? ` · ${E(r.beds)}` : ''}${r.sizeSqft ? ` · ${r.sizeSqft} sq ft` : ''}</div>
-        <div class="room-facts">${plural(r.count, 'room')} of this type${r.photos.length ? ` · ${plural(r.photos.length, 'photo')}` : ' · no photos yet'}</div>
+        <div class="room-facts">Quantity: <strong>${plural(r.count, 'room')}</strong>${r.photos.length ? ` · ${plural(r.photos.length, 'photo')}` : ' · no photos yet'}</div>
         ${(r.benefits || []).length ? `<div class="room-facts">${r.benefits.map(b => `✓ ${E(benefitLabel(b))}`).join(' · ')}</div>` : ''}
         <div class="room-actions">
           <button class="btn btn-ghost btn-sm" data-action="edit-room" data-id="${E(r._id)}">Edit</button>

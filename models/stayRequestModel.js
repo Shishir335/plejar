@@ -9,14 +9,27 @@ const stayRequestSchema = new mongoose.Schema(
     hotel: { type: mongoose.Schema.ObjectId, ref: 'Hotel', required: true, index: true },
     agency: { type: mongoose.Schema.ObjectId, ref: 'Agency', index: true },
     user: { type: mongoose.Schema.ObjectId, ref: 'User', required: true, index: true },
-    // The room type, with its name and price as they were when the guest asked
+    // The rooms asked for: one line per room type, with its name and price as they were when the guest asked
+    items: {
+      type: [new mongoose.Schema({
+        roomType: { type: mongoose.Schema.ObjectId, required: true },
+        roomName: { type: String, trim: true, maxlength: 60, default: '' },
+        pricePerNight: { type: Number, min: 0, default: 0 },
+        quantity: { type: Number, min: 1, max: 50, default: 1 }
+      }, { _id: false })],
+      default: []
+    },
+    // Kept for older app versions and older requests: the first room type, a summary such as
+    // "2 × Deluxe, 1 × Normal", and that first room type's price. `rooms` is the total of all lines.
     roomType: { type: mongoose.Schema.ObjectId },
-    roomName: { type: String, trim: true, maxlength: 60, default: '' },
+    roomName: { type: String, trim: true, maxlength: 120, default: '' },
     pricePerNight: { type: Number, min: 0, default: 0 },
+    // What all the rooms cost for one night
+    nightlyTotal: { type: Number, min: 0, default: 0 },
     checkIn: { type: Date, required: true },
     checkOut: { type: Date, required: true },
     nights: { type: Number, min: 1, required: true },
-    rooms: { type: Number, min: 1, max: 20, default: 1 },
+    rooms: { type: Number, min: 1, max: 100, default: 1 },
     guests: { type: Number, min: 1, max: 100, default: 1 },
     estimatedTotal: { type: Number, min: 0, default: 0 },
     guestName: { type: String, trim: true, maxlength: 80, default: '' },
