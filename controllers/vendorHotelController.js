@@ -8,7 +8,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { logActivity } = require('../utils/activity');
 const { validId, pageParams, paged } = require('../utils/query');
-const { saveContentImage, removeContentImage } = require('../utils/uploads');
+const { saveContentImage, removeContentImage, copyContentImage } = require('../utils/uploads');
 const { applyHotelExtras, extrasView } = require('../utils/hotelExtras');
 
 const MAX_PHOTOS = 12;
@@ -272,6 +272,30 @@ exports.updateRoom = catchAsync(async (req, res) => {
   await hotel.save();
   await Promise.all(dropped.map(p => removeContentImage(p).catch(() => {})));
   res.status(200).json({ status: 'success', data: { hotel: hotelView(hotel) } });
+});
+
+// Copy a room type with all its details and photos, to edit into a new one. The copy starts paused,
+// so guests don't see two identical rooms; it sits right after the original.
+exports.copyRoom = catchAsync(async (req, res) => {
+  const hotel = req.hotel;
+  const source = findRoom(hotel, req.params.roomId);
+  if (hotel.roomTypes.length >= 30) throw new AppError('A hotel can list up to 30 room types.', 400);
+  const { _id, createdAt, updatedAt, photos, ...details } = source.toObject();
+  const suffix = ' (copy)';
+  const room = hotel.roomTypes.create({ ...details, name: `${details.name.slice(0, 60 - suffix.length)}${suffix}`, active: false, photos: [] });
+  // Each photo becomes its own file; one that can't be copied is left out rather than failing the copy
+  const copied = await Promise.all((photos || []).map(p => copyContentImage(p, 'hotels', hotel._id).catch(() => null)));
+  room.photos = copied.filter(Boolean);
+  hotel.roomTypes.splice(hotel.roomTypes.indexOf(source) + 1, 0, room);
+  syncFromPrice(hotel);
+  try {
+    await hotel.save();
+  } catch (err) {
+    await Promise.all(room.photos.map(p => removeContentImage(p).catch(() => {})));
+    throw err;
+  }
+  await logActivity(req, { action: 'hotel.room_added', summary: `Copied the room type "${source.name}" in ${hotel.name}`, agency: req.agency._id });
+  res.status(201).json({ status: 'success', data: { hotel: hotelView(hotel), roomId: String(room._id), photosLeftOut: (photos || []).length - room.photos.length } });
 });
 
 // Past requests keep the room's name and price, so a room type can go even after guests asked for it

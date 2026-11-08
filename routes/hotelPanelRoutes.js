@@ -16,6 +16,7 @@ router.patch('/hotel', panel.updateHotel);
 router.route('/hotel/photos').post(imageUpload.array('photos', 6), panel.addPhotos).delete(panel.removePhoto);
 router.put('/hotel/photos/order', panel.orderPhotos);
 router.post('/hotel/rooms', imageUpload.array('photos', 6), panel.addRoom);
+router.post('/hotel/rooms/:roomId/copy', panel.copyRoom);
 router.route('/hotel/rooms/:roomId').patch(imageUpload.array('photos', 6), panel.updateRoom).delete(panel.removeRoom);
 
 router.get('/requests', panel.listRequests);

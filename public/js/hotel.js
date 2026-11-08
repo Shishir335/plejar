@@ -306,6 +306,7 @@ document.addEventListener('click', e => {
   if (action === 'new-room') openRoom(null);
   if (action === 'edit-room') openRoom(id);
   if (action === 'toggle-room') toggleRoom(id);
+  if (action === 'copy-room') copyRoom(id, el);
   if (action === 'close-dialog') el.closest('dialog').close();
   if (action === 'accept') openAnswer(id, 'accept');
   if (action === 'decline') openAnswer(id, 'decline');
@@ -532,6 +533,7 @@ function renderRooms() {
         ${(r.benefits || []).length ? `<div class="room-facts">${r.benefits.map(b => `✓ ${E(benefitLabel(b))}`).join(' · ')}</div>` : ''}
         <div class="room-actions">
           <button class="btn btn-ghost btn-sm" data-action="edit-room" data-id="${E(r._id)}">Edit</button>
+          <button class="btn btn-ghost btn-sm" data-action="copy-room" data-id="${E(r._id)}" title="Make a new room type with the same details and photos">Copy</button>
           <button class="btn btn-ghost btn-sm" data-action="toggle-room" data-id="${E(r._id)}">${r.active ? 'Pause' : 'Take requests'}</button>
         </div>
       </div>
@@ -636,6 +638,25 @@ $('roomDelete').addEventListener('click', async () => {
     showAlert('roomError', err.message);
   }
 });
+
+// Copy a room type with its details and photos, then open the copy to edit. It starts paused.
+async function copyRoom(id, button) {
+  const room = state.hotel.roomTypes.find(r => r._id === id);
+  if (!room || button.disabled) return;
+  button.disabled = true;
+  button.textContent = 'Copying...';
+  try {
+    const { data } = await api(`${PANEL}/hotel/rooms/${id}/copy`, { method: 'POST' });
+    setHotel(data.hotel);
+    renderRooms();
+    toast(`Copied ${room.name}. Edit the copy, then choose "Take requests" when it's ready.${data.photosLeftOut ? ` ${plural(data.photosLeftOut, 'photo')} couldn't be copied.` : ''}`);
+    openRoom(data.roomId);
+  } catch (err) {
+    toast(err.message, 'error');
+    button.disabled = false;
+    button.textContent = 'Copy';
+  }
+}
 
 async function toggleRoom(id) {
   const room = state.hotel.roomTypes.find(r => r._id === id);

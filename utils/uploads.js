@@ -146,6 +146,31 @@ const removeContentImage = async urlPath => {
   await fs.promises.unlink(target).catch(() => {});
 };
 
+// Copy a stored hotel, promotion or voucher picture into <kind>/<id>, as its own file, so deleting
+// either one later leaves the other. Already compressed, so it is copied as it is. Returns the new URL.
+const copyContentImage = async (urlPath, kind, id) => {
+  if (!CONTENT_KINDS.includes(kind)) throw new Error(`Unknown image kind ${kind}`);
+  const folder = `${kind}/${id}`;
+  // Only our own Cloudinary account's pictures (isCloudinaryUrl checks the address)
+  if (isCloudinaryUrl(urlPath)) {
+    const res = await fetch(urlPath);
+    if (!res.ok) throw new AppError("That photo couldn't be copied right now.", 502);
+    return (await uploadBufferToCloudinary(Buffer.from(await res.arrayBuffer()), { folder })).secure_url;
+  }
+  const source = path.join(__dirname, '..', 'public', String(urlPath || ''));
+  if (!urlPath || !urlPath.startsWith(`/img/${kind}/`) || !source.startsWith(contentDir(kind) + path.sep)) {
+    throw new AppError("That photo couldn't be copied.", 400);
+  }
+  if (isCloudinaryConfigured()) {
+    return (await uploadBufferToCloudinary(await fs.promises.readFile(source), { folder })).secure_url;
+  }
+  const dir = path.join(contentDir(kind), String(id));
+  await ensureDir(dir);
+  const filename = `${randomName()}${path.extname(source)}`;
+  await fs.promises.copyFile(source, path.join(dir, filename));
+  return `/img/${folder}/${filename}`;
+};
+
 const removeContentFolder = async (kind, id) => {
   if (!CONTENT_KINDS.includes(kind)) return;
   await deleteCloudinaryFolder(`${kind}/${id}`);
@@ -242,6 +267,7 @@ module.exports = {
   removeDestinationFolder,
   saveContentImage,
   removeContentImage,
+  copyContentImage,
   removeContentFolder,
   savePrivateDocument,
   hasPrivateDocument,
