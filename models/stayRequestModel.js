@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 
 // A traveler asking a hotel for a stay. The hotel accepts or declines it from its panel (/hotel);
 // payment is settled between the guest and the hotel.
-const STATUSES = ['pending', 'accepted', 'declined', 'cancelled'];
+// 'expired': the hotel didn't answer within ANSWER_WITHIN, so the rooms were let go (utils/stayExpiry.js)
+const STATUSES = ['pending', 'accepted', 'declined', 'cancelled', 'expired'];
+const ANSWER_WITHIN = 24 * 60 * 60 * 1000;
 
 const stayRequestSchema = new mongoose.Schema(
   {
@@ -40,7 +42,8 @@ const stayRequestSchema = new mongoose.Schema(
     hotelNote: { type: String, trim: true, maxlength: 1000, default: '' },
     decidedAt: Date,
     decidedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
-    cancelledAt: Date
+    cancelledAt: Date,
+    expiredAt: Date
   },
   { timestamps: true }
 );
@@ -49,4 +52,7 @@ stayRequestSchema.index({ hotel: 1, status: 1, checkIn: 1 });
 
 const StayRequest = mongoose.model('StayRequest', stayRequestSchema);
 StayRequest.STATUSES = STATUSES;
+StayRequest.ANSWER_WITHIN = ANSWER_WITHIN;
+// When a waiting request stops holding its rooms
+StayRequest.expiresAt = r => new Date(new Date(r.createdAt).getTime() + ANSWER_WITHIN);
 module.exports = StayRequest;

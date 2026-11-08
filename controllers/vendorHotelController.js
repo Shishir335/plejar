@@ -11,6 +11,7 @@ const { validId, pageParams, paged } = require('../utils/query');
 const { saveContentImage, removeContentImage, copyContentImage } = require('../utils/uploads');
 const { applyHotelExtras, extrasView } = require('../utils/hotelExtras');
 const { itemsOf, bookedRooms } = require('../utils/stayAvailability');
+const { expireStayRequests } = require('../utils/stayExpiry');
 const { itemsView } = require('./stayController');
 
 const MAX_PHOTOS = 12;
@@ -114,7 +115,10 @@ const requestView = r => ({
   hotelNote: r.hotelNote,
   decidedAt: r.decidedAt,
   cancelledAt: r.cancelledAt,
-  createdAt: r.createdAt
+  createdAt: r.createdAt,
+  expiredAt: r.expiredAt,
+  // A waiting request must be answered by this time, or it expires and its rooms are let go
+  answerBy: r.status === 'pending' ? StayRequest.expiresAt(r) : null
 });
 
 // The lowest active room price is the "from" price travelers see
@@ -320,12 +324,13 @@ exports.removeRoom = catchAsync(async (req, res) => {
 
 exports.listRequests = catchAsync(async (req, res) => {
   const q = req.query;
+  await expireStayRequests({ hotel: req.hotel._id });
   const today = todayUTC();
   const filter = { hotel: req.hotel._id };
   let sort = { createdAt: -1 };
   if (q.status === 'pending') { filter.status = 'pending'; sort = { checkIn: 1 }; }
   else if (q.status === 'upcoming') { filter.status = 'accepted'; filter.checkOut = { $gte: today }; sort = { checkIn: 1 }; }
-  else if (q.status === 'past') { filter.$or = [{ status: { $in: ['declined', 'cancelled'] } }, { status: 'accepted', checkOut: { $lt: today } }]; }
+  else if (q.status === 'past') { filter.$or = [{ status: { $in: ['declined', 'cancelled', 'expired'] } }, { status: 'accepted', checkOut: { $lt: today } }]; }
   const page = pageParams(q);
   const [rows, total, counts] = await Promise.all([
     StayRequest.find(filter).sort(sort).skip(page.skip).limit(page.limit).populate('user', 'name email phone').lean(),
@@ -346,11 +351,20 @@ exports.decideRequest = catchAsync(async (req, res) => {
   if (!decision) throw new AppError('Choose to accept or decline the request.', 400);
   const request = validId(req.params.id) ? await StayRequest.findOne({ _id: req.params.id, hotel: req.hotel._id }) : null;
   if (!request) throw new AppError('No stay request found with that ID.', 404);
-  if (request.status !== 'pending') throw new AppError(request.status === 'cancelled' ? 'The guest cancelled this request.' : `This request was already ${request.status}.`, 400);
+  if (request.status === 'pending' && StayRequest.expiresAt(request) <= new Date()) {
+    await expireStayRequests({ _id: request._id });
+    request.status = 'expired';
+  }
+  if (request.status !== 'pending') {
+    throw new AppError({
+      cancelled: 'The guest cancelled this request.',
+      expired: "This request expired because it wasn't answered within 24 hours, and its rooms were let go. The guest was told they can ask again."
+    }[request.status] || `This request was already ${request.status}.`, 400);
+  }
   const note = text(b.note, 1000);
   if (decision === 'declined' && !note) throw new AppError('Tell the guest why, for example "Fully booked on those dates".', 400);
 
-  // Accepting holds the rooms, so they must still be free: other stays may have been accepted since
+  // The rooms were held when the guest asked; check again in case the room's quantity was lowered since
   if (decision === 'accepted') {
     const booked = await bookedRooms(req.hotel._id, request.checkIn, request.checkOut, { exclude: request._id });
     for (const item of itemsOf(request)) {

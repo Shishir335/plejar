@@ -9,7 +9,7 @@ const KINDS = [
   // About the traveler's own bookings
   'booking_requested', 'booking_confirmed', 'booking_cancelled', 'booking_completed', 'trip_reminder', 'points_earned', 'referral_reward',
   // A hotel answering the traveler's stay request
-  'stay_accepted', 'stay_declined',
+  'stay_accepted', 'stay_declined', 'stay_expired',
   // From other travelers
   'post_reaction', 'post_comment', 'comment_reply', 'comment_reaction', 'post_share', 'new_follower',
   // From Plejar

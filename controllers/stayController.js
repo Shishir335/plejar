@@ -9,6 +9,7 @@ const Email = require('../utils/email');
 const { validId, pageParams, paged } = require('../utils/query');
 const membership = require('../utils/vendorMembership');
 const { itemsOf, availability } = require('../utils/stayAvailability');
+const { expireStayRequests } = require('../utils/stayExpiry');
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_NIGHTS = 30;
@@ -59,7 +60,10 @@ const myView = r => ({
   hotelNote: r.hotelNote,
   decidedAt: r.decidedAt,
   cancelledAt: r.cancelledAt,
+  expiredAt: r.expiredAt,
   createdAt: r.createdAt,
+  // While waiting: the hotel has until this time to answer, or the request expires
+  answerBy: r.status === 'pending' ? StayRequest.expiresAt(r) : null,
   canCancel: r.status === 'pending' || (r.status === 'accepted' && new Date(r.checkIn) > todayUTC())
 });
 
@@ -111,7 +115,7 @@ exports.create = catchAsync(async (req, res, next) => {
   if (dates.error) return next(new AppError(dates.error, 400));
   const { checkIn, checkOut, nights } = dates;
 
-  // Only rooms not held by accepted stays on those dates can be asked for
+  // Only rooms not held by other guests' waiting or accepted stays on those dates can be asked for
   const free = Object.fromEntries((await availability(hotel, checkIn, checkOut)).map(a => [String(a._id), a]));
   for (const [id, { room, quantity }] of wanted) {
     const left = free[id] ? free[id].available : 0;
@@ -131,6 +135,7 @@ exports.create = catchAsync(async (req, res, next) => {
   const phone = text(b.phone || req.user.phone, 20).replace(/[\s-]/g, '');
   if (!BD_PHONE.test(phone)) return next(new AppError('Enter a mobile number the hotel can call, for example 01712345678.', 400));
 
+  await expireStayRequests({ user: req.user._id, hotel: hotel._id });
   const pending = await StayRequest.countDocuments({ user: req.user._id, hotel: hotel._id, status: 'pending' });
   if (pending >= MAX_PENDING) return next(new AppError('You already have requests waiting for this hotel. Wait for their answer, or cancel one first.', 429));
 
@@ -155,6 +160,16 @@ exports.create = catchAsync(async (req, res, next) => {
     phone,
     note: text(b.note, 1000)
   });
+
+  // Two guests may have asked for the last room at the same moment: check again now this request holds
+  // its rooms, counting only requests made before it (and itself), so the first one keeps the room
+  const after = await availability(hotel, checkIn, checkOut, { upTo: request._id });
+  const over = after.find(a => wanted.has(String(a._id)) && a.booked > a.count);
+  if (over) {
+    await StayRequest.deleteOne({ _id: request._id });
+    return next(new AppError(`${over.name} was just booked by someone else for those dates. Check what's free and try again.`, 409));
+  }
+
   // Tell the hotel's team by email; a slow or blocked mail server never holds up the guest
   User.find({ ...membership.memberOf(hotel.agency), deletedAt: null }).select('name email').lean().then(team => Promise.all(team.filter(u => u.email).map(u =>
     new Email(u, `${req.protocol}://${req.get('host')}/hotel#requests`, {
@@ -173,6 +188,7 @@ exports.create = catchAsync(async (req, res, next) => {
 
 // GET /api/v1/hotels/stay-requests (the traveler's own)
 exports.mine = catchAsync(async (req, res) => {
+  await expireStayRequests({ user: req.user._id });
   const page = pageParams(req.query);
   const filter = { user: req.user._id };
   if (StayRequest.STATUSES.includes(req.query.status)) filter.status = req.query.status;

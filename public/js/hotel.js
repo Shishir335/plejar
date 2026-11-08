@@ -39,7 +39,15 @@ const HOTEL_STATUS = {
   published: { label: 'Live in the app', note: 'Travelers can find your hotel in the Plejar app. Changes you save show straight away.', tone: 'alert-ok' },
   hidden: { label: 'Hidden', note: 'Travelers cannot see your hotel right now. Contact Plejar to show it again.', tone: 'alert-warn' }
 };
-const REQUEST_LABEL = { pending: 'Waiting', accepted: 'Accepted', declined: 'Declined', cancelled: 'Cancelled by guest' };
+const REQUEST_LABEL = { pending: 'Waiting', accepted: 'Accepted', declined: 'Declined', cancelled: 'Cancelled by guest', expired: 'Expired, not answered' };
+
+// "Answer within 5 h" on a waiting request: after 24 hours it expires and its rooms go back on sale
+const answerByText = r => {
+  if (r.status !== 'pending' || !r.answerBy) return '';
+  const mins = Math.round((new Date(r.answerBy) - Date.now()) / 60000);
+  if (mins <= 0) return 'Time to answer has run out';
+  return `Answer within ${mins >= 120 ? `${Math.floor(mins / 60)} h` : `${mins} min`} or it expires`;
+};
 
 const isOwner = () => state.me && state.me.agencyRole === 'owner';
 const escapeHTML = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -421,7 +429,7 @@ async function loadRequests(page) {
 const EMPTY_REQUESTS = {
   pending: ['No requests waiting', 'When a traveler asks for a room, it shows here.'],
   upcoming: ['No upcoming stays', 'Stays you accept show here until the guest checks out.'],
-  past: ['Nothing here yet', 'Declined, cancelled and finished stays show here.'],
+  past: ['Nothing here yet', 'Declined, cancelled, expired and finished stays show here.'],
   all: ['No stay requests yet', 'Travelers ask for a room from your page in the Plejar app once your listing is live.']
 };
 
@@ -438,7 +446,7 @@ function requestCard(r) {
         <small>${plural(r.nights, 'night')}</small>
       </div>
       <div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h3>${E(r.guestName || 'Guest')}</h3><span class="pill pill-${E(r.status)}">${E(REQUEST_LABEL[r.status] || r.status)}</span></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h3>${E(r.guestName || 'Guest')}</h3><span class="pill pill-${E(r.status)}">${E(REQUEST_LABEL[r.status] || r.status)}</span>${answerByText(r) ? `<span class="req-due">${E(answerByText(r))}</span>` : ''}</div>
         <div class="req-facts">
           <span>${E(fmtDay(r.checkIn, { weekday: 'short' }))} → ${E(fmtDay(r.checkOut, { weekday: 'short' }))}</span>
           <span>${plural(r.rooms, 'room')}, ${plural(r.guests, 'guest')}</span>

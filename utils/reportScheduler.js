@@ -3,6 +3,7 @@ const Agency = require('../models/agencyModel');
 const { reportPeriod, dhakaDay } = require('./vendorReport');
 const { sendReport } = require('./reportMailer');
 const { sendTripReminders } = require('./tripReminders');
+const { expireStayRequests } = require('./stayExpiry');
 
 /**
  * Sends scheduled vendor reports from inside the web server:
@@ -61,7 +62,11 @@ const startReportScheduler = () => {
     // Travelers' day-before trip reminders run on the same clock
     .then(() => sendTripReminders())
     .then(r => { if (r && r.sent) console.log(`[REMINDERS] ${r.sent} trip reminders sent`); })
-    .catch(err => console.warn('[REMINDERS WARNING]', err.message));
+    .catch(err => console.warn('[REMINDERS WARNING]', err.message))
+    // Stay requests hotels didn't answer within 24 hours
+    .then(() => expireStayRequests())
+    .then(r => { if (r && r.expired) console.log(`[STAYS] ${r.expired} unanswered stay requests expired`); })
+    .catch(err => console.warn('[STAYS WARNING]', err.message));
   timer = setInterval(tick, CHECK_EVERY);
   timer.unref();
   setTimeout(tick, 60 * 1000).unref();
