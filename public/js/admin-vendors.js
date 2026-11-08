@@ -5,6 +5,7 @@
  */
 
 const V = {
+  kind: 'agency', // which sidebar item is open: 'agency' (Travel agents) or 'hotel' (Hotels)
   sub: 'all',
   page: 1,
   detail: null, // everything GET /admin/vendors/:id returned for the open profile
@@ -50,6 +51,7 @@ function vendorBadges(v) {
 
 const VENDOR_SUB_LOADERS = {
   all: () => loadVendors(V.page),
+  listings: () => loadHotels(1),
   applications: () => { loadApplications(); loadPendingAgencies(); },
   verification: () => loadPendingAgencies(),
   categories: () => loadCategories(),
@@ -59,7 +61,35 @@ const VENDOR_SUB_LOADERS = {
   activity: () => loadVendorActivity()
 };
 
+// Sub-tabs each section has (the rest are hidden by [data-for] in admin.css)
+const KIND_SUBS = {
+  agency: ['all', 'applications', 'verification', 'categories', 'bookings', 'payouts', 'commission', 'activity'],
+  hotel: ['all', 'listings', 'applications', 'verification', 'bookings', 'activity']
+};
+const kindRoute = kind => (kind === 'hotel' ? 'hotels' : 'agents');
+
+// Show the vendor screen as Travel agents ('agency') or Hotels ('hotel')
+function setVendorKind(kind) {
+  kind = kind === 'hotel' ? 'hotel' : 'agency';
+  const changed = V.kind !== kind;
+  V.kind = kind;
+  document.getElementById('tab-vendors').dataset.kind = kind;
+  if (changed) {
+    V.page = 1;
+    // Filters from the other section don't carry over
+    ['vSearch', 'vStatusF', 'vVerifF', 'vndCategoryF', 'apSearch', 'bkSearch', 'bkKind', 'bkVendor', 'vaSearch', 'vaVendor'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const custom = document.getElementById('vCustomF');
+    if (custom) custom.checked = false;
+    fillVendorSelects();
+  }
+  if (!KIND_SUBS[kind].includes(V.sub)) V.sub = 'all';
+}
+
 function switchVendorSub(name) {
+  if (!KIND_SUBS[V.kind].includes(name)) name = 'all';
   V.sub = name;
   document.querySelectorAll('#tab-vendors .subtab').forEach(b => {
     const on = b.dataset.vsub === name;
@@ -69,7 +99,7 @@ function switchVendorSub(name) {
   document.querySelectorAll('#tab-vendors .subpane').forEach(p => p.classList.toggle('active', p.id === `vsub-${name}`));
   if (VENDOR_SUB_LOADERS[name]) VENDOR_SUB_LOADERS[name]();
   try {
-    const route = `#vendors/${name}`;
+    const route = `#${kindRoute(V.kind)}/${name}`;
     history.replaceState(null, '', route);
     sessionStorage.setItem('plezar_admin_tab', route);
   } catch (_) {}
@@ -87,16 +117,20 @@ function refreshVendorViews() {
 
 // ---------- Summary chips and sidebar badges ----------
 
+// Counts for both sections: the open one fills the chips and sub-tab badges, both fill the sidebar badges
 async function loadVendorSummary() {
   try {
-    const { ok, data } = await adminFetch('/api/v1/admin/vendors/summary');
-    if (!ok) return;
-    const s = data.data.summary;
+    const [agents, hotels] = await Promise.all(['agency', 'hotel'].map(kind => adminFetch(`/api/v1/admin/vendors/summary?kind=${kind}`)));
+    if (!agents.ok || !hotels.ok) return;
+    const byKind = { agency: agents.data.data.summary, hotel: hotels.data.data.summary };
+    const s = byKind[V.kind];
+    const isHotels = V.kind === 'hotel';
     const chips = [
-      ['total', 'All vendors', s.total], ['active', 'Active', s.active], ['suspended', 'Suspended', s.suspended],
+      ['total', isHotels ? 'All hotels' : 'All travel agents', s.total], ['active', 'Active', s.active], ['suspended', 'Suspended', s.suspended],
       ['deactivated', 'Deactivated', s.deactivated], ['verified', 'Verified', s.verified],
       ['pending', 'Awaiting verification', s.pendingVerification], ['invited', 'Invite not accepted', s.invited]
     ];
+    if (isHotels) chips.splice(1, 0, ['listings', 'Listings to publish', s.draftListings]);
     const box = document.getElementById('vendorChips');
     if (box) box.innerHTML = chips.map(([key, text, n]) => `<button type="button" class="chip" onclick="applyVendorChip('${key}')"><strong>${n}</strong> ${E(text)}</button>`).join('');
     const setBadge = (id, n) => {
@@ -106,17 +140,25 @@ async function loadVendorSummary() {
     setBadge('vsubLeadCount', s.newLeads);
     setBadge('vsubVerifyCount', s.pendingVerification);
     setBadge('vsubPayoutCount', s.pendingPayouts);
-    setBadge('vendorsAttentionCount', s.newLeads + s.pendingVerification + s.pendingPayouts);
+    setBadge('vsubListingCount', byKind.hotel.draftListings);
+    const a = byKind.agency; const h = byKind.hotel;
+    setBadge('agentsAttentionCount', a.newLeads + a.pendingVerification + a.pendingPayouts);
+    setBadge('hotelsAttentionCount', h.newLeads + h.pendingVerification + h.draftListings);
   } catch (e) { /* badges are informational */ }
 }
 
 function applyVendorChip(key) {
-  ['vSearch', 'vStatusF', 'vVerifF', 'vCategoryF'].forEach(id => { document.getElementById(id).value = ''; });
+  ['vSearch', 'vStatusF', 'vVerifF', 'vndCategoryF'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('vCustomF').checked = false;
   if (['active', 'suspended', 'deactivated'].includes(key)) document.getElementById('vStatusF').value = key;
   if (key === 'verified') document.getElementById('vVerifF').value = 'verified';
   if (key === 'pending') document.getElementById('vVerifF').value = 'pending';
   if (key === 'invited') return switchVendorSub('applications');
+  if (key === 'listings') {
+    const status = document.getElementById('hStatusF');
+    if (status) status.value = 'draft';
+    return switchVendorSub('listings');
+  }
   loadVendors(1);
 }
 
@@ -126,7 +168,7 @@ async function ensureCategories(force) {
   if (V.categories.length && !force) return V.categories;
   const { ok, data } = await adminFetch('/api/v1/admin/vendor-categories');
   if (ok) V.categories = data.data.categories;
-  const select = document.getElementById('vCategoryF');
+  const select = document.getElementById('vndCategoryF');
   if (select) {
     const keep = select.value;
     select.innerHTML = '<option value="">Any category</option>' + V.categories.map(c => `<option value="${E(c._id)}">${E(c.name)}</option>`).join('');
@@ -139,36 +181,88 @@ async function ensureVendorOptions() {
   if (V.vendorOptions.length) return V.vendorOptions;
   const { ok, data } = await adminFetch('/api/v1/admin/vendors?limit=100&sort=name');
   if (ok) V.vendorOptions = data.data.vendors.map(v => ({ id: v.id, name: v.name, kind: v.kind || 'agency' }));
-  const html = V.vendorOptions.map(v => `<option value="${E(v.id)}">${E(v.name)}</option>`).join('');
-  [['bkVendor', 'All vendors'], ['vaVendor', 'All vendors']].forEach(([id, first]) => {
-    const el = document.getElementById(id);
-    if (el) { const keep = el.value; el.innerHTML = `<option value="">${first}</option>${html}`; el.value = keep; }
-  });
+  fillVendorSelects();
   return V.vendorOptions;
+}
+
+// The vendor pickers in Bookings and Activity list only the open section's vendors
+function fillVendorSelects() {
+  const list = V.vendorOptions.filter(v => (v.kind === 'hotel') === (V.kind === 'hotel'));
+  const html = list.map(v => `<option value="${E(v.id)}">${E(v.name)}</option>`).join('');
+  const first = V.kind === 'hotel' ? 'All hotels' : 'All travel agents';
+  ['bkVendor', 'vaVendor'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { const keep = el.value; el.innerHTML = `<option value="">${first}</option>${html}`; el.value = list.some(v => v.id === keep) ? keep : ''; }
+  });
 }
 
 // ---------- All vendors ----------
 
 const debouncedVendors = makeDebounce(() => loadVendors(1));
 
+const LISTING_BADGE = { published: ['badge-active', 'Published'], draft: ['badge-manager', 'Draft, not published'], hidden: ['badge-inactive', 'Hidden'] };
+
+// A hotel's row: its listing, rooms and stay requests instead of tours, bookings and commission
+const hotelVendorRow = v => {
+  const l = v.listing;
+  const [badge, text] = l ? (LISTING_BADGE[l.status] || ['badge-inactive', l.status]) : ['badge-admin', 'No listing'];
+  const st = v.stays || { total: 0, pending: 0, accepted: 0 };
+  return `
+      <tr>
+        <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info">
+          <span class="user-cell-name">${E(v.name)}</span>
+          <span class="user-cell-email">${E(v.phone || '') || '—'}</span></div></div></td>
+        <td>${v.owner ? `<span class="lead-main">${E(v.owner.name)}</span><span class="lead-sub">${E(v.owner.email)}${v.owner.accountStatus === 'invited' ? ' · invite pending' : ''}</span>` : '—'}</td>
+        <td><span class="badge ${badge}">${E(text)}</span>${l ? `<span class="lead-sub">${l.photos} photo${l.photos === 1 ? '' : 's'}${l.pricePerNight ? ` · from ${takaFmt(l.pricePerNight)}` : ''}</span>` : ''}</td>
+        <td>${l ? l.roomTypes : 0}</td>
+        <td>${st.pending ? `<strong>${st.pending} waiting</strong>` : '0 waiting'}<span class="lead-sub">${st.accepted} accepted · ${st.total} in all</span></td>
+        <td>${v.members}</td>
+        <td class="standing"><div class="standing-wrap">${vendorBadges(v)}</div></td>
+        <td style="text-align: right;"><div class="lead-actions">${l ? `<button class="btn btn-secondary btn-sm" onclick="openListingFromVendor('${E(l.id)}', '${E(v.name)}')">Listing</button>` : ''}<button class="btn btn-secondary btn-sm" onclick="openVendor('${E(v.id)}')">Open</button></div></td>
+      </tr>`;
+};
+
+// Open a hotel's listing in the Listings tab
+async function openListingFromVendor(listingId, name) {
+  const search = document.getElementById('hSearch');
+  if (search) search.value = name || '';
+  const status = document.getElementById('hStatusF');
+  if (status) status.value = '';
+  switchVendorSub('listings');
+  await loadHotels(1);
+  if (C.hotels.some(h => h._id === listingId)) openHotel(listingId);
+}
+
 async function loadVendors(page = 1) {
   V.page = page;
-  tableMessage('vendorsTableBody', 9, 'Loading vendors...');
-  ensureCategories();
+  const isHotels = V.kind === 'hotel';
+  const cols = isHotels ? 8 : 9;
+  tableMessage('vendorsTableBody', cols, isHotels ? 'Loading hotels...' : 'Loading travel agents...');
+  if (!isHotels) ensureCategories();
   const q = queryString({
-    search: val('vSearch').trim(), status: val('vStatusF'), verification: val('vVerifF'), category: val('vCategoryF'),
-    sort: val('vSortF'), commission: document.getElementById('vCustomF')?.checked ? 'custom' : '', page, limit: 15
+    kind: V.kind, search: val('vSearch').trim(), status: val('vStatusF'), verification: val('vVerifF'),
+    category: isHotels ? '' : val('vndCategoryF'), sort: val('vSortF'),
+    commission: !isHotels && document.getElementById('vCustomF')?.checked ? 'custom' : '', page, limit: 15
   });
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/vendors?${q}`);
-    if (!ok) return tableMessage('vendorsTableBody', 9, data.message || 'Could not load vendors.', true);
+    if (!ok) return tableMessage('vendorsTableBody', cols, data.message || 'Could not load the list.', true);
     renderPager('vendorsPager', data.data, 'loadVendors');
-    if (!data.data.vendors.length) return tableMessage('vendorsTableBody', 9, 'No vendors match these filters. Invite one, or approve an application.');
+    if (!data.data.vendors.length) {
+      return tableMessage('vendorsTableBody', cols, isHotels
+        ? 'No hotels match these filters. Hotels join by applying at /apply.'
+        : 'No travel agents match these filters. Invite one, or approve an application.');
+    }
+    if (isHotels) {
+      document.getElementById('vendorsTableBody').innerHTML = data.data.vendors.map(hotelVendorRow).join('');
+      loadVendorSummary();
+      return;
+    }
     document.getElementById('vendorsTableBody').innerHTML = data.data.vendors.map(v => `
       <tr>
         <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info">
           <span class="user-cell-name">${E(v.name)}</span>
-          <span class="user-cell-email">${v.kind === 'hotel' ? '<span class="tag">Hotel</span>' : (E((v.regions || []).join(', ')) || 'No areas listed')}</span>
+          <span class="user-cell-email">${E((v.regions || []).join(', ')) || 'No areas listed'}</span>
           ${v.categories.length ? `<span class="tag-row">${v.categories.map(c => `<span class="tag">${E(c.name)}</span>`).join('')}</span>` : ''}</div></div></td>
         <td>${v.owner ? `<span class="lead-main">${E(v.owner.name)}</span><span class="lead-sub">${E(v.owner.email)}${v.owner.accountStatus === 'invited' ? ' · invite pending' : ''}</span>` : '—'}</td>
         <td>${v.packages.published}<span class="lead-sub">${v.packages.total} total</span></td>
@@ -180,7 +274,7 @@ async function loadVendors(page = 1) {
         <td style="text-align: right;"><button class="btn btn-secondary btn-sm" onclick="openVendor('${E(v.id)}')">Open</button></td>
       </tr>`).join('');
   } catch (e) {
-    tableMessage('vendorsTableBody', 9, 'Failed to load vendors.', true);
+    tableMessage('vendorsTableBody', cols, 'Failed to load the list.', true);
   }
   loadVendorSummary();
 }
@@ -278,7 +372,9 @@ function bookingRow(b, { withVendor = true } = {}) {
 async function loadBookings(page = 1) {
   tableMessage('bookingsTableBody', 8, 'Loading bookings...');
   ensureVendorOptions();
-  const q = queryString({ search: val('bkSearch').trim(), status: val('bkStatus'), paymentStatus: val('bkPayment'), kind: val('bkKind'), agency: val('bkVendor'), page, limit: 20 });
+  // Hotels: hotel stays only; Travel agents: tours and guides
+  const kind = V.kind === 'hotel' ? 'hotel' : (val('bkKind') || 'trips');
+  const q = queryString({ search: val('bkSearch').trim(), status: val('bkStatus'), paymentStatus: val('bkPayment'), kind, agency: val('bkVendor'), page, limit: 20 });
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/bookings?${q}`);
     if (!ok) return tableMessage('bookingsTableBody', 8, data.message || 'Could not load bookings.', true);
@@ -446,7 +542,7 @@ function openCommissionModal(vendorId, rate, custom) {
   const d = V.detail;
   const name = vendorId ? ((d && d.agency._id === vendorId ? d.agency.name : (V.commissionNames || {})[vendorId]) || 'this vendor') : '';
   V.commissionCtx = { vendorId, name };
-  document.getElementById('vcTitle').textContent = vendorId ? `Commission for ${name}` : 'Platform default commission';
+  document.getElementById('vcmTitle').textContent = vendorId ? `Commission for ${name}` : 'Platform default commission';
   document.getElementById('vcLead').textContent = vendorId
     ? 'Set a rate for this vendor only. It applies to bookings made after you save; existing bookings keep their rate.'
     : 'The share of each booking Plejar keeps from vendors without their own rate. It applies to bookings made after you save.';
@@ -503,7 +599,7 @@ function activityRows(entries, withVendor = true) {
 async function loadVendorActivity(page = 1) {
   tableMessage('vendorActivityBody', 4, 'Loading...');
   ensureVendorOptions();
-  const q = queryString({ agency: val('vaVendor') || 'any', search: val('vaSearch').trim(), page, limit: 30 });
+  const q = queryString({ agency: val('vaVendor') || 'any', vendorKind: V.kind, search: val('vaSearch').trim(), page, limit: 30 });
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/activity?${q}`);
     if (!ok) return tableMessage('vendorActivityBody', 4, data.message || 'Could not load activity.', true);

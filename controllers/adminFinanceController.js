@@ -21,6 +21,7 @@ const bookingFilter = q => {
   if (q.user && validId(q.user)) filter.user = q.user;
   if (['pending', 'confirmed', 'completed', 'cancelled'].includes(q.status)) filter.status = q.status;
   if (['tour', 'hotel', 'guide'].includes(q.kind)) filter.kind = q.kind;
+  else if (q.kind === 'trips') filter.kind = { $in: ['tour', 'guide'] }; // what tour agents sell
   if (['unpaid', 'paid', 'partially_refunded', 'refunded'].includes(q.paymentStatus)) filter.paymentStatus = q.paymentStatus;
   if (q.search) {
     const rx = new RegExp(escapeRegex(String(q.search).trim()), 'i');

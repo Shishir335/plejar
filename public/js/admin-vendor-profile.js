@@ -25,6 +25,9 @@ async function openVendor(id, tab = 'overview') {
       return;
     }
     V.detail = data.data;
+    // Light up Travel agents or Hotels in the sidebar, whichever this vendor is
+    setVendorKind(V.detail.agency.kind === 'hotel' ? 'hotel' : 'agency');
+    switchTab('vendorDetail', false);
     renderVendorDetail(tab);
   } catch (e) {
     box.innerHTML = '<p style="color: var(--color-danger); padding: 24px;">Failed to load this vendor.</p>';
@@ -54,7 +57,7 @@ function renderVendorDetail(tab = 'overview') {
 
   document.getElementById('vendorDetail').innerHTML = `
     <div class="profile-head">
-      <button class="btn btn-secondary btn-sm" onclick="switchTab('vendors'); refreshVendorViews();">&larr; All vendors</button>
+      <button class="btn btn-secondary btn-sm" onclick="switchTab('vendors')">&larr; ${a.kind === 'hotel' ? 'All hotels' : 'All travel agents'}</button>
       <div class="profile-id">
         ${agencyLogo(a, 56)}
         <div>

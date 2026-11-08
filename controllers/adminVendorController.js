@@ -6,6 +6,8 @@ const Review = require('../models/reviewModel');
 const Complaint = require('../models/complaintModel');
 const Payout = require('../models/payoutModel');
 const AgentLead = require('../models/agentLeadModel');
+const Hotel = require('../models/hotelModel');
+const StayRequest = require('../models/stayRequestModel');
 const VendorCategory = require('../models/vendorCategoryModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
@@ -80,24 +82,34 @@ const ratingSummary = async agencyId => {
 
 // ---------- Summary and list ----------
 
+// ?kind=agency (tour agents) or ?kind=hotel; without it, everyone
 exports.summary = catchAsync(async (req, res, next) => {
-  const [total, active, suspended, deactivated, verified, pendingVerification, invited, newLeads, payoutRows, categories] = await Promise.all([
-    Agency.countDocuments(),
-    Agency.countDocuments({ status: 'active' }),
-    Agency.countDocuments({ status: 'suspended' }),
-    Agency.countDocuments({ status: 'deactivated' }),
-    Agency.countDocuments({ verified: true }),
-    Agency.countDocuments({ 'verification.status': 'pending' }),
-    User.countDocuments({ role: 'agent', agencyRole: 'owner', accountStatus: 'invited' }),
-    AgentLead.countDocuments({ $or: [{ status: 'new' }, { unreadReply: true }] }),
-    Payout.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, amount: { $sum: '$amount' }, count: { $sum: 1 } } }]),
-    VendorCategory.countDocuments()
+  const kind = req.query.kind;
+  const kf = membership.vendorKindFilter(kind);
+  const ids = kind ? await Agency.find(kf).distinct('_id') : null;
+  const isHotels = kind === 'hotel';
+  const [total, active, suspended, deactivated, verified, pendingVerification, invited, newLeads, payoutRows, categories, draftListings] = await Promise.all([
+    Agency.countDocuments(kf),
+    Agency.countDocuments({ ...kf, status: 'active' }),
+    Agency.countDocuments({ ...kf, status: 'suspended' }),
+    Agency.countDocuments({ ...kf, status: 'deactivated' }),
+    Agency.countDocuments({ ...kf, verified: true }),
+    Agency.countDocuments({ ...kf, 'verification.status': 'pending' }),
+    ids
+      ? User.countDocuments({ ...membership.ownersOfAny(ids), accountStatus: 'invited' })
+      : User.countDocuments({ role: 'agent', agencyRole: 'owner', accountStatus: 'invited' }),
+    AgentLead.countDocuments({ ...membership.leadKindFilter(kind), $or: [{ status: 'new' }, { unreadReply: true }] }),
+    // Hotels are paid by their guests directly, so payouts are for tour agents
+    isHotels ? [] : Payout.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, amount: { $sum: '$amount' }, count: { $sum: 1 } } }]),
+    isHotels ? 0 : VendorCategory.countDocuments(),
+    // Hotel listings waiting for Plejar to publish them
+    kind === 'agency' ? 0 : Hotel.countDocuments({ status: 'draft', agency: { $ne: null } })
   ]);
   const p = payoutRows[0] || { amount: 0, count: 0 };
 
   res.status(200).json({
     status: 'success',
-    data: { summary: { total, active, suspended, deactivated, verified, pendingVerification, invited, newLeads, pendingPayouts: p.count, pendingPayoutAmount: round(p.amount), categories } }
+    data: { summary: { kind: kind || 'all', total, active, suspended, deactivated, verified, pendingVerification, invited, newLeads, pendingPayouts: p.count, pendingPayoutAmount: round(p.amount), categories, draftListings } }
   });
 });
 
@@ -115,6 +127,7 @@ exports.listVendors = catchAsync(async (req, res, next) => {
   else if (q.verification === 'none') and.push({ verified: false, 'verification.status': { $in: ['none', null] } });
   if (q.category && validId(q.category)) and.push({ categories: toId(q.category) });
   if (q.commission === 'custom') and.push({ commissionRate: { $type: 'number' } });
+  if (q.kind) and.push(membership.vendorKindFilter(q.kind));
 
   const filter = and.length ? { $and: and } : {};
   const sorts = { newest: { createdAt: -1 }, oldest: { createdAt: 1 }, name: { name: 1 } };
@@ -143,8 +156,23 @@ exports.listVendors = catchAsync(async (req, res, next) => {
     ]),
     Review.aggregate([{ $match: { agency: { $in: ids }, status: 'visible' } }, { $group: { _id: '$agency', avg: { $avg: '$rating' }, count: { $sum: 1 } } }])
   ]);
+  // Hotels: their listing and stay requests
+  const hotelIds = agencies.filter(a => a.kind === 'hotel').map(a => a._id);
+  const [listings, stays] = hotelIds.length ? await Promise.all([
+    Hotel.find({ agency: { $in: hotelIds } }).select('agency status roomTypes.active photos pricePerNight').lean(),
+    StayRequest.aggregate([
+      { $match: { agency: { $in: hotelIds } } },
+      { $group: {
+        _id: '$agency',
+        total: { $sum: 1 },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+        accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } }
+      } }
+    ])
+  ]) : [[], []];
   const by = (rows, key = '_id') => Object.fromEntries(rows.map(r => [String(r[key]), r]));
   const ownerMap = membership.ownersById(owners); const memberMap = by(members); const pkgMap = by(pkgs); const bookingMap = by(bookings); const ratingMap = by(ratings);
+  const listingMap = by(listings, 'agency'); const stayMap = by(stays);
 
   const rows = agencies.map(a => {
     const k = String(a._id);
@@ -169,6 +197,14 @@ exports.listVendors = catchAsync(async (req, res, next) => {
       bookings: { total: b.total, completed: b.completed, cancelled: b.cancelled },
       revenue: round(b.gross),
       rating: r ? { average: Math.round(r.avg * 10) / 10, count: r.count } : { average: null, count: 0 },
+      listing: a.kind === 'hotel' && listingMap[k] ? {
+        id: listingMap[k]._id,
+        status: listingMap[k].status,
+        roomTypes: (listingMap[k].roomTypes || []).filter(rt => rt.active !== false).length,
+        photos: (listingMap[k].photos || []).length,
+        pricePerNight: listingMap[k].pricePerNight
+      } : null,
+      stays: a.kind === 'hotel' ? (stayMap[k] ? { total: stayMap[k].total, pending: stayMap[k].pending, accepted: stayMap[k].accepted } : { total: 0, pending: 0, accepted: 0 }) : undefined,
       createdAt: a.createdAt
     };
   });

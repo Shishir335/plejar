@@ -33,10 +33,12 @@ const decidedAlready = (lead, next) => {
 };
 
 // Counts for the status chips, plus how many need someone to look at them
+// ?kind=agency or ?kind=hotel limits both of these to tour agency or hotel applications
 exports.summary = catchAsync(async (req, res) => {
+  const kf = membership.leadKindFilter(req.query.kind);
   const [byStatus, attention] = await Promise.all([
-    AgentLead.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-    AgentLead.countDocuments(ATTENTION)
+    AgentLead.aggregate([{ $match: kf }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    AgentLead.countDocuments({ ...kf, ...ATTENTION })
   ]);
   const counts = Object.fromEntries(AgentLead.STATUSES.map(s => [s, 0]));
   byStatus.forEach(row => { counts[row._id] = row.count; });
@@ -47,7 +49,7 @@ exports.summary = catchAsync(async (req, res) => {
 
 exports.listApplications = catchAsync(async (req, res) => {
   const q = req.query;
-  const filter = {};
+  const filter = { ...membership.leadKindFilter(q.kind) };
   if (q.status === 'open') filter.status = { $in: OPEN_STATUSES };
   else if (q.status === 'attention') Object.assign(filter, ATTENTION);
   else if (AgentLead.STATUSES.includes(q.status)) filter.status = q.status;

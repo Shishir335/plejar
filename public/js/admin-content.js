@@ -1,5 +1,6 @@
 /**
- * Plejar admin - App content: banners on the app's Tours screen, and hotels for "Hotels Near You".
+ * Plejar admin - App content: banners on the app's Tours screen. Also the hotel listings for "Hotels Near You",
+ * whose pane now sits under Hotels > Listings (see admin-vendors.js).
  * Vouchers and the Help Center are in admin-rewards.js.
  * Depends on admin.js, admin-users.js (E, fmtDate, renderPager, tableMessage, formError, makeDebounce,
  * queryString, val), admin-vendors.js (adminForm) and admin-destinations.js (ensureDestinationOptions).
@@ -23,8 +24,7 @@ function switchContentSub(name) {
     b.setAttribute('aria-selected', String(on));
   });
   document.querySelectorAll('#tab-content .subpane').forEach(p => p.classList.toggle('active', p.id === `csub-${name}`));
-  if (name === 'hotels') loadHotels(1);
-  else if (name === 'ads') loadAdRequests();
+  if (name === 'ads') loadAdRequests();
   else if (name === 'vouchers') loadVouchers();
   else if (name === 'help') loadHelp();
   else if (name === 'pages') loadPages();

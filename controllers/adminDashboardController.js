@@ -4,6 +4,7 @@ const Package = require('../models/packageModel');
 const User = require('../models/userModel');
 const AgentLead = require('../models/agentLeadModel');
 const Subscriber = require('../models/subscriberModel');
+const Hotel = require('../models/hotelModel');
 const catchAsync = require('../utils/catchAsync');
 
 const TZ = 'Asia/Dhaka';
@@ -31,6 +32,15 @@ const sum = arr => arr.reduce((a, b) => a + b, 0);
 const countBy = (rows, key, order) => {
   const map = new Map(rows.map(r => [r._id, r.count]));
   return order.map(k => ({ [key]: k, count: map.get(k) || 0 }));
+};
+
+const hotelAttention = async () => {
+  const [hotelLeads, hotelPendingVerification, draftListings] = await Promise.all([
+    AgentLead.countDocuments({ status: 'new', vendorType: 'hotel' }),
+    Agency.countDocuments({ kind: 'hotel', 'verification.status': 'pending' }),
+    Hotel.countDocuments({ status: 'draft', agency: { $ne: null } })
+  ]);
+  return { hotelLeads, hotelPendingVerification, draftListings };
 };
 
 exports.getDashboard = catchAsync(async (req, res, next) => {
@@ -172,7 +182,9 @@ exports.getDashboard = catchAsync(async (req, res, next) => {
       attention: {
         newLeads: get(leads, 'status', 'new'),
         pendingVerification: verification.pending,
-        invitedOwners
+        invitedOwners,
+        // The hotels' share of the two above, so the dashboard can send each to Travel agents or Hotels
+        ...(await hotelAttention())
       },
       breakdowns: {
         userRoles: byRole,

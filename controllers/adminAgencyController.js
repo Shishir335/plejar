@@ -55,7 +55,7 @@ exports.getStats = catchAsync(async (req, res, next) => {
 
 // List agencies with owner and counts
 exports.listAgencies = catchAsync(async (req, res, next) => {
-  const filter = {};
+  const filter = { ...membership.vendorKindFilter(req.query.kind) };
   if (req.query.status) filter.status = req.query.status;
   if (req.query.verification) filter['verification.status'] = req.query.verification;
 

@@ -12,6 +12,8 @@ const { ROLES, STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, roleFilter, setR
 const { logActivity } = require('../utils/activity');
 const { hasPrivateDocument, sendPrivateDocument, removePrivateDocument } = require('../utils/uploads');
 const { linkVendorAgency } = require('../utils/vendorLink');
+const { vendorKindFilter } = require('../utils/vendorMembership');
+const Agency = require('../models/agencyModel');
 
 const ALL = { includeInactive: true }; // admin screens also see deleted accounts
 const NOT_DELETED = { active: { $ne: false }, deletedAt: null };
@@ -764,7 +766,12 @@ exports.listActivity = catchAsync(async (req, res, next) => {
   const q = req.query;
   const filter = {};
   if (q.user && mongoose.isValidObjectId(q.user)) filter.user = q.user;
-  if (q.agency === 'any') filter.agency = { $ne: null };
+  if (q.agency === 'any') {
+    // ?vendorKind=agency or hotel: only tour agents' or only hotels' activity
+    filter.agency = ['agency', 'hotel'].includes(q.vendorKind)
+      ? { $in: await Agency.find(vendorKindFilter(q.vendorKind)).distinct('_id') }
+      : { $ne: null };
+  }
   else if (q.agency && mongoose.isValidObjectId(q.agency)) filter.agency = q.agency;
   if (q.search) filter.summary = new RegExp(escapeRegex(String(q.search).trim()), 'i');
   const pg = pageParams(q, 30);

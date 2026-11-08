@@ -23,7 +23,7 @@ const isDecided = app => app.status === 'approved' || app.status === 'rejected';
 
 async function loadApplicationSummary() {
   try {
-    const { ok, data } = await adminFetch('/api/v1/admin/applications/summary');
+    const { ok, data } = await adminFetch(`/api/v1/admin/applications/summary?kind=${V.kind}`);
     if (!ok) return null;
     const { counts, attention } = data.data;
     const chips = [
@@ -51,7 +51,7 @@ async function loadApplications(page = AP.page) {
   AP.page = page;
   loadApplicationSummary();
   tableMessage('applicationsTableBody', 7, 'Loading applications...');
-  const params = new URLSearchParams({ page, limit: 20 });
+  const params = new URLSearchParams({ page, limit: 20, kind: V.kind });
   if (AP.status !== 'all') params.set('status', AP.status);
   if (val('apSearch').trim()) params.set('search', val('apSearch').trim());
   if (val('apSort')) params.set('sort', val('apSort'));
@@ -102,6 +102,9 @@ async function openApplication(id) {
       return;
     }
     AP.detail = data.data;
+    // Light up Travel agents or Hotels in the sidebar, whichever this application is for
+    setVendorKind(AP.detail.application.vendorType === 'hotel' ? 'hotel' : 'agency');
+    switchTab('applicationDetail', false);
     renderApplication();
     loadApplicationSummary();
     loadVendorSummary();
@@ -145,14 +148,17 @@ function applicationChecks(app, checks) {
 
 const STAY_NAMES = { hotel: 'Hotel', resort: 'Resort', cottage: 'Cottage', guest_house: 'Guest house', homestay: 'Homestay', eco_resort: 'Eco resort', houseboat: 'Houseboat' };
 
-// The draft listing an approved hotel got, opened in Content > Hotels
+// The draft listing an approved hotel got, opened in Hotels > Listings
 async function openHotelListing(id) {
   closeModal('approveModal');
   const a = AP.detail.application;
   const search = document.getElementById('hSearch');
   if (search) search.value = (a.hotelListing && a.hotelListing.name) || a.agencyName || '';
-  switchTab('content');
-  switchContentSub('hotels');
+  const status = document.getElementById('hStatusF');
+  if (status) status.value = '';
+  setVendorKind('hotel');
+  showTabPane('vendors', 'hotels');
+  switchVendorSub('listings');
   await loadHotels(1);
   if (C.hotels.some(h => h._id === id)) openHotel(id);
 }

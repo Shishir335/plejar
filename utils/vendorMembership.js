@@ -78,4 +78,17 @@ const unlink = (user, id) => {
   return Boolean(user.agency);
 };
 
-module.exports = { same, memberOf, ownerOf, ownersOfAny, ownersById, memberCountPipeline, isIn, roleIn, cannotLink, link, unlink };
+// The admin console shows tour agents and hotels apart: ?kind=agency or ?kind=hotel
+// (older agencies have no kind, which means a tour agency)
+const vendorKindFilter = kind => {
+  if (kind === 'hotel') return { kind: 'hotel' };
+  if (kind === 'agency') return { kind: { $ne: 'hotel' } };
+  return {};
+};
+const leadKindFilter = kind => {
+  if (kind === 'hotel') return { vendorType: 'hotel' };
+  if (kind === 'agency') return { vendorType: { $ne: 'hotel' } };
+  return {};
+};
+
+module.exports = { vendorKindFilter, leadKindFilter, same, memberOf, ownerOf, ownersOfAny, ownersById, memberCountPipeline, isIn, roleIn, cannotLink, link, unlink };

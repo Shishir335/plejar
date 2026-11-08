@@ -759,6 +759,9 @@ textarea.form-input { resize: vertical; font-family: inherit; }
 .subtab { background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px 14px; font: inherit; font-size: 0.88rem; font-weight: 600; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .subtab:hover { color: var(--text-primary); }
 .subtab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
+/* Travel agents and Hotels share the vendor screen; each hides the other's parts */
+#tab-vendors:not([data-kind="hotel"]) [data-for="hotel"],
+#tab-vendors[data-kind="hotel"] [data-for="agency"] { display: none !important; }
 .subpane { display: none; }
 .subpane.active { display: block; }
 .mini-count { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--badge-manager-bg); color: var(--badge-manager-fg); font-size: 0.7rem; font-weight: 700; line-height: 18px; text-align: center; }

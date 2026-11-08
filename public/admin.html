@@ -105,10 +105,16 @@
           <span class="sidebar-text">Newsletter Leads</span>
         </button>
 
-        <button class="nav-link-btn" data-tab="vendors" onclick="switchTab('vendors')">
-          <span>🏝️</span>
-          <span class="sidebar-text">Vendors</span>
-          <span id="vendorsAttentionCount" class="nav-count" hidden>0</span>
+        <button class="nav-link-btn" data-tab="agents" onclick="switchTab('agents')">
+          <span>🧭</span>
+          <span class="sidebar-text">Travel agents</span>
+          <span id="agentsAttentionCount" class="nav-count" hidden>0</span>
+        </button>
+
+        <button class="nav-link-btn" data-tab="hotels" onclick="switchTab('hotels')">
+          <span>🏨</span>
+          <span class="sidebar-text">Hotels</span>
+          <span id="hotelsAttentionCount" class="nav-count" hidden>0</span>
         </button>
 
         <button class="nav-link-btn" data-tab="destinations" onclick="switchTab('destinations'); refreshDestinationViews();">
@@ -419,7 +425,6 @@
           <div class="subtabs" role="tablist" aria-label="App content">
             <button type="button" role="tab" class="subtab active" data-csub="banners" aria-selected="true">Tours banners</button>
             <button type="button" role="tab" class="subtab" data-csub="ads" aria-selected="false">Ad requests <span class="mini-count" id="csubAdCount" hidden>0</span></button>
-            <button type="button" role="tab" class="subtab" data-csub="hotels" aria-selected="false">Hotels</button>
             <button type="button" role="tab" class="subtab" data-csub="vouchers" aria-selected="false">Vouchers &amp; rewards</button>
             <button type="button" role="tab" class="subtab" data-csub="help" aria-selected="false">Help center</button>
             <button type="button" role="tab" class="subtab" data-csub="pages" aria-selected="false">Pages</button>
@@ -454,28 +459,6 @@
                 <tbody id="adRequestsTableBody"></tbody>
               </table>
             </div>
-          </div>
-
-          <div class="subpane" id="csub-hotels">
-            <div class="control-bar">
-              <div class="filters">
-                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="hSearch" class="search-input" placeholder="Search hotel name" aria-label="Search hotels" oninput="debouncedHotels()"></div>
-                <select id="hStatusF" class="form-select" aria-label="Status" onchange="loadHotels(1)">
-                  <option value="">Any status</option><option value="published">Published</option><option value="draft">Draft</option><option value="hidden">Hidden</option>
-                </select>
-              </div>
-              <div class="actions">
-                <button class="btn btn-secondary" onclick="loadHotels()">↻ Refresh</button>
-                <button class="btn btn-primary" onclick="openHotel()">+ Add hotel</button>
-              </div>
-            </div>
-            <div class="table-container">
-              <table class="admin-table lead-table">
-                <thead><tr><th>Hotel</th><th>Where</th><th>Price per night</th><th>Rating</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
-                <tbody id="hotelsTableBody"></tbody>
-              </table>
-            </div>
-            <div class="pager" id="hotelsPager"></div>
           </div>
 
           <div class="subpane" id="csub-vouchers">
@@ -705,14 +688,16 @@
 
         <!-- VENDOR MANAGEMENT -->
         <section id="tab-vendors" class="tab-pane">
+          <!-- One screen for Travel agents and for Hotels: V.kind picks which, and [data-for] hides what doesn't apply -->
           <div class="subtabs" role="tablist" aria-label="Vendor management">
-            <button type="button" role="tab" class="subtab active" data-vsub="all" aria-selected="true">All vendors</button>
+            <button type="button" role="tab" class="subtab active" data-vsub="all" aria-selected="true"><span data-for="agency">All travel agents</span><span data-for="hotel">All hotels</span></button>
+            <button type="button" role="tab" class="subtab" data-vsub="listings" data-for="hotel" aria-selected="false">Listings <span class="mini-count" id="vsubListingCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-vsub="applications" aria-selected="false">Applications <span class="mini-count" id="vsubLeadCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-vsub="verification" aria-selected="false">Verification <span class="mini-count" id="vsubVerifyCount" hidden>0</span></button>
-            <button type="button" role="tab" class="subtab" data-vsub="categories" aria-selected="false">Categories</button>
+            <button type="button" role="tab" class="subtab" data-vsub="categories" data-for="agency" aria-selected="false">Categories</button>
             <button type="button" role="tab" class="subtab" data-vsub="bookings" aria-selected="false">Bookings</button>
-            <button type="button" role="tab" class="subtab" data-vsub="payouts" aria-selected="false">Payouts <span class="mini-count" id="vsubPayoutCount" hidden>0</span></button>
-            <button type="button" role="tab" class="subtab" data-vsub="commission" aria-selected="false">Commission</button>
+            <button type="button" role="tab" class="subtab" data-vsub="payouts" data-for="agency" aria-selected="false">Payouts <span class="mini-count" id="vsubPayoutCount" hidden>0</span></button>
+            <button type="button" role="tab" class="subtab" data-vsub="commission" data-for="agency" aria-selected="false">Commission</button>
             <button type="button" role="tab" class="subtab" data-vsub="activity" aria-selected="false">Activity logs</button>
           </div>
 
@@ -721,37 +706,64 @@
             <div class="chips" id="vendorChips" aria-label="Vendor summary"></div>
             <div class="control-bar">
               <div class="filters">
-                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="vSearch" class="search-input" placeholder="Search name, email, phone or area" aria-label="Search vendors" oninput="debouncedVendors()"></div>
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="vSearch" class="search-input" placeholder="Search name, email, phone or area" aria-label="Search" oninput="debouncedVendors()"></div>
                 <select id="vStatusF" class="form-select" aria-label="Status" onchange="loadVendors(1)">
                   <option value="">Any status</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="deactivated">Deactivated</option>
                 </select>
                 <select id="vVerifF" class="form-select" aria-label="Verification" onchange="loadVendors(1)">
                   <option value="">Any verification</option><option value="verified">Verified</option><option value="pending">Awaiting review</option><option value="rejected">Changes requested</option><option value="none">Not submitted</option>
                 </select>
-                <select id="vCategoryF" class="form-select" aria-label="Category" onchange="loadVendors(1)"><option value="">Any category</option></select>
+                <select id="vndCategoryF" class="form-select" aria-label="Category" data-for="agency" onchange="loadVendors(1)"><option value="">Any category</option></select>
                 <select id="vSortF" class="form-select" aria-label="Sort" onchange="loadVendors(1)">
                   <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A to Z</option>
                 </select>
-                <label class="check"><input type="checkbox" id="vCustomF" onchange="loadVendors(1)"> Custom commission</label>
+                <label class="check" data-for="agency"><input type="checkbox" id="vCustomF" onchange="loadVendors(1)"> Custom commission</label>
               </div>
               <div class="actions">
                 <button class="btn btn-secondary" onclick="loadVendors()">↻ Refresh</button>
-                <button class="btn btn-primary" onclick="openInviteAgency()">+ Invite vendor</button>
+                <button class="btn btn-primary" data-for="agency" onclick="openInviteAgency()">+ Invite travel agent</button>
               </div>
             </div>
             <div class="table-container">
               <table class="admin-table">
-                <thead><tr><th>Vendor</th><th>Owner</th><th>Packages</th><th>Bookings</th><th>Revenue</th><th>Rating</th><th>Commission</th><th>Standing</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead data-for="agency"><tr><th>Travel agent</th><th>Owner</th><th>Packages</th><th>Bookings</th><th>Revenue</th><th>Rating</th><th>Commission</th><th>Standing</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead data-for="hotel"><tr><th>Hotel</th><th>Owner</th><th>Listing</th><th>Room types</th><th>Stay requests</th><th>Team</th><th>Standing</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="vendorsTableBody"></tbody>
               </table>
             </div>
             <div class="pager" id="vendorsPager"></div>
           </div>
 
+          <!-- Hotel listings (what travelers see in "Hotels Near You"); Plejar publishes a new hotel's first listing -->
+          <div class="subpane" id="vsub-listings" data-for="hotel">
+            <div class="control-bar">
+              <div><h3 class="pane-title">Hotel listings</h3><p class="pane-sub">What travelers see under "Hotels Near You". A hotel that joins gets a draft listing: add photos and a map position, then publish it. After that the hotel keeps it up to date from its panel.</p></div>
+            </div>
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="hSearch" class="search-input" placeholder="Search hotel name" aria-label="Search hotels" oninput="debouncedHotels()"></div>
+                <select id="hStatusF" class="form-select" aria-label="Status" onchange="loadHotels(1)">
+                  <option value="">Any status</option><option value="published">Published</option><option value="draft">Draft</option><option value="hidden">Hidden</option>
+                </select>
+              </div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="loadHotels()">↻ Refresh</button>
+                <button class="btn btn-primary" onclick="openHotel()">+ Add hotel</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>Hotel</th><th>Where</th><th>Price per night</th><th>Rating</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <tbody id="hotelsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="pager" id="hotelsPager"></div>
+          </div>
+
           <!-- Applications -->
           <div class="subpane" id="vsub-applications">
             <div class="control-bar">
-              <div><h3 class="pane-title">Membership applications</h3><p class="pane-sub">Agencies apply on the website at /apply. Open one to check the documents, then accept, ask for more, or reject.</p></div>
+              <div><h3 class="pane-title"><span data-for="agency">Travel agent applications</span><span data-for="hotel">Hotel applications</span></h3><p class="pane-sub"><span data-for="agency">Tour agencies</span><span data-for="hotel">Hotels and resorts</span> apply on the website at /apply. Open one to check the documents, then accept, ask for more, or reject.</p></div>
               <button class="btn btn-secondary" onclick="loadApplications(); loadPendingAgencies();">↻ Refresh</button>
             </div>
             <div class="chips" id="applicationChips" aria-label="Application summary"></div>
@@ -763,7 +775,7 @@
             </div>
             <div class="table-container">
               <table class="admin-table lead-table">
-                <thead><tr><th>Agency</th><th>Applicant</th><th>Areas</th><th>Documents</th><th>Received</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead><tr><th><span data-for="agency">Agency</span><span data-for="hotel">Hotel</span></th><th>Applicant</th><th><span data-for="agency">Areas</span><span data-for="hotel">Where</span></th><th>Documents</th><th>Received</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="applicationsTableBody"></tbody>
               </table>
             </div>
@@ -781,7 +793,7 @@
           <!-- Verification -->
           <div class="subpane" id="vsub-verification">
             <div class="control-bar">
-              <div><h3 class="pane-title">Waiting for your verification review</h3><p class="pane-sub">Vendors who have uploaded their trade license and the owner's ID.</p></div>
+              <div><h3 class="pane-title">Waiting for your verification review</h3><p class="pane-sub"><span data-for="agency">Travel agents</span><span data-for="hotel">Hotels</span> who have uploaded their trade license and the owner's ID.</p></div>
               <button class="btn btn-secondary" onclick="loadPendingAgencies()">↻ Refresh</button>
             </div>
             <div class="table-container">
@@ -817,7 +829,7 @@
                 <select id="bkPayment" class="form-select" aria-label="Payment" onchange="loadBookings(1)">
                   <option value="">Any payment</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="partially_refunded">Part refunded</option><option value="refunded">Refunded</option>
                 </select>
-                <select id="bkKind" class="form-select" aria-label="What was booked" onchange="loadBookings(1)"><option value="">Tours, hotels and guides</option><option value="tour">Tours</option><option value="hotel">Hotel stays (Plejar confirms)</option><option value="guide">Guides</option></select>
+                <select id="bkKind" class="form-select" aria-label="What was booked" data-for="agency" onchange="loadBookings(1)"><option value="">Tours and guides</option><option value="tour">Tours</option><option value="guide">Guides</option></select>
                 <select id="bkVendor" class="form-select" aria-label="Vendor" onchange="loadBookings(1)"><option value="">All vendors</option></select>
               </div>
               <button class="btn btn-secondary" onclick="loadBookings()">↻ Refresh</button>
@@ -1747,7 +1759,7 @@
   <!-- Commission Modal -->
   <div id="vCommissionModal" class="modal-overlay">
     <div class="modal-card">
-      <div class="modal-head"><h3 id="vcTitle">Commission</h3><button class="modal-x" onclick="closeModal('vCommissionModal')" aria-label="Close">&times;</button></div>
+      <div class="modal-head"><h3 id="vcmTitle">Commission</h3><button class="modal-x" onclick="closeModal('vCommissionModal')" aria-label="Close">&times;</button></div>
       <form onsubmit="submitCommission(event)" novalidate>
         <p class="modal-lead" id="vcLead"></p>
         <div class="form-group"><label class="form-label" for="vcRate" id="vcLabel">Commission (%)</label><input id="vcRate" class="form-input" type="number" min="0" max="100" step="0.1"></div>

@@ -240,19 +240,32 @@ async function handleAdminLogout() {
 // Switch Sidebar Tabs
 const TAB_TITLES = {
   dashboard: 'Dashboard', users: 'Users', userDetail: 'User profile', subscribers: 'Newsletter Leads', agencies: 'Agencies',
-  vendors: 'Vendors', vendorDetail: 'Vendor profile', applicationDetail: 'Membership application', destinations: 'Destinations', destinationDetail: 'Destination', content: 'App content', notifications: 'Notifications', system: 'System Status', profile: 'My profile'
+  vendors: 'Travel agents', agents: 'Travel agents', hotels: 'Hotels', vendorDetail: 'Vendor profile', applicationDetail: 'Membership application', destinations: 'Destinations', destinationDetail: 'Destination', content: 'App content', notifications: 'Notifications', system: 'System Status', profile: 'My profile'
 };
 
-// Old tab names still work: they open the matching Vendors sub-tab
+// Old tab names still work: they open the matching Travel agents sub-tab
 const TAB_ALIASES = {
-  agencies: ['vendors', 'all'],
-  pendingAgencies: ['vendors', 'verification'],
-  agentLeads: ['vendors', 'applications'],
+  agencies: ['agents', 'all'],
+  pendingAgencies: ['agents', 'verification'],
+  agentLeads: ['agents', 'applications'],
   agencyDetail: ['vendorDetail']
 };
-const NAV_FOR = { userDetail: 'users', vendorDetail: 'vendors', applicationDetail: 'vendors', destinationDetail: 'destinations' };
+// Travel agents and Hotels are one screen (tab-vendors) shown for one kind; 'vendors' means the one open now
+const VENDOR_NAV = () => (typeof V !== 'undefined' && V.kind === 'hotel' ? 'hotels' : 'agents');
+const NAV_FOR = { userDetail: 'users', vendorDetail: VENDOR_NAV, applicationDetail: VENDOR_NAV, destinationDetail: 'destinations' };
 
 function switchTab(tabId, updateUrl = true) {
+  if (tabId === 'vendors') tabId = VENDOR_NAV();
+  if (tabId === 'agents' || tabId === 'hotels') {
+    const kind = tabId === 'hotels' ? 'hotel' : 'agency';
+    const changed = typeof V !== 'undefined' && V.kind !== kind;
+    if (typeof setVendorKind === 'function') setVendorKind(kind);
+    showTabPane('vendors', tabId);
+    // Clicking the sidebar item (or switching section) loads the list
+    if (typeof switchVendorSub === 'function') switchVendorSub(changed ? 'all' : V.sub);
+    if (typeof loadVendorSummary === 'function') loadVendorSummary();
+    return;
+  }
   if (TAB_ALIASES[tabId]) {
     const [real, sub] = TAB_ALIASES[tabId];
     switchTab(real, updateUrl);
@@ -264,8 +277,9 @@ function switchTab(tabId, updateUrl = true) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link-btn').forEach(b => b.classList.remove('active'));
 
+  const nav = typeof NAV_FOR[tabId] === 'function' ? NAV_FOR[tabId]() : NAV_FOR[tabId];
   const targetPane = document.getElementById(`tab-${tabId}`);
-  const targetBtn = document.querySelector(`[data-tab="${NAV_FOR[tabId] || tabId}"]`);
+  const targetBtn = document.querySelector(`[data-tab="${nav || tabId}"]`);
 
   if (targetPane) targetPane.classList.add('active');
   if (targetBtn) targetBtn.classList.add('active');
@@ -277,6 +291,14 @@ function switchTab(tabId, updateUrl = true) {
       sessionStorage.setItem('plezar_admin_tab', `#${tabId}`);
     } catch (_) {}
   }
+}
+
+// Show a pane and light up its sidebar item, without loading anything (the vendor screen loads itself)
+function showTabPane(paneId, navId) {
+  const title = document.getElementById('topbarTitle');
+  if (title) title.textContent = TAB_TITLES[navId] || TAB_TITLES[paneId] || 'Admin Console';
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${paneId}`));
+  document.querySelectorAll('.nav-link-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === navId));
 }
 
 // Restore active screen after page refresh or browser back/forward navigation
@@ -301,12 +323,19 @@ function navigateAdminToRoute() {
     }
   }
 
-  // e.g. #vendors/:subOrId
+  // e.g. #agents/:sub, #hotels/:sub, #vendors/:subOrId (older links: a sub-tab means Travel agents)
+  if ((mainTab === 'agents' || mainTab === 'hotels') && parts[1]) {
+    if (typeof setVendorKind === 'function') setVendorKind(mainTab === 'hotels' ? 'hotel' : 'agency');
+    showTabPane('vendors', mainTab);
+    if (typeof switchVendorSub === 'function') switchVendorSub(parts[1]);
+    if (typeof loadVendorSummary === 'function') loadVendorSummary();
+    return;
+  }
   if (mainTab === 'vendors' && parts[1]) {
     const subOrId = parts[1];
-    const validSubs = ['all', 'verification', 'applications', 'messages'];
+    const validSubs = ['all', 'listings', 'verification', 'applications', 'categories', 'bookings', 'payouts', 'commission', 'activity'];
     if (validSubs.includes(subOrId)) {
-      switchTab('vendors', false);
+      switchTab('agents', false);
       if (typeof switchVendorSub === 'function') switchVendorSub(subOrId);
       return;
     } else if (typeof openVendor === 'function') {
@@ -809,7 +838,8 @@ async function loadPendingAgencies() {
   if (result) result.innerHTML = '';
 
   try {
-    const { ok, data } = await adminFetch('/api/v1/admin/agencies');
+    const kind = typeof V !== 'undefined' ? V.kind : '';
+    const { ok, data } = await adminFetch(`/api/v1/admin/agencies${kind ? `?kind=${kind}` : ''}`);
     if (!ok) {
       pendingRowMessage('pendingReviewBody', data.message || 'Could not load agencies.');
       pendingRowMessage('pendingInviteBody', '');
@@ -1103,8 +1133,15 @@ function renderDashboard(d) {
   const t = d.totals;
   const a = d.attention;
   const attention = [];
-  if (a.newLeads) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.newLeads)}</strong><span>membership ${a.newLeads === 1 ? 'application' : 'applications'} to review</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('agentLeads')">Review applications</button></div>`);
-  if (a.pendingVerification) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.pendingVerification)}</strong><span>${a.pendingVerification === 1 ? 'agency is' : 'agencies are'} waiting for verification</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">Review</button></div>`);
+  // Travel agents and hotels each go to their own section
+  const agentLeads = (a.newLeads || 0) - (a.hotelLeads || 0);
+  const agentVerify = (a.pendingVerification || 0) - (a.hotelPendingVerification || 0);
+  const card = (n, text, go, button) => `<div class="attention-card"><div><strong>${nf.format(n)}</strong><span>${text}</span></div><button class="btn btn-secondary btn-sm" onclick="${go}">${button}</button></div>`;
+  if (agentLeads > 0) attention.push(card(agentLeads, `travel agent ${agentLeads === 1 ? 'application' : 'applications'} to review`, "switchTab('agents'); switchVendorSub('applications')", 'Review applications'));
+  if (a.hotelLeads) attention.push(card(a.hotelLeads, `hotel ${a.hotelLeads === 1 ? 'application' : 'applications'} to review`, "switchTab('hotels'); switchVendorSub('applications')", 'Review applications'));
+  if (agentVerify > 0) attention.push(card(agentVerify, `travel ${agentVerify === 1 ? 'agent is' : 'agents are'} waiting for verification`, "switchTab('agents'); switchVendorSub('verification')", 'Review'));
+  if (a.hotelPendingVerification) attention.push(card(a.hotelPendingVerification, `${a.hotelPendingVerification === 1 ? 'hotel is' : 'hotels are'} waiting for verification`, "switchTab('hotels'); switchVendorSub('verification')", 'Review'));
+  if (a.draftListings) attention.push(card(a.draftListings, `hotel ${a.draftListings === 1 ? 'listing' : 'listings'} to publish`, "switchTab('hotels'); applyVendorChip('listings')", 'Open listings'));
   if (a.invitedOwners) attention.push(`<div class="attention-card"><div><strong>${nf.format(a.invitedOwners)}</strong><span>${a.invitedOwners === 1 ? 'owner has' : 'owners have'} not accepted their invite</span></div><button class="btn btn-secondary btn-sm" onclick="switchTab('pendingAgencies'); loadPendingAgencies();">View</button></div>`);
 
   const s = d.series;
