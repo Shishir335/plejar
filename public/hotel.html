@@ -185,7 +185,8 @@
             <p class="muted">A few lines on where you are and what makes a stay with you special.</p>
             <div class="field">
               <label for="dDescription">Description</label>
-              <textarea id="dDescription" name="description" rows="5" maxlength="3000"></textarea>
+              <textarea id="dDescription" name="description" rows="5" maxlength="3000" aria-describedby="dDescriptionCount"></textarea>
+              <span class="hint" id="dDescriptionCount" aria-live="polite"></span>
             </div>
             <div class="field">
               <label for="dHighlights">Highlights</label>

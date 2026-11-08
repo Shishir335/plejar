@@ -324,13 +324,26 @@ function setHotel(hotel) {
 
 // ---------- Dashboard ----------
 
+// A description long enough to tell guests something about the stay
+const MIN_DESCRIPTION = 80;
+const descriptionLength = text => String(text || '').trim().length;
+
+// "30 of 80 characters" under the description while it is too short
+function showDescriptionCount() {
+  const n = descriptionLength($('dDescription').value);
+  $('dDescriptionCount').textContent = n >= MIN_DESCRIPTION
+    ? `${n} characters.`
+    : `${n} of at least ${MIN_DESCRIPTION} characters. A fuller description gets more stay requests.`;
+}
+$('dDescription').addEventListener('input', showDescriptionCount);
+
 function setupSteps(h) {
   const p = h.policies || {};
   return [
     { done: h.photos.length >= 5, text: `Add at least 5 photos of the property (${h.photos.length} so far)`, view: 'photos' },
     { done: h.roomTypes.some(r => r.active), text: 'Add your room types and their prices', view: 'rooms' },
     { done: h.roomTypes.some(r => r.photos.length), text: 'Add photos to your rooms', view: 'rooms' },
-    { done: (h.description || '').length >= 80, text: 'Describe the hotel', view: 'details' },
+    { done: descriptionLength(h.description) >= MIN_DESCRIPTION, text: `Describe the hotel in at least ${MIN_DESCRIPTION} characters (${descriptionLength(h.description)} so far)`, view: 'details' },
     { done: h.amenities.length >= 3, text: 'Tick your amenities', view: 'details' },
     { done: Boolean(h.checkIn && h.checkOut), text: 'Set check-in and check-out times', view: 'details' },
     { done: Boolean(p.cancellation), text: 'Write your cancellation policy', view: 'details' },
@@ -699,6 +712,7 @@ function renderDetails() {
   if (!h) return;
   const f = $('detailsForm');
   f.description.value = h.description || '';
+  showDescriptionCount();
   f.highlights.value = (h.highlights || []).join('\n');
   f.phone.value = h.phone || '';
   f.website.value = h.website || '';
