@@ -102,6 +102,7 @@
 }
 .mc-top { display: flex; justify-content: space-between; align-items: center; }
 .mc-logo { font-weight: 800; font-size: 1.15rem; letter-spacing: -0.03em; display: inline-flex; align-items: center; color: #fff; }
+.mc-logo .brand-logo { display: block; height: 1.12em; width: auto; }
 .mc-kind { font-size: 0.8rem; color: #bfe0cf; }
 .mc-name {
   margin-top: auto; font-size: 1.55rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; color: #fff;

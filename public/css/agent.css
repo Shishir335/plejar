@@ -28,6 +28,8 @@ img { display: block; max-width: 100%; }
 
 .logo { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.045em; text-decoration: none; color: var(--ink); display: inline-flex; align-items: baseline; }
 .logo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--marigold); margin-left: 2px; }
+/* The Plejar logo image; sized from the font size of the link it sits in */
+.logo .brand-logo { display: block; height: 1.08em; width: auto; }
 
 /* Buttons */
 .btn {

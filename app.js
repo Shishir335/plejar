@@ -43,6 +43,7 @@ const adminSocialRouter = require('./routes/adminSocialRoutes');
 const adminNotificationRouter = require('./routes/adminNotificationRoutes');
 
 const AppError = require('./utils/appError');
+const cloudflare = require('./utils/cloudflare');
 const { sendPage, staticHeaders, privateByDefault, publicCache, clearAfterWrite, smallerImages } = require('./utils/cache');
 const authController = require('./controllers/authController');
 const globalErrorHandler = require('./controllers/errorController');
@@ -55,6 +56,11 @@ const app = express();
 app.enable('trust proxy');
 
 // 1) GLOBAL MIDDLEWARES
+
+// CLOUDFLARE: turn away requests that skip our Cloudflare (once CF_ORIGIN_SECRET is set), and take the
+// visitor's IP from CF-Connecting-IP, which can't be faked, rather than X-Forwarded-For, which can
+app.use(cloudflare.originGuard);
+app.use(cloudflare.realClientIp);
 
 // COMPRESS RESPONSES (first, so pages, scripts and styles are compressed as well as the API)
 app.use(compression());

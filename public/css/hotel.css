@@ -103,6 +103,8 @@ input:disabled, textarea:disabled, select:disabled { background: var(--surface-2
 
 .brand { font-family: var(--sans); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.04em; color: var(--ink); text-decoration: none; display: inline-flex; align-items: baseline; gap: 8px; }
 .brand-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; margin-left: 1px; }
+/* The Plejar logo image, next to "for hotels" */
+.brand .brand-logo { display: block; height: 1.08em; width: auto; align-self: center; }
 .brand small { font-family: var(--serif); font-weight: 500; font-style: italic; font-size: 0.95rem; letter-spacing: 0; color: var(--accent); }
 
 /* ---------- Panel ---------- */
