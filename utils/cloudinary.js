@@ -35,8 +35,13 @@ const configure = () => cloudinary.config({
 
 const randomId = () => crypto.randomBytes(16).toString('hex');
 
-// Development uploads stay apart from the live site's
-const rootFolder = () => (process.env.NODE_ENV === 'production' ? 'plezar' : 'plezar-dev');
+// Development uploads stay apart from the live site's. CLOUDINARY_FOLDER overrides the choice, so the
+// dev service on Render (which runs with NODE_ENV=production) can keep its files in plezar-dev too.
+const rootFolder = () => {
+  const set = (process.env.CLOUDINARY_FOLDER || '').trim().replace(/^\/+|\/+$/g, '');
+  if (/^[\w-]+$/.test(set)) return set;
+  return process.env.NODE_ENV === 'production' ? 'plezar' : 'plezar-dev';
+};
 const cloudFolder = folder => `${rootFolder()}/${folder}`;
 
 /** Upload a buffer. `folder` is relative to the root, such as "hotels/<id>". Returns Cloudinary's answer. */
