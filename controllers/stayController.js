@@ -10,6 +10,10 @@ const { validId, pageParams, paged } = require('../utils/query');
 const membership = require('../utils/vendorMembership');
 const { itemsOf, availability } = require('../utils/stayAvailability');
 const { expireStayRequests } = require('../utils/stayExpiry');
+const { claimCoupon, releaseCoupon } = require('../utils/coupons');
+const { CouponRedemption } = require('../models/couponModel');
+const Agency = require('../models/agencyModel');
+const { termsFor, snapshot } = require('../utils/commission');
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_NIGHTS = 30;
@@ -56,6 +60,8 @@ const myView = r => ({
   rooms: r.rooms,
   guests: r.guests,
   estimatedTotal: r.estimatedTotal,
+  // A coupon the guest used; estimatedTotal is already after it
+  coupon: r.discountAmount ? { code: r.couponCode, discount: r.discountAmount, subtotal: r.subtotal } : null,
   note: r.note,
   hotelNote: r.hotelNote,
   decidedAt: r.decidedAt,
@@ -141,25 +147,51 @@ exports.create = catchAsync(async (req, res, next) => {
 
   const nightlyTotal = items.reduce((n, i) => n + i.pricePerNight * i.quantity, 0);
   const summary = roomsSummary(items);
-  const request = await StayRequest.create({
-    hotel: hotel._id,
-    agency: hotel.agency,
-    user: req.user._id,
-    items,
-    roomType: items[0].roomType,
-    roomName: summary.length > 120 ? `${summary.slice(0, 119)}…` : summary,
-    pricePerNight: items[0].pricePerNight,
-    nightlyTotal,
-    checkIn,
-    checkOut,
-    nights,
-    rooms,
-    guests,
-    estimatedTotal: nightlyTotal * nights,
-    guestName: text(req.user.name, 80),
-    phone,
-    note: text(b.note, 1000)
-  });
+  // A coupon from Plejar or from this hotel takes money off what the guest pays the hotel
+  const subtotal = nightlyTotal * nights;
+  const coupon = String(b.couponCode || '').trim()
+    ? await claimCoupon(b.couponCode, { user: req.user._id, kind: 'hotel', vendor: hotel.agency, subtotal })
+    : null;
+  const couponFields = coupon ? {
+    subtotal,
+    discountAmount: coupon.discount,
+    couponCode: coupon.coupon.code,
+    couponRedemption: coupon.redemption._id,
+    couponFundedBy: coupon.coupon.fundedBy
+  } : {};
+  // Plejar's commission, when it's on for this hotel. On a Plejar coupon Plejar pays the discount, so the
+  // commission is on the full price; on the hotel's own coupon it's on what the guest pays.
+  const estimatedTotal = subtotal - (coupon ? coupon.discount : 0);
+  const vendor = await Agency.findById(hotel.agency).select('commission').lean();
+  const commission = snapshot(coupon && coupon.coupon.fundedBy === 'plejar' ? subtotal : estimatedTotal, termsFor(vendor));
+  let request;
+  try {
+    request = await StayRequest.create({
+      hotel: hotel._id,
+      agency: hotel.agency,
+      user: req.user._id,
+      items,
+      roomType: items[0].roomType,
+      roomName: summary.length > 120 ? `${summary.slice(0, 119)}…` : summary,
+      pricePerNight: items[0].pricePerNight,
+      nightlyTotal,
+      checkIn,
+      checkOut,
+      nights,
+      rooms,
+      guests,
+      estimatedTotal,
+      ...couponFields,
+      ...commission,
+      guestName: text(req.user.name, 80),
+      phone,
+      note: text(b.note, 1000)
+    });
+  } catch (err) {
+    if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
+    throw err;
+  }
+  if (coupon) await CouponRedemption.updateOne({ _id: coupon.redemption._id }, { stayRequest: request._id });
 
   // Two guests may have asked for the last room at the same moment: check again now this request holds
   // its rooms, counting only requests made before it (and itself), so the first one keeps the room
@@ -167,6 +199,7 @@ exports.create = catchAsync(async (req, res, next) => {
   const over = after.find(a => wanted.has(String(a._id)) && a.booked > a.count);
   if (over) {
     await StayRequest.deleteOne({ _id: request._id });
+    if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
     return next(new AppError(`${over.name} was just booked by someone else for those dates. Check what's free and try again.`, 409));
   }
 
@@ -207,5 +240,6 @@ exports.cancel = catchAsync(async (req, res, next) => {
   request.status = 'cancelled';
   request.cancelledAt = new Date();
   await request.save();
+  if (request.couponRedemption) await releaseCoupon({ stayRequest: request._id });
   res.status(200).json({ status: 'success', data: { request: myView(request) } });
 });

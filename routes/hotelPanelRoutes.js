@@ -2,6 +2,7 @@ const express = require('express');
 const authController = require('../controllers/authController');
 const agencyController = require('../controllers/agencyController');
 const panel = require('../controllers/vendorHotelController');
+const coupons = require('../controllers/couponController');
 const { imageUpload } = require('../utils/uploads');
 
 // The hotel panel (/hotel): signed-in members of an active hotel account, scoped to their own hotel.
@@ -10,6 +11,10 @@ const router = express.Router();
 router.use(authController.protect, agencyController.requireAgent, panel.hotelsOnly);
 
 router.get('/me', panel.getPanel);
+
+// The hotel's own coupons for its stays (the hotel pays their discounts; the owner manages them)
+router.route('/coupons').get(coupons.listMine).post(agencyController.requireOwner, coupons.createMine);
+router.route('/coupons/:id').patch(agencyController.requireOwner, coupons.updateMine).delete(agencyController.requireOwner, coupons.deleteMine);
 
 router.use(panel.loadHotel);
 router.patch('/hotel', panel.updateHotel);

@@ -12,6 +12,7 @@ const { saveContentImage, removeContentImage, copyContentImage } = require('../u
 const { applyHotelExtras, extrasView } = require('../utils/hotelExtras');
 const { itemsOf, bookedRooms } = require('../utils/stayAvailability');
 const { expireStayRequests } = require('../utils/stayExpiry');
+const { releaseCoupon } = require('../utils/coupons');
 const { itemsView } = require('./stayController');
 
 const MAX_PHOTOS = 12;
@@ -108,6 +109,10 @@ const requestView = r => ({
   rooms: r.rooms,
   guests: r.guests,
   estimatedTotal: r.estimatedTotal,
+  // A coupon the guest used: the guest pays estimatedTotal. fundedBy plejar: Plejar pays the hotel the discount
+  coupon: r.discountAmount ? { code: r.couponCode, discount: r.discountAmount, subtotal: r.subtotal, fundedBy: r.couponFundedBy } : null,
+  // Plejar's commission on this stay, which the hotel owes Plejar after the stay
+  commission: r.commissionAmount > 0 ? { amount: r.commissionAmount, type: r.commissionType, value: r.commissionType === 'amount' ? r.commissionFlat : r.commissionRate } : null,
   guestName: r.guestName || (r.user && r.user.name) || '',
   phone: r.phone || (r.user && r.user.phone) || '',
   email: r.user && r.user.email ? r.user.email : '',
@@ -383,6 +388,8 @@ exports.decideRequest = catchAsync(async (req, res) => {
   request.decidedAt = new Date();
   request.decidedBy = req.user._id;
   await request.save();
+  // A declined request gives its coupon use back to the guest
+  if (decision === 'declined' && request.couponRedemption) await releaseCoupon({ stayRequest: request._id });
 
   const hotel = req.hotel;
   const dates = `${fmtDay(request.checkIn)} to ${fmtDay(request.checkOut)}`;

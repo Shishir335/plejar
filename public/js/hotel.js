@@ -250,7 +250,7 @@ async function boot() {
   }
   showOnly('panelView');
   const start = (window.location.hash || '#dashboard').slice(1);
-  showView(['dashboard', 'requests', 'rooms', 'photos', 'details', 'account'].includes(start) ? start : 'dashboard');
+  showView(['dashboard', 'requests', 'rooms', 'photos', 'details', 'coupons', 'account'].includes(start) ? start : 'dashboard');
 }
 
 async function loadPanel() {
@@ -295,6 +295,7 @@ function showView(view) {
   if (view === 'rooms') renderRooms();
   if (view === 'photos') renderPhotos();
   if (view === 'details') renderDetails();
+  if (view === 'coupons') loadCoupons();
   if (view === 'account') loadAccount();
   try { history.replaceState(null, '', `#${view}`); } catch (e) { /* ignore */ }
   window.scrollTo(0, 0);
@@ -453,6 +454,8 @@ function requestCard(r) {
           <span>About ${taka(r.estimatedTotal)} (${taka(r.nightlyTotal || r.pricePerNight * r.rooms)} a night)</span>
         </div>
         <ul class="req-rooms">${requestItems(r).map(i => `<li><strong>${Number(i.quantity)} × ${E(i.roomName || 'Room')}</strong> <span>${taka(i.pricePerNight)} a night each</span></li>`).join('')}</ul>
+        ${r.coupon ? `<div class="req-coupon">Coupon <strong>${E(r.coupon.code)}</strong>: ${taka(r.coupon.discount)} off ${taka(r.coupon.subtotal)}. The guest pays you ${taka(r.estimatedTotal)}${r.coupon.fundedBy === 'plejar' ? `, and Plejar pays you the ${taka(r.coupon.discount)} after the stay` : ''}.</div>` : ''}
+        ${r.commission ? `<div class="req-coupon">Plejar commission: ${taka(r.commission.amount)} (${r.commission.type === 'amount' ? 'flat, per booking' : `${r.commission.value}%`}), owed to Plejar after the stay.</div>` : ''}
         <div class="req-facts">
           ${r.phone ? `<a href="tel:${E(r.phone)}">${E(r.phone)}</a>` : ''}
           ${r.email ? `<a href="mailto:${E(r.email)}">${E(r.email)}</a>` : ''}
@@ -1011,3 +1014,17 @@ async function loadVerification() {
 }
 
 boot();
+
+// ---------- Coupons (the hotel's own; guests pay the hotel the lower price) ----------
+
+let couponsView = null;
+function loadCoupons() {
+  if (couponsView) { couponsView.reload(); return; }
+  couponsView = window.CouponsPanel.mount(document.getElementById('couponsRoot'), {
+    mode: 'hotel',
+    base: '/api/v1/hotel-panel/coupons',
+    request: (method, path, body) => api(path, { method, body }),
+    canEdit: isOwner(),
+    buttons: { primary: 'btn btn-primary', quiet: 'btn btn-ghost btn-sm' }
+  });
+}

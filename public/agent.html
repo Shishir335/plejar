@@ -81,6 +81,7 @@
         <button data-view="guides">Guides</button>
         <button data-view="announcements">Announcements</button>
         <button data-view="ads">Tour ads</button>
+        <button data-view="coupons">Coupons</button>
         <button data-view="notifications">Notifications</button>
         <button data-view="wall">Wall</button>
         <button data-view="followers">Followers</button>
@@ -326,6 +327,16 @@
       </section>
 
       <!-- Tour guides -->
+      <section id="view-coupons" data-view-pane hidden>
+        <div class="page-head">
+          <div>
+            <h1>Coupons</h1>
+            <p>Discount codes travelers use when they book your tours or guides in the app.</p>
+          </div>
+        </div>
+        <div id="couponsRoot"></div>
+      </section>
+
       <section id="view-guides" data-view-pane hidden>
         <div class="page-head">
           <div>
@@ -1024,6 +1035,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/picker-only.js"></script>
+  <script src="/js/coupons-panel.js"></script>
   <script src="/js/agent.js"></script>
 </body>
 </html>

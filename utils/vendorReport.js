@@ -71,7 +71,7 @@ const buildReport = async (agency, period) => {
     ]),
     Booking.countDocuments({ agency: id, cancelledAt: range }),
     Booking.aggregate([{ $match: { agency: id, completedAt: range } }, { $group: { _id: null, count: { $sum: 1 }, travelers: { $sum: '$travelers' } } }]),
-    Booking.aggregate([{ $match: { agency: id, paidAt: range, paymentStatus: { $in: PAID } } }, { $group: { _id: null, amount: { $sum: '$amount' }, commission: { $sum: '$commissionAmount' }, count: { $sum: 1 } } }]),
+    Booking.aggregate([{ $match: { agency: id, paidAt: range, paymentStatus: { $in: PAID } } }, { $group: { _id: null, amount: { $sum: '$amount' }, commission: { $sum: '$commissionAmount' }, plejarPays: { $sum: '$plejarPays' }, count: { $sum: 1 } } }]),
     Payout.aggregate([{ $match: { agency: id, status: 'paid', paidAt: range } }, { $group: { _id: null, amount: { $sum: '$amount' }, count: { $sum: 1 } } }]),
     Review.aggregate([{ $match: { agency: id, createdAt: range } }, { $group: { _id: null, count: { $sum: 1 }, average: { $avg: '$rating' } } }]),
     earningsFor(id),
@@ -91,7 +91,7 @@ const buildReport = async (agency, period) => {
     money: {
       paid: p.amount || 0,
       commission: Math.round((p.commission || 0) * 100) / 100,
-      earned: Math.round(((p.amount || 0) - (p.commission || 0)) * 100) / 100,
+      earned: Math.round(((p.amount || 0) - (p.commission || 0) + (p.plejarPays || 0)) * 100) / 100,
       payoutsPaid: first(payouts).amount || 0,
       payoutsPaidCount: first(payouts).count || 0,
       available: earnings.available,

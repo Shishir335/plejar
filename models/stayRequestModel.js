@@ -34,6 +34,20 @@ const stayRequestSchema = new mongoose.Schema(
     rooms: { type: Number, min: 1, max: 100, default: 1 },
     guests: { type: Number, min: 1, max: 100, default: 1 },
     estimatedTotal: { type: Number, min: 0, default: 0 },
+    // A coupon: estimatedTotal is after its discount, subtotal before. The guest pays the hotel the lower
+    // amount. A hotel's own coupon is the hotel's cost; for Plejar's coupons Plejar owes the hotel the
+    // discount once the guest has stayed (see utils/earnings.js).
+    subtotal: { type: Number, min: 0, default: null },
+    discountAmount: { type: Number, min: 0, default: 0 },
+    couponCode: { type: String, default: '' },
+    couponRedemption: { type: mongoose.Schema.ObjectId, ref: 'CouponRedemption' },
+    couponFundedBy: { type: String, enum: ['plejar', 'vendor', null], default: null },
+    // Plejar's commission on the stay, a snapshot of the hotel's terms when the guest asked.
+    // The guest pays the hotel, so the hotel owes Plejar this once the stay is over.
+    commissionType: { type: String, enum: ['none', 'percent', 'amount'], default: 'none' },
+    commissionRate: { type: Number, min: 0, max: 100, default: 0 },
+    commissionFlat: { type: Number, min: 0, default: 0 },
+    commissionAmount: { type: Number, min: 0, default: 0 },
     guestName: { type: String, trim: true, maxlength: 80, default: '' },
     phone: { type: String, trim: true, maxlength: 20, default: '' },
     note: { type: String, trim: true, maxlength: 1000, default: '' },

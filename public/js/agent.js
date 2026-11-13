@@ -220,6 +220,7 @@ function showView(view) {
   if (view === 'ads') loadAds();
   if (view === 'messages') loadConversations();
   if (view === 'guides') loadGuides();
+  if (view === 'coupons') loadCoupons();
   if (view === 'notifications') loadNotificationsView();
   if (view === 'wall') loadWall();
   if (view === 'followers') loadFollowers();
@@ -311,7 +312,7 @@ async function boot() {
   renderProfileForm();
 
   const start = (window.location.hash || '#overview').slice(1);
-  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'notifications', 'wall', 'followers', 'profile', 'team', 'verification'];
+  const views = ['overview', 'events', 'registrations', 'messages', 'guides', 'announcements', 'ads', 'coupons', 'notifications', 'wall', 'followers', 'profile', 'team', 'verification'];
   refreshMessagesBadge();
   setInterval(refreshMessagesBadge, 60000);
   connectChatSocket();
@@ -2844,3 +2845,17 @@ async function loadFollowers(more) {
 $('followersMore').addEventListener('click', () => loadFollowers(true));
 
 boot();
+
+// ---------- Coupons (the agency's own; their discounts come out of its earnings) ----------
+
+let couponsView = null;
+function loadCoupons() {
+  if (couponsView) { couponsView.reload(); return; }
+  couponsView = window.CouponsPanel.mount(document.getElementById('couponsRoot'), {
+    mode: 'agency',
+    base: '/api/v1/agency/me/coupons',
+    request: (method, path, body) => api(path, { method, body }),
+    canEdit: isOwner(),
+    buttons: { primary: 'btn btn-primary', quiet: 'btn btn-quiet btn-sm' }
+  });
+}

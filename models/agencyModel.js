@@ -90,8 +90,18 @@ const agencySchema = new mongoose.Schema(
 
     categories: [{ type: mongoose.Schema.ObjectId, ref: 'VendorCategory' }],
 
-    // Percent of each booking Plejar keeps. Empty means the platform default applies.
+    // Old: a percent of each booking from before commission was set per vendor. No longer used.
     commissionRate: { type: Number, min: [0, 'Commission cannot be negative'], max: [100, 'Commission cannot be more than 100%'], default: null },
+
+    // Plejar's commission on this vendor's bookings (or a hotel's stays). Off until an admin turns it on.
+    // percent: that share of each booking; amount: a flat sum in taka per booking.
+    commission: {
+      enabled: { type: Boolean, default: false },
+      type: { type: String, enum: ['percent', 'amount'], default: 'percent' },
+      value: { type: Number, min: [0, 'Commission cannot be negative'], default: 0 },
+      changedAt: Date,
+      changedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }
+    },
 
     contract: {
       status: { type: String, enum: ['none', 'draft', 'sent', 'signed', 'terminated'], default: 'none' },

@@ -4,6 +4,7 @@ const hotels = require('../controllers/hotelController');
 const promotions = require('../controllers/promotionController');
 const ads = require('../controllers/adController');
 const vouchers = require('../controllers/voucherController');
+const coupons = require('../controllers/couponController');
 const help = require('../controllers/helpController');
 const pages = require('../controllers/pageController');
 const { imageUpload } = require('../utils/uploads');
@@ -25,6 +26,11 @@ router.post('/ad-requests/:id/reject', ads.adminReject);
 
 router.route('/vouchers').get(vouchers.adminList).post(imageUpload.single('image'), vouchers.adminCreate);
 router.route('/vouchers/:id').patch(imageUpload.single('image'), vouchers.adminUpdate).delete(adminOnly, vouchers.adminDelete);
+
+// Coupons: Plejar's own (Plejar pays the discount) and every vendor's (which can be stopped)
+router.route('/coupons').get(coupons.adminList).post(coupons.adminCreate);
+router.route('/coupons/:id').patch(coupons.adminUpdate).delete(adminOnly, coupons.adminDelete);
+router.get('/coupons/:id/redemptions', coupons.adminRedemptions);
 router.route('/rewards-settings').get(help.adminRewardSettings).patch(adminOnly, help.adminRewardSettings);
 
 router.route('/help/articles').get(help.adminList).post(help.adminCreate);

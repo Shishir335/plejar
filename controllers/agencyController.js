@@ -13,7 +13,7 @@ const Booking = require('../models/bookingModel');
 const Payout = require('../models/payoutModel');
 const { moveBooking } = require('../utils/bookings');
 const { earningsFor, monthlyEarnings } = require('../utils/earnings');
-const { getDefaultRate, isCustom } = require('../utils/commission');
+const { commissionView } = require('../utils/commission');
 const { HOLDS_SEAT, scheduleFrom, registrationStats, withStats } = require('../utils/events');
 const { notifyUsers } = require('../utils/notify');
 const { applyPlan, planProblems, describeMissing } = require('../utils/tourPlan');
@@ -22,6 +22,7 @@ const Announcement = require('../models/announcementModel');
 const Destination = require('../models/destinationModel');
 const { usableDestination } = require('./vendorDestinationController');
 const { releaseVoucher } = require('../utils/vouchers');
+const { releaseCoupon } = require('../utils/coupons');
 const { hasRole, addRole, removeRole } = require('../utils/roles');
 const { closeTourGroup } = require('../utils/chats');
 const Promotion = require('../models/promotionModel');
@@ -383,9 +384,11 @@ exports.cancelMyPackage = catchAsync(async (req, res, next) => {
   const users = await Booking.distinct('user', filter);
   // Vouchers used on these registrations go back to the travelers
   const vouchers = await Booking.distinct('voucher', { ...filter, voucher: { $ne: null } });
+  const couponBookings = await Booking.distinct('_id', { ...filter, couponRedemption: { $ne: null } });
   const result = await Booking.updateMany(filter, { status: 'cancelled', cancelledAt: new Date(), cancelReason: `Cancelled by the agency: ${reason}`.slice(0, 500) });
 
   await Promise.all(vouchers.map(releaseVoucher));
+  if (couponBookings.length) await releaseCoupon({ booking: { $in: couponBookings } });
   await closeTourGroup(pkg._id, reason);
   // Its ad stops too
   await Promotion.updateMany({ source: 'vendor', tour: pkg._id, active: true }, { active: false, stoppedAt: new Date() });
@@ -702,11 +705,9 @@ exports.updateMyBooking = catchAsync(async (req, res, next) => {
 });
 
 exports.getMyEarnings = catchAsync(async (req, res, next) => {
-  const [earnings, monthly, defaultRate] = await Promise.all([earningsFor(req.agency._id), monthlyEarnings(req.agency._id, 6), getDefaultRate()]);
-  res.status(200).json({
-    status: 'success',
-    data: { earnings, monthly, commission: { rate: isCustom(req.agency) ? req.agency.commissionRate : defaultRate } }
-  });
+  const [earnings, monthly] = await Promise.all([earningsFor(req.agency._id), monthlyEarnings(req.agency._id, 6)]);
+  const { enabled, type, value, label } = commissionView(req.agency);
+  res.status(200).json({ status: 'success', data: { earnings, monthly, commission: { enabled, type, value, label } } });
 });
 
 exports.listMyPayouts = catchAsync(async (req, res, next) => {

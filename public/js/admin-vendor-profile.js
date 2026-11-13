@@ -490,23 +490,31 @@ async function submitPayout(e) {
 function vendorCommission() {
   const d = V.detail;
   const c = d.commission;
+  const isHotel = d.agency.kind === 'hotel';
   const sample = 10000;
-  const keep = Math.round(sample * c.rate) / 100;
+  const keep = !c.enabled ? 0 : (c.type === 'amount' ? Math.min(c.value, sample) : Math.round(sample * c.value) / 100);
   const contractRate = d.contract.agreedCommission;
+  const charged = c.enabled && c.type === 'percent' ? c.value : null;
+  let contractNote = '<p class="detail-muted">This matches what is being charged.</p>';
+  if (!c.enabled) contractNote = `<p class="detail-note">The contract says ${pct(contractRate)}, but commission is off for this vendor.</p>`;
+  else if (c.type === 'amount') contractNote = `<p class="detail-note">The contract says ${pct(contractRate)}, but this vendor is charged a flat ${takaFmt(c.value)} per booking.</p>`;
+  else if (contractRate !== charged) contractNote = `<p class="detail-note">The contract says ${pct(contractRate)} but bookings are charged at ${pct(charged)}. Update one so they match.</p>`;
   return `
     <div class="detail-grid">
       <div class="detail-card">
-        <h3>Commission rate</h3>
-        <div class="commission-rate">${pct(c.rate)}</div>
-        <p class="detail-muted">${c.custom ? `This vendor has its own rate. The platform default is ${pct(c.defaultRate)}.` : 'This vendor pays the platform default rate.'}</p>
-        <p class="detail-muted">Example: on a ${takaFmt(sample)} booking, Plejar keeps ${takaFmt(keep)} and the vendor receives ${takaFmt(sample - keep)}.</p>
-        <p class="detail-muted">A new rate applies to bookings made after the change. Existing bookings keep the rate they were made with.</p>
-        ${isMoneyAdmin() ? `<button class="btn btn-primary" onclick="openCommissionModal('${E(d.agency._id)}', ${c.rate}, ${c.custom})">Change commission</button>` : '<p class="detail-muted">Only administrators can change commission.</p>'}
+        <h3>Commission</h3>
+        <div class="commission-rate">${c.enabled ? E(c.type === 'amount' ? takaFmt(c.value) : `${c.value}%`) : 'Off'}</div>
+        <p class="detail-muted">${c.enabled
+          ? (c.type === 'amount' ? 'A flat amount on every booking.' : 'A percent of every booking.')
+          : `Plejar takes no commission from this ${isHotel ? 'hotel' : 'travel agent'}.`}</p>
+        ${c.enabled ? `<p class="detail-muted">Example: on a ${takaFmt(sample)} ${isHotel ? 'stay' : 'booking'}, Plejar's commission is ${takaFmt(keep)} and the ${isHotel ? 'hotel' : 'vendor'} keeps ${takaFmt(sample - keep)}.</p>` : ''}
+        ${isHotel ? '<p class="detail-muted">Guests pay the hotel directly, so the hotel owes Plejar the commission on each accepted stay once it is over.</p>' : ''}
+        <p class="detail-muted">Changes apply to bookings made after you save. Bookings already made keep the terms they were made with.</p>
+        ${isMoneyAdmin() ? `<button class="btn btn-primary" onclick="openCommissionModal('${E(d.agency._id)}')">${c.enabled ? 'Change commission' : 'Turn on commission'}</button>` : '<p class="detail-muted">Only administrators can change commission.</p>'}
       </div>
       <div class="detail-card">
         <h3>What the contract says</h3>
-        ${contractRate == null ? '<p class="detail-muted">No commission is written into the contract.</p>' : `<p class="commission-rate" style="font-size: 1.6rem;">${pct(contractRate)}</p>
-          ${contractRate !== c.rate ? `<p class="detail-note">The contract says ${pct(contractRate)} but bookings are charged at ${pct(c.rate)}. Update one so they match.</p>` : '<p class="detail-muted">This matches the rate being charged.</p>'}`}
+        ${contractRate == null ? '<p class="detail-muted">No commission is written into the contract.</p>' : `<p class="commission-rate" style="font-size: 1.6rem;">${pct(contractRate)}</p>${contractNote}`}
       </div>
     </div>`;
 }

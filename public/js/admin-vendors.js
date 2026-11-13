@@ -12,7 +12,6 @@ const V = {
   tab: 'overview',
   categories: [],
   vendorOptions: [],
-  defaultRate: null,
   bookings: new Map(),
   payouts: new Map(),
   statusCtx: null,
@@ -60,14 +59,14 @@ const VENDOR_SUB_LOADERS = {
   categories: () => loadCategories(),
   bookings: () => loadBookings(),
   payouts: () => loadPayouts(),
-  commission: () => loadCommissionPane(),
+  commission: () => loadCommissionPane(V.cmPage || 1),
   activity: () => loadVendorActivity()
 };
 
 // Sub-tabs each section has (the rest are hidden by [data-for] in admin.css)
 const KIND_SUBS = {
   agency: ['all', 'packages', 'applications', 'verification', 'categories', 'bookings', 'payouts', 'commission', 'activity'],
-  hotel: ['all', 'listings', 'applications', 'verification', 'bookings', 'activity']
+  hotel: ['all', 'listings', 'applications', 'verification', 'bookings', 'commission', 'activity']
 };
 const kindRoute = kind => (kind === 'hotel' ? 'hotels' : 'agents');
 
@@ -273,6 +272,7 @@ const hotelVendorRow = v => {
         <td>${l ? l.roomTypes : 0}</td>
         <td>${st.pending ? `<strong>${st.pending} waiting</strong>` : '0 waiting'}<span class="lead-sub">${st.accepted} accepted · ${st.total} in all</span></td>
         <td>${v.members}</td>
+        <td>${commissionCell(v.commission)}</td>
         <td class="standing"><div class="standing-wrap">${vendorBadges(v)}</div></td>
         <td style="text-align: right;"><div class="lead-actions">${l ? `<button class="btn btn-secondary btn-sm" onclick="openListingFromVendor('${E(l.id)}', '${E(v.name)}')">Listing</button>` : ''}<button class="btn btn-secondary btn-sm" onclick="openVendor('${E(v.id)}')">Open</button></div></td>
       </tr>`;
@@ -292,13 +292,13 @@ async function openListingFromVendor(listingId, name) {
 async function loadVendors(page = 1) {
   V.page = page;
   const isHotels = V.kind === 'hotel';
-  const cols = isHotels ? 8 : 9;
+  const cols = 9;
   tableMessage('vendorsTableBody', cols, isHotels ? 'Loading hotels...' : 'Loading travel agents...');
   if (!isHotels) ensureCategories();
   const q = queryString({
     kind: V.kind, search: val('vSearch').trim(), status: val('vStatusF'), verification: val('vVerifF'),
     category: isHotels ? '' : val('vndCategoryF'), sort: val('vSortF'),
-    commission: !isHotels && document.getElementById('vCustomF')?.checked ? 'custom' : '', page, limit: 15
+    commission: document.getElementById('vCustomF')?.checked ? 'on' : '', page, limit: 15
   });
   try {
     const { ok, data } = await adminFetch(`/api/v1/admin/vendors?${q}`);
@@ -325,7 +325,7 @@ async function loadVendors(page = 1) {
         <td>${v.bookings.total}<span class="lead-sub">${v.bookings.completed} completed · ${v.bookings.cancelled} cancelled</span></td>
         <td style="white-space: nowrap;">${takaFmt(v.revenue)}</td>
         <td>${v.rating.average ? `<span class="stars">★</span> ${v.rating.average}<span class="lead-sub">${v.rating.count} review${v.rating.count === 1 ? '' : 's'}</span>` : '<span class="lead-sub" style="margin:0">No reviews</span>'}</td>
-        <td style="white-space: nowrap;">${pct(v.commission.rate)}${v.commission.custom ? '<span class="lead-sub">custom</span>' : '<span class="lead-sub">default</span>'}</td>
+        <td>${commissionCell(v.commission)}</td>
         <td class="standing"><div class="standing-wrap">${vendorBadges(v)}</div></td>
         <td style="text-align: right;"><button class="btn btn-secondary btn-sm" onclick="openVendor('${E(v.id)}')">Open</button></td>
       </tr>`).join('');
@@ -418,7 +418,7 @@ function bookingRow(b, { withVendor = true } = {}) {
       <td>${b.user ? `<a href="#" onclick="event.preventDefault(); openUser('${E(b.user._id)}')">${E(b.user.name)}</a><span class="lead-sub">${b.travelers} traveler${b.travelers === 1 ? '' : 's'}</span>` : '—'}</td>
       ${withVendor ? `<td>${b.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(b.agency._id)}')">${E(b.agency.name)}</a>` : (b.kind === 'hotel' ? '<span class="lead-sub" style="display:inline;">Plejar confirms</span>' : '—')}</td>` : ''}
       <td style="white-space: nowrap;">${E(fmtDate(b.travelDate))}${b.endDate && b.endDate !== b.travelDate ? `<span class="lead-sub">to ${E(fmtDate(b.endDate))}${b.units ? ` · ${b.units} ${b.kind === 'hotel' ? 'night' : 'day'}${b.units === 1 ? '' : 's'}` : ''}</span>` : ''}</td>
-      <td style="white-space: nowrap;">${takaFmt(b.amount)}<span class="lead-sub">Plejar ${takaFmt(b.commissionAmount)} (${pct(b.commissionRate)})</span></td>
+      <td style="white-space: nowrap;">${takaFmt(b.amount)}<span class="lead-sub">${bookingCommission(b)}</span></td>
       <td><span class="badge ${BOOKING_BADGE[b.status]}">${E(label(b.status))}</span></td>
       <td>${E(PAY_LABEL[b.paymentStatus] || b.paymentStatus)}</td>
       <td style="text-align: right;"><button class="btn btn-secondary btn-sm" onclick="openBookingModal('${E(b._id)}')">Manage</button></td>
@@ -565,50 +565,91 @@ function rejectPayout(id) {
 }
 
 // ---------- Commission ----------
+// Off for every vendor until an admin turns it on for one, as a percent or a flat amount per booking.
 
-async function loadCommissionPane() {
-  tableMessage('commissionTableBody', 4, 'Loading...');
-  const [setting, list] = await Promise.all([
-    adminFetch('/api/v1/admin/settings/commission'),
-    adminFetch('/api/v1/admin/vendors?commission=custom&limit=100&sort=name')
-  ]);
-  if (!setting.ok || !list.ok) return tableMessage('commissionTableBody', 4, 'Could not load commission settings.', true);
-  V.defaultRate = setting.data.data.defaultRate;
-  const canEdit = isMoneyAdmin();
-  document.getElementById('commissionHero').innerHTML = `
-    <div><div class="kpi-label">Platform default commission</div><div class="commission-rate">${pct(V.defaultRate)}</div>
-    <p class="pane-sub">Plejar keeps this share of every booking, unless the vendor has its own rate below.</p></div>
-    ${canEdit ? '<button class="btn btn-primary" onclick="openCommissionModal(null)">Change default</button>' : '<span class="detail-muted" style="margin:0">Only administrators can change commission.</span>'}`;
-  const vendors = list.data.data.vendors;
-  if (!vendors.length) return tableMessage('commissionTableBody', 4, 'No vendor has a custom rate. They all pay the platform default.');
-  document.getElementById('commissionTableBody').innerHTML = vendors.map(v => {
-    const diff = Math.round((v.commission.rate - V.defaultRate) * 100) / 100;
-    return `<tr>
-      <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info"><span class="user-cell-name">${E(v.name)}</span></div></div></td>
-      <td style="font-weight: 700;">${pct(v.commission.rate)}</td>
-      <td>${diff === 0 ? 'Same as the default' : (diff > 0 ? `${diff} points higher` : `${Math.abs(diff)} points lower`)}</td>
-      <td style="text-align: right;"><div class="lead-actions"><button class="btn btn-secondary btn-sm" onclick="openVendor('${E(v.id)}', 'commission')">Open</button>
-      ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="openCommissionModal('${E(v.id)}', ${v.commission.rate}, true)">Change</button>` : ''}</div></td></tr>`;
-  }).join('');
-  V.commissionNames = Object.fromEntries(vendors.map(v => [v.id, v.name]));
+const commissionLabel = c => {
+  if (!c || !c.enabled) return 'Off';
+  return c.type === 'amount' ? `${takaFmt(c.value)} per booking` : `${c.value}% of each booking`;
+};
+const commissionCell = c => (c && c.enabled
+  ? `<strong style="white-space: nowrap;">${E(c.type === 'amount' ? takaFmt(c.value) : `${c.value}%`)}</strong><span class="lead-sub">${c.type === 'amount' ? 'flat, per booking' : 'of each booking'}</span>`
+  : '<span class="lead-sub" style="margin:0">Off</span>');
+// What a booking was charged, from the snapshot it keeps
+function bookingCommission(b) {
+  if (b.commissionType === 'none' || !b.commissionAmount) return 'No commission';
+  const how = b.commissionType === 'amount' ? `flat ${takaFmt(b.commissionFlat)}` : pct(b.commissionRate);
+  return `Plejar ${takaFmt(b.commissionAmount)} (${how})`;
 }
 
-// vendorId null = the platform default
-function openCommissionModal(vendorId, rate, custom) {
+async function loadCommissionPane(page = 1) {
+  V.cmPage = page;
+  const isHotels = V.kind === 'hotel';
+  document.getElementById('commissionPaneTitle').textContent = isHotels ? 'Commission on hotel stays' : 'Commission on travel agent bookings';
+  document.getElementById('cmVendorHead').textContent = isHotels ? 'Hotel' : 'Travel agent';
+  tableMessage('commissionTableBody', 4, 'Loading...');
+  const show = val('cmShowF');
+  const q = queryString({ kind: V.kind, commission: show, search: val('cmSearch').trim(), sort: 'name', page, limit: 20 });
+  const [list, onCount] = await Promise.all([
+    adminFetch(`/api/v1/admin/vendors?${q}`),
+    adminFetch(`/api/v1/admin/vendors?${queryString({ kind: V.kind, commission: 'on', limit: 1 })}`)
+  ]);
+  if (!list.ok || !onCount.ok) return tableMessage('commissionTableBody', 4, 'Could not load commission.', true);
+  const canEdit = isMoneyAdmin();
+  const on = onCount.data.data.total || 0;
+  const who = isHotels ? 'hotel' : 'travel agent';
+  document.getElementById('commissionHero').innerHTML = `
+    <div><div class="kpi-label">Commission is on for</div><div class="commission-rate">${on} ${who}${on === 1 ? '' : 's'}</div>
+    <p class="pane-sub">${on ? `Every other ${who} pays no commission.` : `No ${who} pays commission yet.`} ${isHotels
+      ? 'Guests pay hotels directly, so a hotel owes Plejar its commission after each accepted stay.'
+      : 'Plejar keeps its commission out of what travelers pay for each booking.'}</p></div>
+    ${canEdit ? (show === 'on' ? `<button class="btn btn-primary" onclick="document.getElementById('cmShowF').value=''; loadCommissionPane(1); document.getElementById('cmSearch').focus()">Turn on for a ${who}</button>` : '') : '<span class="detail-muted" style="margin:0">Only administrators can change commission.</span>'}`;
+  renderPager('commissionPager', list.data.data, 'loadCommissionPane');
+  const vendors = list.data.data.vendors;
+  V.commissionRows = Object.fromEntries(vendors.map(v => [v.id, v]));
+  if (!vendors.length) {
+    return tableMessage('commissionTableBody', 4, show === 'on'
+      ? `Commission is off for every ${who}. Choose "Everyone" to turn it on for one.`
+      : `No ${who} matches that name.`);
+  }
+  document.getElementById('commissionTableBody').innerHTML = vendors.map(v => `<tr>
+      <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info"><span class="user-cell-name">${E(v.name)}</span></div></div></td>
+      <td>${commissionCell(v.commission)}</td>
+      <td>${v.commission.changedAt ? E(new Date(v.commission.changedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })) : '—'}</td>
+      <td style="text-align: right;"><div class="lead-actions"><button class="btn btn-secondary btn-sm" onclick="openVendor('${E(v.id)}', 'commission')">Open</button>
+      ${canEdit ? `<button class="btn ${v.commission.enabled ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="openCommissionModal('${E(v.id)}')">${v.commission.enabled ? 'Change' : 'Turn on'}</button>` : ''}</div></td></tr>`).join('');
+}
+
+function openCommissionModal(vendorId) {
   const d = V.detail;
-  const name = vendorId ? ((d && d.agency._id === vendorId ? d.agency.name : (V.commissionNames || {})[vendorId]) || 'this vendor') : '';
+  const fromProfile = d && d.agency._id === vendorId;
+  const row = (V.commissionRows || {})[vendorId];
+  const name = (fromProfile ? d.agency.name : row && row.name) || 'this vendor';
+  const c = (fromProfile ? d.commission : row && row.commission) || { enabled: false, type: 'percent', value: 0 };
   V.commissionCtx = { vendorId, name };
-  document.getElementById('vcmTitle').textContent = vendorId ? `Commission for ${name}` : 'Platform default commission';
-  document.getElementById('vcLead').textContent = vendorId
-    ? 'Set a rate for this vendor only. It applies to bookings made after you save; existing bookings keep their rate.'
-    : 'The share of each booking Plejar keeps from vendors without their own rate. It applies to bookings made after you save.';
-  document.getElementById('vcLabel').textContent = vendorId ? 'Commission for this vendor (%)' : 'Default commission (%)';
-  const startRate = vendorId ? (rate != null ? rate : (d ? d.commission.rate : V.defaultRate)) : V.defaultRate;
-  document.getElementById('vcRate').value = startRate;
-  document.getElementById('vcRate').disabled = false;
-  document.getElementById('vcResetRow').hidden = !vendorId;
-  document.getElementById('vcReset').checked = false;
-  document.getElementById('vcReset').onchange = e => { document.getElementById('vcRate').disabled = e.target.checked; };
+  document.getElementById('vcmTitle').textContent = `Commission for ${name}`;
+  document.getElementById('vcLead').textContent = 'Applies to bookings made after you save. Bookings already made keep the terms they were made with.';
+  document.getElementById('vcOn').checked = !!c.enabled;
+  document.querySelectorAll('input[name="vcType"]').forEach(r => { r.checked = r.value === (c.type || 'percent'); });
+  document.getElementById('vcRate').value = c.value || '';
+  const sync = () => {
+    const on = document.getElementById('vcOn').checked;
+    const type = document.querySelector('input[name="vcType"]:checked').value;
+    const input = document.getElementById('vcRate');
+    document.getElementById('vcTerms').style.display = on ? '' : 'none';
+    document.getElementById('vcLabel').textContent = type === 'amount' ? 'Flat amount per booking (৳)' : 'Percent of each booking (%)';
+    input.max = type === 'amount' ? '1000000' : '100';
+    input.step = type === 'amount' ? '1' : '0.1';
+    const n = Number(input.value);
+    const sample = 10000;
+    const keep = type === 'amount' ? Math.min(n, sample) : Math.round(sample * n) / 100;
+    document.getElementById('vcExample').textContent = n > 0
+      ? `Example: on a ${takaFmt(sample)} booking, Plejar's commission is ${takaFmt(keep)} and the vendor keeps ${takaFmt(sample - keep)}.`
+      : '';
+  };
+  document.getElementById('vcOn').onchange = sync;
+  document.querySelectorAll('input[name="vcType"]').forEach(r => { r.onchange = sync; });
+  document.getElementById('vcRate').oninput = sync;
+  sync();
   formError('vcError');
   openModal('vCommissionModal');
 }
@@ -616,21 +657,24 @@ function openCommissionModal(vendorId, rate, custom) {
 async function submitCommission(e) {
   e.preventDefault();
   const { vendorId } = V.commissionCtx;
-  const reset = document.getElementById('vcReset').checked;
-  const rate = Number(val('vcRate'));
-  if (!reset && (!Number.isFinite(rate) || rate < 0 || rate > 100 || val('vcRate') === '')) return formError('vcError', 'Enter a percentage between 0 and 100.');
+  const enabled = document.getElementById('vcOn').checked;
+  const type = document.querySelector('input[name="vcType"]:checked').value;
+  const raw = val('vcRate');
+  const value = Number(raw);
+  if (enabled) {
+    if (raw === '' || !Number.isFinite(value) || value <= 0) return formError('vcError', type === 'amount' ? 'Enter an amount above ৳0.' : 'Enter a percent above 0.');
+    if (type === 'percent' && value > 100) return formError('vcError', 'A percent can be at most 100.');
+  }
   const btn = document.getElementById('vcSubmit');
   btn.disabled = true;
   try {
-    const res = vendorId
-      ? await adminFetch(`/api/v1/admin/vendors/${vendorId}/commission`, { method: 'PUT', body: JSON.stringify({ rate: reset ? null : rate }) })
-      : await adminFetch('/api/v1/admin/settings/commission', { method: 'PUT', body: JSON.stringify({ defaultRate: rate }) });
+    const body = enabled ? { enabled, type, value } : { enabled: false };
+    const res = await adminFetch(`/api/v1/admin/vendors/${vendorId}/commission`, { method: 'PUT', body: JSON.stringify(body) });
     if (!res.ok) return formError('vcError', res.data.message || 'Could not save the commission.');
     closeModal('vCommissionModal');
-    showAdminToast('Commission saved. It applies to new bookings.', 'success');
-    if (!vendorId) V.defaultRate = rate;
+    showAdminToast(enabled ? `Commission on: ${commissionLabel(res.data.data.commission)}. It applies to new bookings.` : 'Commission turned off. New bookings have no commission.', 'success');
+    if (V.detail && V.detail.agency._id === vendorId) V.detail.commission = res.data.data.commission;
     refreshVendorViews();
-    if (document.getElementById('vsub-commission').classList.contains('active')) loadCommissionPane();
   } catch (x) {
     formError('vcError', 'Could not reach the server.');
   } finally {

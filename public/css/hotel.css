@@ -167,6 +167,7 @@ button.stat:hover { border-color: var(--line-strong); }
 .req h3 { font-family: var(--sans); font-weight: 800; font-size: 1rem; }
 .req-facts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.88rem; color: var(--ink-soft); margin-top: 4px; }
 .req-due { font-size: 0.82rem; font-weight: 600; color: var(--warn); }
+.req-coupon { margin: 6px 0 2px; font-size: .9rem; padding: 6px 10px; border-radius: 8px; background: rgba(105,166,249,.12); }
 .req-rooms { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; font-size: 0.9rem; }
 .req-rooms span { color: var(--ink-soft); }
 .req-note { margin-top: 10px; background: var(--surface-2); border-left: 3px solid var(--line-strong); padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 0.9rem; white-space: pre-wrap; }

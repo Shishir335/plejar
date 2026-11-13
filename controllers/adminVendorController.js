@@ -13,7 +13,7 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { logActivity } = require('../utils/activity');
 const { earningsFor, monthlyEarnings, round, PAID } = require('../utils/earnings');
-const { getDefaultRate, isCustom } = require('../utils/commission');
+const { termsFor, describe, commissionView } = require('../utils/commission');
 const { escapeRegex, pageParams, paged, validId, toId } = require('../utils/query');
 const { savePrivateDocument, removePrivateDocument, hasPrivateDocument, sendPrivateDocument } = require('../utils/uploads');
 const { teamView, verificationView, packageCounts } = require('./agencyController');
@@ -200,17 +200,16 @@ exports.listVendors = catchAsync(async (req, res, next) => {
   else if (['pending', 'rejected'].includes(q.verification)) and.push({ 'verification.status': q.verification });
   else if (q.verification === 'none') and.push({ verified: false, 'verification.status': { $in: ['none', null] } });
   if (q.category && validId(q.category)) and.push({ categories: toId(q.category) });
-  if (q.commission === 'custom') and.push({ commissionRate: { $type: 'number' } });
+  if (q.commission === 'on' || q.commission === 'custom') and.push({ 'commission.enabled': true, 'commission.value': { $gt: 0 } });
   if (q.kind) and.push(membership.vendorKindFilter(q.kind));
 
   const filter = and.length ? { $and: and } : {};
   const sorts = { newest: { createdAt: -1 }, oldest: { createdAt: 1 }, name: { name: 1 } };
   const pg = pageParams(q);
 
-  const [agencies, total, defaultRate] = await Promise.all([
+  const [agencies, total] = await Promise.all([
     Agency.find(filter).sort(sorts[q.sort] || sorts.newest).skip(pg.skip).limit(pg.limit).populate('categories', 'name').lean(),
-    Agency.countDocuments(filter),
-    getDefaultRate()
+    Agency.countDocuments(filter)
   ]);
   const ids = agencies.map(a => a._id);
 
@@ -264,7 +263,7 @@ exports.listVendors = catchAsync(async (req, res, next) => {
       verified: a.verified,
       verificationStatus: a.verification ? a.verification.status : 'none',
       categories: (a.categories || []).map(c => ({ id: c._id, name: c.name })),
-      commission: { rate: isCustom(a) ? a.commissionRate : defaultRate, custom: isCustom(a) },
+      commission: commissionView(a),
       owner: o ? { id: o._id, name: o.name, email: o.email, accountStatus: o.accountStatus } : null,
       members: (memberMap[k] || {}).count || 0,
       packages: { total: (pkgMap[k] || {}).total || 0, published: (pkgMap[k] || {}).published || 0 },
@@ -293,13 +292,12 @@ exports.getVendor = catchAsync(async (req, res, next) => {
   if (!agency) return;
   await agency.populate('categories', 'name');
 
-  const [members, packages, counts, earnings, ratings, defaultRate, bookingCount, complaintCount] = await Promise.all([
+  const [members, packages, counts, earnings, ratings, bookingCount, complaintCount] = await Promise.all([
     User.find(membership.memberOf(agency._id)).sort({ agencyRole: 1, name: 1 }),
     Package.find({ agency: agency._id }).sort({ updatedAt: -1 }).populate('itinerary.stops.destinationRef', 'name slug'),
     packageCounts(agency._id),
     earningsFor(agency._id),
     ratingSummary(agency._id),
-    getDefaultRate(),
     Booking.countDocuments({ agency: agency._id }),
     Complaint.countDocuments({ againstAgency: agency._id })
   ]);
@@ -313,7 +311,7 @@ exports.getVendor = catchAsync(async (req, res, next) => {
       categories: (agency.categories || []).map(c => ({ id: c._id, name: c.name })),
       verification: verificationView(agency),
       contract: contractView(agency),
-      commission: { rate: isCustom(agency) ? agency.commissionRate : defaultRate, custom: isCustom(agency), defaultRate },
+      commission: commissionView(agency),
       members: members.map(u => teamView(u, agency._id)),
       vendorId: vendorCode(agency),
       packages: packages.map(p => ({ ...p.toObject(), planMissing: planProblems(p) })),
@@ -376,25 +374,34 @@ exports.setCategories = catchAsync(async (req, res, next) => {
 
 // ---------- Commission ----------
 
+// PUT /admin/vendors/:id/commission { enabled, type: 'percent' | 'amount', value }
+// Turns Plejar's commission on or off for one travel agent or hotel. New bookings use the new terms;
+// bookings and stay requests already made keep theirs.
 exports.setCommission = catchAsync(async (req, res, next) => {
   const agency = await findVendor(req.params.id, next);
   if (!agency) return;
+  const b = req.body || {};
+  const enabled = b.enabled === true || b.enabled === 'true';
+  const current = agency.commission || {};
+  const type = b.type === undefined ? (current.type || 'percent') : b.type;
+  if (!['percent', 'amount'].includes(type)) return next(new AppError('Choose a percent or a flat amount.', 400));
+  const value = b.value === undefined || b.value === '' ? Number(current.value) || 0 : Number(b.value);
+  if (!Number.isFinite(value) || value < 0) return next(new AppError('Enter the commission as a number, 0 or more.', 400));
+  if (type === 'percent' && value > 100) return next(new AppError('A percent commission can be at most 100%.', 400));
+  if (type === 'amount' && value > 1000000) return next(new AppError('That flat amount is too large.', 400));
+  if (enabled && !(value > 0)) return next(new AppError(type === 'percent' ? 'Enter a percent above 0.' : 'Enter an amount above ৳0.', 400));
 
-  const raw = req.body.rate;
-  const reset = raw === null || raw === '' || raw === undefined;
-  const rate = reset ? null : Number(raw);
-  if (!reset && (!Number.isFinite(rate) || rate < 0 || rate > 100)) {
-    return next(new AppError('Commission must be between 0% and 100%.', 400));
-  }
-
-  const defaultRate = await getDefaultRate();
-  const before = isCustom(agency) ? agency.commissionRate : defaultRate;
-  agency.commissionRate = rate;
+  const before = describe(termsFor(agency));
+  agency.commission = { enabled, type, value: Math.round(value * 100) / 100, changedAt: new Date(), changedBy: req.user._id };
   await agency.save();
+  const after = describe(termsFor(agency));
 
-  const now = rate === null ? defaultRate : rate;
-  await logActivity(req, { action: 'agency.commission', summary: rate === null ? `Commission reset to the platform default (${defaultRate}%), was ${before}%` : `Commission changed from ${before}% to ${rate}%. Applies to new bookings only.`, agency: agency._id });
-  res.status(200).json({ status: 'success', data: { commission: { rate: now, custom: rate !== null, defaultRate } } });
+  await logActivity(req, {
+    action: 'agency.commission',
+    summary: before === after ? `Commission saved: ${after}` : `Commission changed from ${before} to ${after}. Applies to new bookings only.`,
+    agency: agency._id
+  });
+  res.status(200).json({ status: 'success', data: { commission: commissionView(agency) } });
 });
 
 // ---------- Contract / agreement ----------
@@ -544,11 +551,8 @@ exports.getRatings = catchAsync(async (req, res, next) => {
 exports.getEarnings = catchAsync(async (req, res, next) => {
   const agency = await findVendor(req.params.id, next);
   if (!agency) return;
-  const [earnings, monthly, defaultRate] = await Promise.all([earningsFor(agency._id), monthlyEarnings(agency._id, 6), getDefaultRate()]);
-  res.status(200).json({
-    status: 'success',
-    data: { earnings, monthly, commission: { rate: isCustom(agency) ? agency.commissionRate : defaultRate, custom: isCustom(agency) } }
-  });
+  const [earnings, monthly] = await Promise.all([earningsFor(agency._id), monthlyEarnings(agency._id, 6)]);
+  res.status(200).json({ status: 'success', data: { earnings, monthly, commission: commissionView(agency) } });
 });
 
 // Set or change the password of a vendor's owner or team member.

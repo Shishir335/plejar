@@ -2,6 +2,7 @@ const Notification = require('../models/notificationModel');
 const User = require('../models/userModel');
 const { awardBookingPoints } = require('./rewards');
 const { releaseVoucher } = require('./vouchers');
+const { releaseCoupon } = require('./coupons');
 const { rewardReferrer } = require('./referrals');
 const { joinTourGroup, leaveTourGroup } = require('./chats');
 
@@ -49,6 +50,8 @@ const bookingStatusChanged = async (booking, previous, { by } = {}) => {
   if (booking.status === previous) return;
   const what = WHAT[booking.kind] || 'booking';
   if (booking.status === 'cancelled' && booking.voucher) await releaseVoucher(booking.voucher);
+  // A cancelled booking gives its coupon use back to the traveler
+  if (booking.status === 'cancelled' && booking.couponRedemption) await releaseCoupon({ booking: booking._id });
   // Tour group chat: confirmed travelers join, cancelled ones leave
   try {
     if (booking.status === 'confirmed') await joinTourGroup(booking, await User.findById(booking.user).select('name firstName'));

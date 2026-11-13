@@ -8,8 +8,6 @@ const { hasRole } = require('../utils/roles');
 const { logActivity } = require('../utils/activity');
 const { moveBooking } = require('../utils/bookings');
 const { earningsFor, round } = require('../utils/earnings');
-const { getDefaultRate } = require('../utils/commission');
-const { setSetting } = require('../utils/settings');
 const { escapeRegex, pageParams, paged, validId, toId } = require('../utils/query');
 const { bookingStatusChanged } = require('../utils/bookingEvents');
 
@@ -45,10 +43,11 @@ exports.listBookings = catchAsync(async (req, res, next) => {
   const [bookings, total, totals] = await Promise.all([
     Booking.find(filter).sort({ createdAt: -1 }).skip(pg.skip).limit(pg.limit).populate('user', 'name email').populate('agency', 'name').lean(),
     Booking.countDocuments(filter),
-    Booking.aggregate([{ $match: matchForAggregate(filter) }, { $group: { _id: null, amount: { $sum: '$amount' }, commission: { $sum: '$commissionAmount' } } }])
+    Booking.aggregate([{ $match: matchForAggregate(filter) }, { $group: { _id: null, amount: { $sum: '$amount' }, commission: { $sum: '$commissionAmount' }, plejarPays: { $sum: '$plejarPays' } } }])
   ]);
-  const t = totals[0] || { amount: 0, commission: 0 };
-  res.status(200).json({ status: 'success', data: { bookings, totals: { amount: round(t.amount), commission: round(t.commission) }, ...paged(total, pg) } });
+  const t = totals[0] || { amount: 0, commission: 0, plejarPays: 0 };
+  // plejarCoupons: discounts from Plejar's coupons, which Plejar pays out of its commission
+  res.status(200).json({ status: 'success', data: { bookings, totals: { amount: round(t.amount), commission: round(t.commission), plejarCoupons: round(t.plejarPays) }, ...paged(total, pg) } });
 });
 
 exports.updateBooking = catchAsync(async (req, res, next) => {
@@ -206,19 +205,3 @@ exports.deleteCategory = catchAsync(async (req, res, next) => {
   res.status(204).json({ status: 'success', data: null });
 });
 
-// ---------- Platform commission setting ----------
-
-exports.getCommissionSetting = catchAsync(async (req, res, next) => {
-  res.status(200).json({ status: 'success', data: { defaultRate: await getDefaultRate() } });
-});
-
-exports.setCommissionSetting = catchAsync(async (req, res, next) => {
-  const rate = Number(req.body.defaultRate);
-  if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
-    return next(new AppError('The default commission must be between 0% and 100%.', 400));
-  }
-  const before = await getDefaultRate();
-  await setSetting('commissionRate', rate, req.user._id);
-  await logActivity(req, { action: 'settings.commission', summary: `Platform default commission changed from ${before}% to ${rate}%. Applies to new bookings from vendors without their own rate.` });
-  res.status(200).json({ status: 'success', data: { defaultRate: rate } });
-});

@@ -95,6 +95,7 @@
           <button class="tab" data-view="rooms">Rooms &amp; rates</button>
           <button class="tab" data-view="photos">Photos</button>
           <button class="tab" data-view="details">Details &amp; policies</button>
+          <button class="tab" data-view="coupons">Coupons</button>
           <button class="tab" data-view="account">Account</button>
         </nav>
       </div>
@@ -157,6 +158,16 @@
       </section>
 
       <!-- Photos -->
+      <section data-pane="coupons" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Coupons</h1>
+            <p>Discount codes guests use when they ask for a stay in the app.</p>
+          </div>
+        </div>
+        <div id="couponsRoot"></div>
+      </section>
+
       <section data-pane="photos" hidden>
         <div class="page-head">
           <div>
@@ -396,6 +407,7 @@
   <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
   <script src="/js/picker-only.js"></script>
+  <script src="/js/coupons-panel.js"></script>
   <script src="/js/hotel.js"></script>
 </body>
 </html>

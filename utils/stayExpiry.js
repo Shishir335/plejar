@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const StayRequest = require('../models/stayRequestModel');
+const { releaseCoupon } = require('./coupons');
 const Notification = require('../models/notificationModel');
 require('../models/hotelModel'); // for populate('hotel')
 
@@ -21,6 +22,8 @@ const expireStayRequests = async (scope = {}, now = new Date()) => {
     const changed = await StayRequest.updateOne({ _id: request._id, status: 'pending' }, { $set: { status: 'expired', expiredAt: now } });
     if (!changed.modifiedCount) continue;
     expired += 1;
+    // Its coupon use goes back to the guest
+    if (request.couponRedemption) await releaseCoupon({ stayRequest: request._id });
     const hotelName = (request.hotel && request.hotel.name) || 'The hotel';
     await Notification.create({
       user: request.user,

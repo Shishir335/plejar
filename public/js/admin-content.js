@@ -26,6 +26,7 @@ function switchContentSub(name) {
   document.querySelectorAll('#tab-content .subpane').forEach(p => p.classList.toggle('active', p.id === `csub-${name}`));
   if (name === 'ads') loadAdRequests();
   else if (name === 'vouchers') loadVouchers();
+  else if (name === 'coupons') loadAdminCoupons();
   else if (name === 'help') loadHelp();
   else if (name === 'pages') loadPages();
   else loadBanners();
@@ -376,5 +377,22 @@ function deleteHotel(id) {
       showAdminToast('Hotel deleted.', 'info');
       loadHotels();
     }
+  });
+}
+
+// ---------- Coupons: Plejar's own (Plejar pays) and every vendor's ----------
+
+let adminCoupons = null;
+function loadAdminCoupons() {
+  if (adminCoupons) { adminCoupons.reload(); return; }
+  adminCoupons = window.CouponsPanel.mount(document.getElementById('adminCouponsRoot'), {
+    mode: 'admin',
+    base: '/api/v1/admin/coupons',
+    request: async (method, path, body) => {
+      const { ok, data } = await adminFetch(path, { method, body: body ? JSON.stringify(body) : undefined });
+      if (!ok) throw new Error((data && data.message) || 'Something went wrong.');
+      return data;
+    },
+    buttons: { primary: 'btn btn-primary', quiet: 'btn btn-secondary btn-sm' }
   });
 }

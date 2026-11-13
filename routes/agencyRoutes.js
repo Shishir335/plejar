@@ -1,4 +1,5 @@
 const express = require('express');
+const coupons = require('../controllers/couponController');
 const authController = require('../controllers/authController');
 const agencyController = require('../controllers/agencyController');
 const content = require('../controllers/vendorContentController');
@@ -20,7 +21,7 @@ router.get('/me', agencyController.getMyAgency);
 // A hotel account uses its own panel (/hotel, /api/v1/hotel-panel) instead of the tour pages
 router.use(
   ['/me/guides', '/me/ads', '/me/packages', '/me/destinations', '/me/destination-geography', '/me/announcements', '/me/audience',
-    '/me/broadcasts', '/me/bookings', '/me/earnings', '/me/payouts', '/me/posts', '/me/followers', '/me/comments'],
+    '/me/broadcasts', '/me/bookings', '/me/earnings', '/me/payouts', '/me/posts', '/me/followers', '/me/comments', '/me/coupons'],
   hotels.toursOnly
 );
 
@@ -67,6 +68,10 @@ router.get('/me/bookings', agencyController.listMyBookings);
 router.patch('/me/bookings/:id', agencyController.updateMyBooking);
 
 router.get('/me/earnings', agencyController.requireOwner, agencyController.getMyEarnings);
+
+// The agency's own coupons for its tours and guides (the agency pays their discounts; the owner manages them)
+router.route('/me/coupons').get(coupons.listMine).post(agencyController.requireOwner, coupons.createMine);
+router.route('/me/coupons/:id').patch(agencyController.requireOwner, coupons.updateMine).delete(agencyController.requireOwner, coupons.deleteMine);
 router
   .route('/me/payouts')
   .get(agencyController.requireOwner, agencyController.listMyPayouts)

@@ -427,6 +427,7 @@
             <button type="button" role="tab" class="subtab active" data-csub="banners" aria-selected="true">Tours banners</button>
             <button type="button" role="tab" class="subtab" data-csub="ads" aria-selected="false">Ad requests <span class="mini-count" id="csubAdCount" hidden>0</span></button>
             <button type="button" role="tab" class="subtab" data-csub="vouchers" aria-selected="false">Vouchers &amp; rewards</button>
+            <button type="button" role="tab" class="subtab" data-csub="coupons" aria-selected="false">Coupons</button>
             <button type="button" role="tab" class="subtab" data-csub="help" aria-selected="false">Help center</button>
             <button type="button" role="tab" class="subtab" data-csub="pages" aria-selected="false">Pages</button>
           </div>
@@ -460,6 +461,10 @@
                 <tbody id="adRequestsTableBody"></tbody>
               </table>
             </div>
+          </div>
+
+          <div class="subpane" id="csub-coupons">
+            <div id="adminCouponsRoot"></div>
           </div>
 
           <div class="subpane" id="csub-vouchers">
@@ -699,7 +704,7 @@
             <button type="button" role="tab" class="subtab" data-vsub="categories" data-for="agency" aria-selected="false">Categories</button>
             <button type="button" role="tab" class="subtab" data-vsub="bookings" aria-selected="false">Bookings</button>
             <button type="button" role="tab" class="subtab" data-vsub="payouts" data-for="agency" aria-selected="false">Payouts <span class="mini-count" id="vsubPayoutCount" hidden>0</span></button>
-            <button type="button" role="tab" class="subtab" data-vsub="commission" data-for="agency" aria-selected="false">Commission</button>
+            <button type="button" role="tab" class="subtab" data-vsub="commission" aria-selected="false">Commission</button>
             <button type="button" role="tab" class="subtab" data-vsub="activity" aria-selected="false">Activity logs</button>
           </div>
 
@@ -719,7 +724,7 @@
                 <select id="vSortF" class="form-select" aria-label="Sort" onchange="loadVendors(1)">
                   <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A to Z</option>
                 </select>
-                <label class="check" data-for="agency"><input type="checkbox" id="vCustomF" onchange="loadVendors(1)"> Custom commission</label>
+                <label class="check"><input type="checkbox" id="vCustomF" onchange="loadVendors(1)"> Commission on</label>
               </div>
               <div class="actions">
                 <button class="btn btn-secondary" onclick="loadVendors()">↻ Refresh</button>
@@ -729,7 +734,7 @@
             <div class="table-container">
               <table class="admin-table">
                 <thead data-for="agency"><tr><th>Travel agent</th><th>Owner</th><th>Packages</th><th>Bookings</th><th>Revenue</th><th>Rating</th><th>Commission</th><th>Standing</th><th style="text-align: right;">Actions</th></tr></thead>
-                <thead data-for="hotel"><tr><th>Hotel</th><th>Owner</th><th>Listing</th><th>Room types</th><th>Stay requests</th><th>Team</th><th>Standing</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead data-for="hotel"><tr><th>Hotel</th><th>Owner</th><th>Listing</th><th>Room types</th><th>Stay requests</th><th>Team</th><th>Commission</th><th>Standing</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="vendorsTableBody"></tbody>
               </table>
             </div>
@@ -900,15 +905,25 @@
           <div class="subpane" id="vsub-commission">
             <div class="commission-hero" id="commissionHero"></div>
             <div class="control-bar">
-              <div><h3 class="pane-title">Vendors with their own rate</h3><p class="pane-sub">Everyone else pays the platform default. A new rate applies to bookings made after the change.</p></div>
+              <div><h3 class="pane-title" id="commissionPaneTitle">Commission</h3><p class="pane-sub">Commission is off unless you turn it on here. New terms apply to bookings made after you save; earlier bookings keep theirs.</p></div>
               <button class="btn btn-secondary" onclick="loadCommissionPane()">↻ Refresh</button>
+            </div>
+            <div class="control-bar">
+              <div class="filters">
+                <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="cmSearch" class="search-input" placeholder="Search by name" aria-label="Search" oninput="clearTimeout(V.cmTimer); V.cmTimer = setTimeout(() => loadCommissionPane(1), 300)"></div>
+                <select id="cmShowF" class="form-select" aria-label="Show" onchange="loadCommissionPane(1)">
+                  <option value="on">Commission on</option>
+                  <option value="">Everyone</option>
+                </select>
+              </div>
             </div>
             <div class="table-container">
               <table class="admin-table">
-                <thead><tr><th>Vendor</th><th>Rate</th><th>Compared with default</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead><tr><th id="cmVendorHead">Vendor</th><th>Commission</th><th>Last changed</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="commissionTableBody"></tbody>
               </table>
             </div>
+            <div class="pager" id="commissionPager"></div>
           </div>
 
           <!-- Activity logs -->
@@ -1793,8 +1808,17 @@
       <div class="modal-head"><h3 id="vcmTitle">Commission</h3><button class="modal-x" onclick="closeModal('vCommissionModal')" aria-label="Close">&times;</button></div>
       <form onsubmit="submitCommission(event)" novalidate>
         <p class="modal-lead" id="vcLead"></p>
-        <div class="form-group"><label class="form-label" for="vcRate" id="vcLabel">Commission (%)</label><input id="vcRate" class="form-input" type="number" min="0" max="100" step="0.1"></div>
-        <label class="check" id="vcResetRow"><input type="checkbox" id="vcReset"> Use the platform default instead</label>
+        <label class="check"><input type="checkbox" id="vcOn"> Charge commission</label>
+        <div id="vcTerms">
+          <div class="form-group" style="margin-top: 12px;"><span class="form-label">Charge as</span>
+            <div class="cm-types">
+              <label class="check"><input type="radio" name="vcType" value="percent" checked> A percent of each booking</label>
+              <label class="check"><input type="radio" name="vcType" value="amount"> A flat amount per booking</label>
+            </div>
+          </div>
+          <div class="form-group"><label class="form-label" for="vcRate" id="vcLabel">Percent of each booking (%)</label><input id="vcRate" class="form-input" type="number" min="0" max="100" step="0.1"></div>
+          <p class="detail-muted" id="vcExample" style="margin: 0;"></p>
+        </div>
         <div class="form-error-box" id="vcError" role="alert" hidden style="margin-top: 12px;"></div>
         <button type="submit" class="btn btn-primary btn-block" id="vcSubmit" style="margin-top: 14px;">Save</button>
       </form>
@@ -1832,6 +1856,7 @@
   <script src="/js/admin-system.js"></script>
   <script src="/js/admin-content.js"></script>
   <script src="/js/admin-rewards.js"></script>
+  <script src="/js/coupons-panel.js"></script>
   <script src="/js/admin-notifications.js"></script>
 </body>
 </html>

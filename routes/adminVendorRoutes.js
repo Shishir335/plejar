@@ -40,7 +40,5 @@ router.patch('/payouts/:id', moneyAdmin, finance.decidePayout);
 router.route('/vendor-categories').get(finance.listCategories).post(moneyAdmin, finance.createCategory);
 router.route('/vendor-categories/:id').patch(moneyAdmin, finance.updateCategory).delete(moneyAdmin, finance.deleteCategory);
 
-router.get('/settings/commission', finance.getCommissionSetting);
-router.put('/settings/commission', moneyAdmin, finance.setCommissionSetting);
 
 module.exports = router;

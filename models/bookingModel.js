@@ -38,8 +38,19 @@ const bookingSchema = new mongoose.Schema(
     discountAmount: { type: Number, min: 0, default: 0 },
     voucher: { type: mongoose.Schema.ObjectId, ref: 'UserVoucher' },
     voucherCode: { type: String, default: '' },
+    // Or a coupon (one discount per booking). subtotal and discountAmount above hold its discount too.
+    // A Plejar coupon: Plejar pays the discount, so plejarPays is added to the vendor's share.
+    // A vendor's own coupon: the vendor pays it; its share and Plejar's commission come from the lower amount.
+    couponCode: { type: String, default: '' },
+    couponRedemption: { type: mongoose.Schema.ObjectId, ref: 'CouponRedemption' },
+    couponFundedBy: { type: String, enum: ['plejar', 'vendor', null], default: null },
+    plejarPays: { type: Number, min: 0, default: 0 },
 
-    commissionRate: { type: Number, required: true, min: 0, max: 100 }, // percent, snapshot at booking time
+    // Plejar's commission, a snapshot of the vendor's terms at booking time: none, a percent
+    // (commissionRate) or a flat amount per booking (commissionFlat)
+    commissionType: { type: String, enum: ['none', 'percent', 'amount'], default: 'percent' },
+    commissionRate: { type: Number, required: true, min: 0, max: 100 }, // percent
+    commissionFlat: { type: Number, min: 0, default: 0 }, // taka per booking
     commissionAmount: { type: Number, required: true, min: 0 }, // Plejar's share of `amount`
 
     status: {

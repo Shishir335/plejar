@@ -7,13 +7,15 @@ const Guide = require('../models/guideModel');
 const Review = require('../models/reviewModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
-const { rateFor, commissionFor } = require('../utils/commission');
+const { termsFor, snapshot, commissionFor, termsOf } = require('../utils/commission');
 const { logActivity } = require('../utils/activity');
 const { HOLDS_SEAT, registrationStats, registrationClosedReason } = require('../utils/events');
 const { bookingRequested, bookingStatusChanged } = require('../utils/bookingEvents');
 const { PLACE_POPULATE, placeView, tourRatings, priceView } = require('../utils/tourCards');
 const { claimVoucher, releaseVoucher } = require('../utils/vouchers');
 const { UserVoucher } = require('../models/voucherModel');
+const { claimCoupon, releaseCoupon } = require('../utils/coupons');
+const { CouponRedemption } = require('../models/couponModel');
 const { hasRole } = require('../utils/roles');
 
 // A restriction with an end date stops applying once that date has passed
@@ -73,7 +75,6 @@ const bookTour = async (req, travelers) => {
   const agency = await Agency.findById(pkg.agency);
   if (!agency || agency.status !== 'active') throw new AppError('This agency is not taking bookings right now.', 400);
   const amount = pkg.priceFrom * travelers;
-  const commissionRate = await rateFor(agency);
   return {
     kind: 'tour',
     agency: agency._id,
@@ -87,8 +88,7 @@ const bookTour = async (req, travelers) => {
     pricePerPerson: pkg.priceFrom,
     regularPrice: pkg.regularPrice > pkg.priceFrom ? pkg.regularPrice : null,
     amount,
-    commissionRate,
-    commissionAmount: commissionFor(amount, commissionRate)
+    ...snapshot(amount, termsFor(agency))
   };
 };
 
@@ -120,6 +120,7 @@ const bookHotel = async (req, travelers) => {
     pricePerPerson: hotel.pricePerNight,
     regularPrice: hotel.regularPrice > hotel.pricePerNight ? hotel.regularPrice : null,
     amount: hotel.pricePerNight * nights * rooms,
+    commissionType: 'none',
     commissionRate: 0,
     commissionAmount: 0
   };
@@ -142,7 +143,6 @@ const bookGuide = async (req, travelers) => {
     throw new AppError(`${guide.name} is already booked on some of those days. Try other dates.`, 400);
   }
   const amount = guide.pricePerDay * days;
-  const commissionRate = await rateFor(agency);
   return {
     kind: 'guide',
     agency: agency._id,
@@ -157,8 +157,7 @@ const bookGuide = async (req, travelers) => {
     pricePerPerson: guide.pricePerDay,
     regularPrice: guide.regularPrice > guide.pricePerDay ? guide.regularPrice : null,
     amount,
-    commissionRate,
-    commissionAmount: commissionFor(amount, commissionRate)
+    ...snapshot(amount, termsFor(agency))
   };
 };
 
@@ -182,14 +181,38 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   if (!Number.isInteger(travelers) || travelers < 1 || travelers > 50) return next(new AppError('Enter between 1 and 50 travelers.', 400));
 
   const fields = await { tour: bookTour, hotel: bookHotel, guide: bookGuide }[kind](req, travelers);
+  const hasCoupon = Boolean(String(req.body.couponCode || '').trim());
+  if (hasCoupon && String(req.body.voucherCode || '').trim()) {
+    return next(new AppError('Use a voucher or a coupon on a booking, not both.', 400));
+  }
+  let coupon = null;
+  if (hasCoupon) {
+    coupon = await claimCoupon(req.body.couponCode, { user: req.user._id, kind, vendor: fields.agency, packageId: fields.package, subtotal: fields.amount });
+    fields.subtotal = fields.amount;
+    fields.discountAmount = coupon.discount;
+    fields.amount -= coupon.discount;
+    fields.couponCode = coupon.coupon.code;
+    fields.couponRedemption = coupon.redemption._id;
+    fields.couponFundedBy = coupon.coupon.fundedBy;
+    if (coupon.coupon.fundedBy === 'plejar') {
+      // Plejar pays: commission stays on the full price and the vendor is owed the discount on top
+      fields.plejarPays = coupon.discount;
+    } else {
+      // The vendor pays: its share and Plejar's commission come from what the traveler pays
+      fields.commissionAmount = commissionFor(fields.amount, termsOf(fields));
+    }
+  }
   let voucher = null;
   if (String(req.body.voucherCode || '').trim()) {
     voucher = await claimVoucher(req.user._id, req.body.voucherCode, kind, fields.amount);
-    // Plejar pays for the discount from its commission, so the agency's share stays the same
+    // Plejar pays for the discount, so the agency's share stays the same: first out of its commission,
+    // and whatever the commission doesn't cover (all of it, when commission is off) is owed to the agency
     fields.subtotal = fields.amount;
     fields.discountAmount = voucher.discount;
     fields.amount -= voucher.discount;
-    fields.commissionAmount = Math.max(0, Math.round((fields.commissionAmount - voucher.discount) * 100) / 100);
+    const fromCommission = Math.min(fields.commissionAmount, voucher.discount);
+    fields.commissionAmount = Math.round((fields.commissionAmount - fromCommission) * 100) / 100;
+    fields.plejarPays = Math.round((voucher.discount - fromCommission) * 100) / 100;
     fields.voucher = voucher.userVoucher._id;
     fields.voucherCode = voucher.userVoucher.code;
   }
@@ -198,9 +221,11 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     booking = await Booking.create({ ...fields, user: req.user._id, note: req.body.note });
   } catch (err) {
     if (voucher) await releaseVoucher(voucher.userVoucher._id);
+    if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
     throw err;
   }
   if (voucher) await UserVoucher.updateOne({ _id: voucher.userVoucher._id }, { booking: booking._id });
+  if (coupon) await CouponRedemption.updateOne({ _id: coupon.redemption._id }, { booking: booking._id });
   await bookingRequested(booking);
   await logActivity(req, { action: 'booking.created', summary: `Booked ${booking.packageTitle} (${booking.reference}) for ${travelers} traveler${travelers === 1 ? '' : 's'}`, user: req.user._id, agency: booking.agency });
 
@@ -270,7 +295,7 @@ const bookingCards = async bookings => {
       price: priceView(b.pricePerPerson, b.regularPrice),
       per: { tour: 'person', hotel: 'night', guide: 'day' }[b.kind],
       amount: b.amount,
-      discount: b.discountAmount ? { amount: b.discountAmount, voucherCode: b.voucherCode, subtotal: b.subtotal } : null,
+      discount: b.discountAmount ? { amount: b.discountAmount, voucherCode: b.voucherCode, couponCode: b.couponCode || '', subtotal: b.subtotal } : null,
       dates: { start: b.travelDate, end: b.endDate || b.travelDate },
       travelers: b.travelers,
       rooms: b.rooms,
