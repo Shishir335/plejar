@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Apply for membership — Plejar</title>
-  <meta name="description" content="Tour agencies, hotels and resorts in Bangladesh can apply to join Plejar. Send your details, trade license and owner's NID, and our team reviews them within 3 working days.">
+  <meta name="description" content="Tour agencies, hotels and resorts in Bangladesh can apply to join Plejar. Send your details and the owner's NID, and our team reviews them within 3 working days.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Tiro+Bangla&display=swap">
@@ -35,7 +35,7 @@
     <section class="apply" id="applyView" data-vendor="agency" hidden>
       <div class="wrap apply-head">
         <h1 class="apply-title"><span data-for="agency" data-i18n="applyTitle">Join Plejar as a member agency</span><span data-for="hotel" data-i18n="applyTitleHotel">Join Plejar as a member hotel</span></h1>
-        <p class="apply-lead"><span data-for="agency" data-i18n="applyLead">Tell us about your agency and send your trade license and the owner's national ID. Our team checks every application by hand and replies within 3 working days.</span><span data-for="hotel" data-i18n="applyLeadHotel">Tell us about your hotel or resort and send your trade license and the owner's national ID. Our team checks every application by hand and replies within 3 working days, then prepares your listing on Plejar.</span></p>
+        <p class="apply-lead"><span data-for="agency" data-i18n="applyLead">Tell us about your agency and send the owner's national ID. Our team checks every application by hand and replies within 3 working days.</span><span data-for="hotel" data-i18n="applyLeadHotel">Tell us about your hotel or resort and send the owner's national ID. Our team checks every application by hand and replies within 3 working days, then prepares your listing on Plejar.</span></p>
       </div>
 
       <div class="wrap apply-grid">
@@ -56,8 +56,8 @@
             </div>
             <div class="field-row">
               <div class="field">
-                <label for="tradeLicenseNumber" data-i18n="lblLicenseNo">Trade license number *</label>
-                <input id="tradeLicenseNumber" name="tradeLicenseNumber" type="text" required maxlength="60" placeholder="TRAD/DNCC/012345/2025">
+                <label for="tradeLicenseNumber" data-i18n="lblLicenseNo">Trade license number</label>
+                <input id="tradeLicenseNumber" name="tradeLicenseNumber" type="text" maxlength="60" placeholder="TRAD/DNCC/012345/2025">
               </div>
               <div class="field">
                 <label for="yearStarted" data-i18n="lblYear">Year you started</label>
@@ -180,9 +180,9 @@
             <legend><span class="part-no">3</span><span data-i18n="partDocs">Documents</span></legend>
             <p class="part-note" data-i18n="partDocsNote">Photos or PDFs, up to 5 MB each. Only our review team can see them.</p>
             <div class="doc-list">
-              <div class="doc" data-kind="trade_license" data-max="1" data-required="true">
+              <div class="doc" data-kind="trade_license" data-max="1">
                 <div class="doc-text">
-                  <strong data-i18n="docLicense">Trade license *</strong>
+                  <strong data-i18n="docLicense">Trade license</strong>
                   <span data-i18n="docLicenseHint">The current one, with the number and expiry date readable.</span>
                   <ul class="doc-files" aria-live="polite"></ul>
                 </div>
@@ -190,7 +190,7 @@
               </div>
               <div class="doc" data-kind="nid" data-max="2" data-required="true">
                 <div class="doc-text">
-                  <strong data-i18n="docNid">Owner's national ID *</strong>
+                  <strong data-i18n="docNid">Owner's national ID (front and back) *</strong>
                   <span data-i18n="docNidHint">Front and back. Two files are fine.</span>
                   <ul class="doc-files" aria-live="polite"></ul>
                 </div>

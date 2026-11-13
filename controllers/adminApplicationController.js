@@ -74,8 +74,8 @@ exports.listApplications = catchAsync(async (req, res) => {
   const applications = rows.map(r => ({
     ...r,
     documentCount: (r.documents || []).length,
-    // Website: trade license and owner's NID. App: business license, insurance and tax ID
-    hasRequiredDocuments: (r.source === 'app' ? ['trade_license', 'insurance', 'tax_id'] : ['trade_license', 'nid']).every(k => (r.documents || []).some(d => d.kind === k)),
+    // Website: the owner's NID. App: business license, insurance and tax ID
+    hasRequiredDocuments: (r.source === 'app' ? ['trade_license', 'insurance', 'tax_id'] : ['nid']).every(k => (r.documents || []).some(d => d.kind === k)),
     documents: undefined
   }));
   res.status(200).json({ status: 'success', data: { applications, ...paged(total, page) } });
