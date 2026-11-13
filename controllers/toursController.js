@@ -671,7 +671,7 @@ exports.home = catchAsync(async (req, res) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   const [banners, searches, recent, hotels, types, unread] = await Promise.all([
-    liveBanners(),
+    liveBanners(req, { count: true }),
     req.user ? recentSearches(req.user, 5) : [],
     req.user ? recentlyViewed(req.user, 10) : [],
     nearbyHotels({ lat, lng, user: req.user, limit: 10 }),
@@ -696,7 +696,9 @@ exports.home = catchAsync(async (req, res) => {
       resultCount: ranked ? ranked.length : null,
       results: ranked ? ranked.slice(0, 20) : null,
       unreadNotifications: unread,
-      banners: banners.map(bannerView),
+      banners: banners.banners.map(bannerView),
+      // How many agents' ads are live; the app can offer a "See all" screen (GET /promotions/ads)
+      adsTotal: banners.adsTotal,
       continueSearch: searches,
       popularDestinations: popular,
       recentlyViewed: recent,

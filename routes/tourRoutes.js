@@ -38,6 +38,7 @@ hotelRouter.route('/:id/save').post(protect, tours.save('hotel')).delete(protect
 // Banners at the top of the Tours screen
 const promotionRouter = express.Router();
 promotionRouter.get('/', promotions.listLive);
+promotionRouter.get('/ads', optionalAuth, promotions.listAds);
 
 // Local guides travelers can hire ("Guide" in My Bookings)
 const guideRouter = express.Router();

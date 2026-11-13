@@ -90,6 +90,8 @@ const packageSchema = new mongoose.Schema(
     registrationDeadline: Date,
     seats: { type: Number, min: [1, 'An event needs at least 1 seat'], max: [1000, 'An event can have at most 1000 seats'] },
     meetingPoint: { type: String, trim: true, maxlength: [200, 'Meeting point must be 200 characters or fewer'], default: '' },
+    // The district the tour leaves from (a code from data/bangladesh.js), so ads can be shown to travelers nearby
+    startDistrict: { type: String, default: '' },
     departureTime: { type: String, default: '', validate: { validator: v => !v || TIME.test(v), message: 'Use a 24-hour departure time like 21:30' } },
     returnInfo: { type: String, trim: true, maxlength: [200, 'Keep the return details under 200 characters'], default: '' },
 

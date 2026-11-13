@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Package = require('../models/packageModel');
+const { district } = require('./places');
 const Destination = require('../models/destinationModel');
 const Guide = require('../models/guideModel');
 const AppError = require('./appError');
@@ -148,6 +149,7 @@ const planProblems = pkg => {
   else if (pkg.priceFrom != null && pkg.advanceAmount > pkg.priceFrom) missing.push('a booking advance no higher than the price');
   if (pkg.regularPrice != null && pkg.priceFrom != null && pkg.regularPrice < pkg.priceFrom) missing.push('a regular price no lower than the price (or leave it empty when there is no sale)');
   if (!pkg.meetingPoint) missing.push('the meeting point');
+  if (!district(pkg.startDistrict)) missing.push('the district the tour starts from');
   if (!pkg.departureTime) missing.push('the departure time');
   if (!pkg.returnInfo) missing.push('when and where the tour ends');
   if (!pkg.transport || !pkg.transport.mode) missing.push('how travelers get there (transport)');

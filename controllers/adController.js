@@ -7,6 +7,7 @@ const AppError = require('../utils/appError');
 const Email = require('../utils/email');
 const { logActivity } = require('../utils/activity');
 const { saveContentImage, removeContentImage, removeContentFolder } = require('../utils/uploads');
+const { district } = require('../utils/places');
 
 /**
  * Vendor ads on the app's Tours screen. A vendor applies with a tour, a picture and the wording;
@@ -48,6 +49,7 @@ const adView = ad => ({
   rejectedReason: ad.reviewStatus === 'rejected' ? ad.rejectedReason : '',
   reviewedAt: ad.reviewedAt || null,
   clicks: ad.clicks || 0,
+  views: ad.views || 0,
   createdAt: ad.createdAt
 });
 
@@ -65,11 +67,13 @@ const applyAdForm = async (ad, b, agencyId) => {
   if (ad.highlight && !ad.subtitle.includes(ad.highlight)) errors.highlight = 'The highlighted words must be part of the subtitle.';
 
   const tourId = b.tour !== undefined ? b.tour : ad.tour;
-  const tour = validId(tourId) ? await Package.findOne({ _id: tourId, agency: agencyId }).select('title status startDate hiddenByAdmin') : null;
+  const tour = validId(tourId) ? await Package.findOne({ _id: tourId, agency: agencyId }).select('title status startDate hiddenByAdmin startDistrict') : null;
   const today = isoDay(new Date(Date.now() + 6 * 3600 * 1000));
   if (!tour) errors.tour = 'Choose one of your tours.';
   else if (tour.status !== 'published' || tour.hiddenByAdmin) errors.tour = 'Only a published tour can be advertised.';
   else if (!tour.startDate || tourDay(tour) < today) errors.tour = 'This tour has already left.';
+  // Ads are shown to travelers near where the tour starts
+  else if (!district(tour.startDistrict)) errors.tour = 'Add the district this tour starts from (edit the tour, under Getting there) before applying for an ad.';
   if (errors.tour) return { errors, tour };
   ad.tour = tour._id;
   ad.tours = [tour._id];

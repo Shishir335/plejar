@@ -739,6 +739,7 @@ function planMissing() {
   else if (form.priceFrom.value !== '' && Number(val('evAdvance')) > Number(form.priceFrom.value)) missing.push('a booking advance no higher than the price');
   if (val('evRegularPrice') !== '' && form.priceFrom.value !== '' && Number(val('evRegularPrice')) < Number(form.priceFrom.value)) missing.push('a regular price no lower than the price (or leave it empty when there is no sale)');
   if (!val('evMeeting')) missing.push('the meeting point');
+  if (!val('evStartDistrict')) missing.push('the district the tour starts from');
   if (!val('evDeparture')) missing.push('the departure time');
   if (!val('evReturn')) missing.push('when and where the tour ends');
   if (!val('evTransport')) missing.push('the transport');
@@ -845,6 +846,27 @@ $('evPlaceSearch').addEventListener('input', () => {
   updatePlanCheck();
 });
 
+// Bangladesh's divisions and districts, loaded once
+async function loadGeo() {
+  if (state.geo && state.geo.length) return state.geo;
+  try {
+    const { data } = await api('/api/v1/agency/me/destination-geography');
+    state.geo = data.divisions;
+  } catch (err) {
+    state.geo = [];
+  }
+  return state.geo;
+}
+
+// The "District the tour starts from" picker, grouped by division
+async function fillStartDistricts(selected) {
+  const select = $('evStartDistrict');
+  const geo = await loadGeo();
+  select.innerHTML = '<option value="">Choose a district</option>' + geo.map(d => `<optgroup label="${escapeHTML(d.name)}">${d.districts.map(x => `<option value="${escapeHTML(x.code)}">${escapeHTML(x.name)} (${escapeHTML(x.nameBn)})</option>`).join('')}</optgroup>`).join('');
+  select.value = selected || '';
+  updatePlanCheck();
+}
+
 // The add-destination dialog, for the event itself or for one stop in the plan
 async function openPlaceDialog(target, name) {
   state.placeTarget = target;
@@ -852,14 +874,7 @@ async function openPlaceDialog(target, name) {
   form.reset();
   showAlert('placeError', '');
   $('plName').value = name || '';
-  if (!state.geo) {
-    try {
-      const { data } = await api('/api/v1/agency/me/destination-geography');
-      state.geo = data.divisions;
-    } catch (err) {
-      state.geo = [];
-    }
-  }
+  await loadGeo();
   $('plDivision').innerHTML = '<option value="">Choose a division</option>' + state.geo.map(d => `<option value="${escapeHTML(d.code)}">${escapeHTML(d.name)} (${escapeHTML(d.nameBn)})</option>`).join('');
   fillPlDistricts();
   $('placeDialog').hidden = false;
@@ -951,6 +966,8 @@ function openEventEditor(ev) {
   form.reset();
   showAlert('eventError', '');
   $('eventFormTitle').textContent = ev ? 'Edit tour event' : 'New tour event';
+  // An older tour without one gets a guess from its meeting point, for the agent to check
+  fillStartDistricts(ev ? ev.startDistrict || ev.startDistrictGuess : '');
   $('eventHiddenNote').hidden = !(ev && ev.hiddenByAdmin);
   const regs = ev ? ev.stats.registrations : 0;
   $('eventRegisteredNote').hidden = !(ev && ev.stats.seatsTaken);
@@ -1105,7 +1122,7 @@ $('eventForm').addEventListener('submit', async e => {
   if (kept + newFiles.length > 6) return showAlert('eventError', `An event can have 6 photos. Remove ${kept + newFiles.length - 6} and try again.`);
 
   const fd = new FormData();
-  ['title', 'startDate', 'endDate', 'registrationDeadline', 'seats', 'priceFrom', 'meetingPoint', 'description', 'status', 'destinationRef'].forEach(f => fd.append(f, v(f)));
+  ['title', 'startDate', 'endDate', 'registrationDeadline', 'seats', 'priceFrom', 'meetingPoint', 'startDistrict', 'description', 'status', 'destinationRef'].forEach(f => fd.append(f, v(f)));
   fd.append('included', linesOf(form.included.value).join('\n'));
   fd.append('plan', JSON.stringify(planPayload()));
   newFiles.forEach(f => fd.append('photos', f));
@@ -1471,7 +1488,7 @@ function renderAds() {
         <span class="badge ${badge}">${label}</span>
       </div>
       ${a.state === 'rejected' && a.rejectedReason ? `<div class="alert alert-error" style="margin-top: 10px;">Plejar's note: ${escapeHTML(a.rejectedReason)}</div>` : ''}
-      <div class="ann-meta">${a.startsAt ? `${escapeHTML(fmtDate(a.startsAt))} to ` : 'Until '}${escapeHTML(fmtDate(a.endsAt))}${a.state === 'pending' ? '' : ` · ${Number(a.clicks)} ${a.clicks === 1 ? 'tap' : 'taps'}`}</div>
+      <div class="ann-meta">${a.startsAt ? `${escapeHTML(fmtDate(a.startsAt))} to ` : 'Until '}${escapeHTML(fmtDate(a.endsAt))}${a.state === 'pending' ? '' : ` · ${Number(a.views || 0).toLocaleString()} ${a.views === 1 ? 'view' : 'views'} · ${Number(a.clicks)} ${a.clicks === 1 ? 'tap' : 'taps'}`}</div>
       <div class="pkg-actions">
         ${canEdit ? `<button class="btn btn-quiet btn-sm" data-action="edit-ad" data-id="${id}">${a.state === 'rejected' ? 'Fix and send again' : 'Edit'}</button>` : ''}
         ${canEdit ? `<button class="btn btn-quiet btn-sm" data-action="remove-ad" data-id="${id}">Delete</button>` : ''}
