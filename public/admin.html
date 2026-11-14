@@ -95,11 +95,20 @@
           <span class="sidebar-text">Dashboard</span>
         </button>
 
-        <button class="nav-link-btn" data-tab="users" onclick="switchTab('users')">
-          <span>👥</span>
-          <span class="sidebar-text">Users</span>
-          <span id="usersAttentionCount" class="nav-count" hidden>0</span>
-        </button>
+        <div class="nav-group" id="usersNavGroup">
+          <button class="nav-link-btn" data-tab="users" onclick="openUsersByRole('')" aria-controls="usersNavSub">
+            <span>👥</span>
+            <span class="sidebar-text">Users</span>
+            <span id="usersAttentionCount" class="nav-count" hidden>0</span>
+            <span class="nav-caret" role="button" tabindex="0" aria-label="Show or hide the user groups" onclick="event.stopPropagation(); toggleUsersNav()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); toggleUsersNav(); }">▾</span>
+          </button>
+          <div class="nav-sub" id="usersNavSub">
+            <button class="nav-sub-btn" data-urole="" onclick="openUsersByRole('')"><span class="sidebar-text">All users</span><span class="nav-sub-count" data-count="all"></span></button>
+            <button class="nav-sub-btn" data-urole="user" onclick="openUsersByRole('user')"><span class="sidebar-text">Travelers</span><span class="nav-sub-count" data-count="user"></span></button>
+            <button class="nav-sub-btn" data-urole="agent" onclick="openUsersByRole('agent')"><span class="sidebar-text">Vendors</span><span class="nav-sub-count" data-count="agent"></span></button>
+            <button class="nav-sub-btn" data-urole="staff" onclick="openUsersByRole('staff')"><span class="sidebar-text">Staff</span><span class="nav-sub-count" data-count="staff"></span></button>
+          </div>
+        </div>
 
         <button class="nav-link-btn" data-tab="subscribers" onclick="switchTab('subscribers')">
           <span>📬</span>
@@ -212,7 +221,8 @@
                 <select id="uRole" class="form-select" aria-label="Role" onchange="loadUsers(1)">
                   <option value="">All roles</option>
                   <option value="user">Travelers</option>
-                  <option value="agent">Agency accounts</option>
+                  <option value="agent">Vendors</option>
+                  <option value="staff">Staff (all)</option>
                   <option value="manager">Managers</option>
                   <option value="admin">Administrators</option>
                   <option value="dev">Developers</option>
@@ -639,9 +649,10 @@
                 <button class="btn btn-primary" onclick="openNewDestination()">+ Add destination</button>
               </div>
             </div>
+            <div id="destBulkBar" class="bulk-bar" hidden role="region" aria-label="Selected destinations"></div>
             <div class="table-container">
               <table class="admin-table">
-                <thead><tr><th>Destination</th><th>Type</th><th>Map &amp; media</th><th>Availability</th><th>Events</th><th>Travelers</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead><tr><th class="sel-col"><input type="checkbox" id="destSelectPage" aria-label="Select every place on this page" onchange="selectDestinationPage(this.checked)"></th><th>Destination</th><th>Type</th><th>Map &amp; media</th><th>Availability</th><th>Events</th><th>Travelers</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="destinationsTableBody"></tbody>
               </table>
             </div>
@@ -1867,6 +1878,7 @@
   <script src="/js/google-auth.js"></script>
   <script src="/js/admin.js"></script>
   <script src="/js/admin-users.js"></script>
+  <script src="/js/admin-bulk.js"></script>
   <script src="/js/admin-social.js"></script>
   <script src="/js/admin-vendors.js"></script>
   <script src="/js/admin-vendor-profile.js"></script>
@@ -1878,5 +1890,6 @@
   <script src="/js/admin-rewards.js"></script>
   <script src="/js/coupons-panel.js"></script>
   <script src="/js/admin-notifications.js"></script>
+  <script src="/js/admin-bulk-lists.js"></script>
 </body>
 </html>

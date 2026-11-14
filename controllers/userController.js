@@ -4,7 +4,8 @@ const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
 const factory = require("./handlerFactory");
 const Email = require("../utils/email");
-const { savePrivateDocument, removePrivateDocument } = require('../utils/uploads');
+const { savePrivateDocument, removePrivateDocument, IMAGE_TYPES } = require('../utils/uploads');
+const { ID_KINDS, FACE_KINDS, ageOn, idOptions } = require('../utils/identity');
 const { saveProfileImage } = require('../utils/userImages');
 const { logActivity } = require('../utils/activity');
 const { STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, setRoles } = require('../utils/roles');
@@ -139,6 +140,108 @@ exports.submitMyVerification = catchAsync(async (req, res, next) => {
 // Saves the files, then hands over to the next handler (the app's own response)
 exports.saveMyVerificationDocuments = catchAsync(async (req, res, next) => {
     await saveVerificationDocuments(req);
+    next();
+});
+
+// ---------- ID and face check from the app (POST /me/verification/identity) ----------
+
+// Multipart field -> document kind
+const IDENTITY_FIELDS = {
+    nidFront: 'nid_front',
+    nidBack: 'nid_back',
+    birthCertificate: 'birth_certificate',
+    selfie: 'selfie',
+    faceLeft: 'face_left',
+    faceRight: 'face_right'
+};
+exports.IDENTITY_FIELDS = IDENTITY_FIELDS;
+
+// A 400 the app can place next to the right photo: { code, message, errors: { field: message } }
+const fieldError = (res, message, field, code) =>
+    res.status(400).json({ status: 'fail', code, message, errors: { [field]: message } });
+
+const num = v => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 10) / 10 : undefined);
+
+// The app's head-turn check: { order: ['left','right'], leftYaw, rightYaw, durationMs, platform }
+const readLiveness = raw => {
+    let l = raw;
+    if (typeof raw === 'string') {
+        try { l = JSON.parse(raw); } catch (e) { l = null; }
+    }
+    if (!l || typeof l !== 'object') return undefined;
+    const order = (Array.isArray(l.order) ? l.order : []).filter(o => ['left', 'right', 'straight'].includes(o)).slice(0, 4);
+    return {
+        order,
+        leftYaw: num(l.leftYaw),
+        rightYaw: num(l.rightYaw),
+        durationMs: num(l.durationMs),
+        platform: String(l.platform || '').slice(0, 20)
+    };
+};
+
+/**
+ * Saves a complete submission: the ID (NID front and back from 18, a birth certificate below 18)
+ * and three face photos (straight, left, right). Replaces anything sent before and waits for review.
+ */
+exports.submitIdentity = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user.id).select('+verification.documents.file');
+    if (user.verification.status === 'approved') {
+        return next(new AppError('Your identity is already verified.', 400));
+    }
+    const age = ageOn(user.dateOfBirth);
+    if (age == null) {
+        return fieldError(res, 'Add your date of birth to your profile first, so we know which ID to ask for.', 'dateOfBirth', 'date_of_birth_required');
+    }
+
+    const files = req.files || {};
+    const file = field => files[field] && files[field][0];
+    const allowed = idOptions(age);
+    const documentType = String(req.body.documentType || (file('birthCertificate') ? 'birth_certificate' : 'nid'));
+    if (!allowed.includes(documentType)) {
+        return fieldError(res,
+            allowed[0] === 'nid'
+                ? 'You are 18 or older, so please use your National ID card (NID).'
+                : 'You are under 18, so please use your birth certificate.',
+            'documentType', 'wrong_document_type'
+        );
+    }
+
+    const idFields = documentType === 'nid' ? ['nidFront', 'nidBack'] : ['birthCertificate'];
+    const names = { nidFront: 'the front of your NID', nidBack: 'the back of your NID', birthCertificate: 'your birth certificate', selfie: 'a photo looking straight at the camera', faceLeft: 'a photo turning your head left', faceRight: 'a photo turning your head right' };
+    const needed = [...idFields, 'selfie', 'faceLeft', 'faceRight'];
+    const missing = needed.find(f => !file(f));
+    if (missing) return fieldError(res, `Add ${names[missing]}.`, missing, 'missing_photo');
+    // Face photos and NID sides must be photos the reviewer can see; a birth certificate may be a PDF
+    const notImage = needed.find(f => f !== 'birthCertificate' && !IMAGE_TYPES.includes(file(f).mimetype));
+    if (notImage) return fieldError(res, `Send ${names[notImage]} as a JPG, PNG or WebP photo.`, notImage, 'not_an_image');
+
+    const stored = await Promise.all(needed.map(f => savePrivateDocument(file(f), `u-${user.id}`)));
+    // A new submission replaces every earlier ID and face photo
+    const replaced = user.verification.documents.filter(d => ID_KINDS.includes(d.kind) || FACE_KINDS.includes(d.kind));
+    user.verification.documents = user.verification.documents.filter(d => !replaced.includes(d));
+    needed.forEach((f, i) => {
+        const upload = file(f);
+        user.verification.documents.push({
+            kind: IDENTITY_FIELDS[f],
+            file: stored[i],
+            originalName: String(upload.originalname || '').slice(0, 120),
+            mimeType: upload.mimetype
+        });
+    });
+    user.verification.liveness = readLiveness(req.body.liveness);
+    user.verification.status = 'pending';
+    user.verification.note = '';
+    user.verification.submittedAt = new Date();
+    user.verification.reviewedAt = undefined;
+    user.verification.reviewedBy = undefined;
+    await user.save({ validateBeforeSave: false });
+    await Promise.all(replaced.map(d => removePrivateDocument(d.file)));
+
+    await logActivity(req, {
+        action: 'verification.submitted',
+        summary: `Submitted ${documentType === 'nid' ? 'NID' : 'birth certificate'} and face check for verification`,
+        user: user._id
+    });
     next();
 });
 

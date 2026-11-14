@@ -65,8 +65,9 @@ async function loadApplications(page = AP.page) {
       : 'No applications match. Agencies apply on the website at /apply.';
     tableMessage('applicationsTableBody', 7, empty);
   } else {
+    bulkRows('applications', rows);
     document.getElementById('applicationsTableBody').innerHTML = rows.map(r => `
-      <tr class="row-link" onclick="openApplication('${E(r._id)}')">
+      <tr class="row-link" onclick="openApplication('${E(r._id)}')" data-bulk-id="${E(r._id)}">
         <td><span class="lead-main">${E(r.agencyName)}${r.vendorType === 'hotel' ? ' <span class="tag">Hotel</span>' : ''}</span><span class="lead-sub">${r.reference ? E(r.reference) : 'From the old contact form'}${r.source === 'app' ? ' · from the app' : ''}</span></td>
         <td><span class="lead-main">${E(r.contactName)}</span><span class="lead-sub">${E(r.phone)}</span></td>
         <td><span class="lead-sub" style="margin-top:0">${E([r.district, r.regions].filter(Boolean).join(': ')) || '—'}</span></td>

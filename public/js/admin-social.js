@@ -58,8 +58,9 @@ async function loadSocialReports(page, closed) {
     if (!ok) return tableMessage('socialTableBody', 6, data.message || 'Could not load reports.', true);
     renderPager('socialPager', data.data, 'loadSocial');
     if (!data.data.reports.length) return tableMessage('socialTableBody', 6, closed ? 'No closed reports yet.' : 'No open reports. Nothing needs a look right now.');
+    bulkRows('social', data.data.reports);
     document.getElementById('socialTableBody').innerHTML = data.data.reports.map(r => `
-      <tr>
+      <tr data-bulk-id="${E(r._id)}">
         <td>${reportTarget(r)}</td>
         <td>${userLink(r.reporter)}</td>
         <td>${E(REASON_LABELS[r.reason] || r.reason)}${r.note ? `<span class="lead-sub">${E(r.note)}</span>` : ''}${r.openReportsOnTarget > 1 ? `<span class="lead-sub">${r.openReportsOnTarget} people reported this</span>` : ''}</td>
@@ -122,8 +123,9 @@ async function loadSocialPosts(page, view) {
     if (!ok) return tableMessage('socialTableBody', 6, data.message || 'Could not load posts.', true);
     renderPager('socialPager', data.data, 'loadSocial');
     if (!data.data.posts.length) return tableMessage('socialTableBody', 6, 'No posts match.');
+    bulkRows('social', data.data.posts);
     document.getElementById('socialTableBody').innerHTML = data.data.posts.map(p => `
-      <tr class="${p.status !== 'active' ? 'row-muted' : ''}">
+      <tr class="${p.status !== 'active' ? 'row-muted' : ''}" data-bulk-id="${E(p._id)}">
         <td>${userLink(p.author)}</td>
         <td><a href="#" onclick="event.preventDefault(); openSocialPost('${E(p._id)}')" class="lead-message" style="display:block">${E(p.text) || '<em>No text</em>'}</a>
           <span class="lead-sub">${E(mediaLine(p))}</span>${p.moderationNote ? `<span class="lead-sub">${E(p.status)}: ${E(p.moderationNote)}</span>` : ''}</td>

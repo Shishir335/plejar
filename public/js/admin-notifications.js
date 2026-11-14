@@ -279,6 +279,7 @@ async function fetchAdminBroadcastHistory(page = 1, scope = 'all') {
       return;
     }
 
+    if (typeof bulkRows === 'function') bulkRows('broadcasts', broadcasts);
     tbody.innerHTML = broadcasts.map(b => {
       const dateStr = b.createdAt ? new Date(b.createdAt).toLocaleString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric',
@@ -312,7 +313,7 @@ async function fetchAdminBroadcastHistory(page = 1, scope = 'all') {
       }
 
       return `
-        <tr>
+        <tr data-bulk-id="${escapeAdminHtml(b._id)}">
           <td style="white-space: nowrap; font-size: 0.82rem; color: var(--text-muted);">${dateStr}</td>
           <td>
             <div style="font-weight: 600; font-size: 0.92rem; margin-bottom: 2px;">${escapeAdminHtml(b.title)}</div>

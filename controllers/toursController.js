@@ -25,6 +25,7 @@ const { publicGuide } = require('./guideController');
 const { userCard } = require('../utils/social');
 const { HOLDS_SEAT } = require('../utils/events');
 const { pointsPerTaka } = require('../utils/rewards');
+const { topRatedAgencies } = require('./agencyDirectoryController');
 
 // The app's Tours tab: the home screen in one call, search with filters, a tour's page,
 // hearts (wishlist), recently viewed and "Continue Your Search"
@@ -675,13 +676,14 @@ exports.home = catchAsync(async (req, res) => {
 
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
-  const [banners, searches, recent, hotels, types, unread] = await Promise.all([
+  const [banners, searches, recent, hotels, types, unread, topAgents] = await Promise.all([
     liveBanners(req, { count: true }),
     req.user ? recentSearches(req.user, 5) : [],
     req.user ? recentlyViewed(req.user, 10) : [],
     nearbyHotels({ lat, lng, user: req.user, limit: 10 }),
     typeCounts(),
-    req.user ? Notification.countDocuments({ user: req.user._id, readAt: null, ...Notification.NOT_CHAT }) : 0
+    req.user ? Notification.countDocuments({ user: req.user._id, readAt: null, ...Notification.NOT_CHAT }) : 0,
+    topRatedAgencies(req.user, 10)
   ]);
 
   res.status(200).json({
@@ -709,7 +711,9 @@ exports.home = catchAsync(async (req, res) => {
       recentlyViewed: recent,
       hotelsNearYou: hotels.hotels,
       hotelsNearYouBasis: hotels.basis,
-      specialOffers: offers
+      specialOffers: offers,
+      // "Top rated agents": agencies with reviews, best rated first (see agencyDirectoryController)
+      topAgents
     }
   });
 });

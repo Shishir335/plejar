@@ -52,8 +52,9 @@ async function loadVouchers() {
   const filter = document.getElementById('vCategoryF');
   if (filter.options.length === 1) filter.innerHTML += R.categories.map(c => `<option value="${E(c.key)}">${E(c.label)}</option>`).join('');
   if (!R.vouchers.length) return tableMessage('vouchersTableBody', 7, 'No vouchers yet. Add one so travelers can spend their points.');
+  bulkRows('vouchers', R.vouchers);
   document.getElementById('vouchersTableBody').innerHTML = R.vouchers.map(v => `
-    <tr class="${v.state === 'live' ? '' : 'row-muted'}">
+    <tr class="${v.state === 'live' ? '' : 'row-muted'}" data-bulk-id="${E(v._id)}">
       <td><div style="display:flex; gap:10px; align-items:center;">
         ${v.image ? `<img src="${E(v.image)}" alt="" style="width:56px; height:40px; object-fit:cover; border-radius:6px;">` : ''}
         <div><strong>${E(v.title)}</strong><span class="lead-sub">${E(v.categoryLabel)}${v.code ? ` · ${E(v.code)}` : ''}${v.location ? ` · ${E(v.location)}` : ''}</span></div></div></td>
@@ -185,8 +186,9 @@ function renderHelpArticles() {
   const rows = R.articles.filter(a => !category || a.category === category);
   if (!rows.length) return tableMessage('helpTableBody', 6, 'No questions here yet. Add the ones travelers ask most.');
   const label = key => (R.helpCategories.find(c => c.key === key) || {}).label || key;
+  bulkRows('help', rows);
   document.getElementById('helpTableBody').innerHTML = rows.map(a => `
-    <tr class="${a.published ? '' : 'row-muted'}">
+    <tr class="${a.published ? '' : 'row-muted'}" data-bulk-id="${E(a._id)}">
       <td><strong>${E(a.question)}</strong><span class="lead-sub">${E(a.answer.slice(0, 120))}${a.answer.length > 120 ? '…' : ''}</span></td>
       <td>${E(label(a.category))}</td>
       <td>${Number(a.order) || 0}</td>

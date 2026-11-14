@@ -19,7 +19,12 @@ const D = {
   map: null,
   editMap: null,
   editMarker: null,
-  categoryCtx: null
+  categoryCtx: null,
+  selected: new Set(), // ticked rows, kept across pages
+  allMatching: false, // "select all N matching": acts on the filters, not the ticked rows
+  filterKey: '',
+  total: 0,
+  pageIds: []
 };
 
 const DEST_TYPES = { country: 'Country', region: 'Region', city: 'City / district', attraction: 'Attraction' };
@@ -148,22 +153,27 @@ async function loadDestinations(page = D.page) {
   D.page = page;
   ensureDestinationCategories();
   ensureDestinationOptions();
-  tableMessage('destinationsTableBody', 8, 'Loading destinations...');
-  const params = new URLSearchParams({ page, limit: 25 });
-  [['search', 'dSearch'], ['type', 'dTypeF'], ['within', 'dWithinF'], ['status', 'dStatusF'], ['category', 'dCategoryF'], ['availability', 'dAvailF'], ['missing', 'dMissingF'], ['source', 'dSourceF'], ['sort', 'dSortF']]
-    .forEach(([k, id]) => { const v = val(id).trim(); if (v) params.set(k, v); });
+  tableMessage('destinationsTableBody', 9, 'Loading destinations...');
+  const filters = destinationFilters();
+  const params = new URLSearchParams({ page, limit: 25, ...filters });
+  // New filters start a new selection
+  const key = JSON.stringify(filters);
+  if (key !== D.filterKey) { D.filterKey = key; D.selected.clear(); D.allMatching = false; }
   const { ok, data } = await adminFetch(`/api/v1/admin/destinations?${params}`);
-  if (!ok) return tableMessage('destinationsTableBody', 8, data.message || 'Could not load destinations.', 'var(--color-danger)');
+  if (!ok) return tableMessage('destinationsTableBody', 9, data.message || 'Could not load destinations.', 'var(--color-danger)');
   const rows = data.data.destinations;
+  D.total = data.data.total != null ? data.data.total : rows.length;
+  D.pageIds = rows.map(r => String(r._id));
   if (!rows.length) {
-    tableMessage('destinationsTableBody', 8, params.toString().includes('search') || params.toString().length > 20
+    tableMessage('destinationsTableBody', 9, params.toString().includes('search') || params.toString().length > 20
       ? 'No destinations match these filters.'
       : 'No destinations yet. Start with a country, then add its regions, cities and attractions.');
   } else {
     document.getElementById('destinationsTableBody').innerHTML = rows.map(d => {
       const id = E(d._id);
       return `
-      <tr class="row-link" onclick="openDestination('${id}')">
+      <tr class="row-link${destIsSelected(d._id) ? ' row-selected' : ''}" onclick="openDestination('${id}')">
+        <td class="sel-col" onclick="event.stopPropagation()"><input type="checkbox" aria-label="Select ${E(d.name)}" ${destIsSelected(d._id) ? 'checked' : ''} onchange="selectDestination('${id}', this.checked, this)"></td>
         <td><div class="dest-cell">
           ${d.coverImage ? `<img class="dest-thumb" src="${E(d.coverImage)}" alt="" loading="lazy">` : '<span class="dest-thumb dest-thumb-empty">No photo</span>'}
           <div><span class="lead-main">${E(d.name)}${d.featured ? ' <span class="tag">Featured</span>' : ''}${d.trendingPinned ? ' <span class="tag">Trending</span>' : ''}</span>
@@ -183,6 +193,107 @@ async function loadDestinations(page = D.page) {
     }).join('');
   }
   renderPager('destinationsPager', data.data, 'loadDestinations');
+  renderDestinationBulkBar();
+}
+
+// The list's filters, as the API names them
+function destinationFilters() {
+  const out = {};
+  [['search', 'dSearch'], ['type', 'dTypeF'], ['within', 'dWithinF'], ['status', 'dStatusF'], ['category', 'dCategoryF'], ['availability', 'dAvailF'], ['missing', 'dMissingF'], ['source', 'dSourceF'], ['sort', 'dSortF']]
+    .forEach(([k, id]) => { const v = val(id).trim(); if (v) out[k] = v; });
+  return out;
+}
+
+// ---------- Selecting rows, and publishing or unpublishing them together ----------
+
+const destIsSelected = id => D.allMatching || D.selected.has(String(id));
+
+function selectDestination(id, on, box) {
+  if (D.allMatching) {
+    // Unticking one row while "all matching" is on: switch to the rows on hand, minus this one
+    D.allMatching = false;
+    D.pageIds.forEach(x => D.selected.add(x));
+  }
+  if (on) D.selected.add(String(id)); else D.selected.delete(String(id));
+  const row = box && box.closest('tr');
+  if (row) row.classList.toggle('row-selected', on);
+  renderDestinationBulkBar();
+}
+
+function selectDestinationPage(on) {
+  D.allMatching = false;
+  D.pageIds.forEach(id => (on ? D.selected.add(id) : D.selected.delete(id)));
+  document.querySelectorAll('#destinationsTableBody tr').forEach(tr => {
+    const box = tr.querySelector('.sel-col input');
+    if (box) { box.checked = on; tr.classList.toggle('row-selected', on); }
+  });
+  renderDestinationBulkBar();
+}
+
+function selectAllMatchingDestinations() {
+  D.allMatching = true;
+  document.querySelectorAll('#destinationsTableBody tr').forEach(tr => {
+    const box = tr.querySelector('.sel-col input');
+    if (box) { box.checked = true; tr.classList.add('row-selected'); }
+  });
+  renderDestinationBulkBar();
+}
+
+function clearDestinationSelection() {
+  D.allMatching = false;
+  D.selected.clear();
+  document.querySelectorAll('#destinationsTableBody tr').forEach(tr => {
+    const box = tr.querySelector('.sel-col input');
+    if (box) { box.checked = false; tr.classList.remove('row-selected'); }
+  });
+  renderDestinationBulkBar();
+}
+
+function renderDestinationBulkBar() {
+  const bar = document.getElementById('destBulkBar');
+  const head = document.getElementById('destSelectPage');
+  const onPage = D.pageIds.filter(id => destIsSelected(id)).length;
+  if (head) {
+    head.checked = D.pageIds.length > 0 && onPage === D.pageIds.length;
+    head.indeterminate = onPage > 0 && onPage < D.pageIds.length;
+  }
+  if (!bar) return;
+  const count = D.allMatching ? D.total : D.selected.size;
+  bar.hidden = !count;
+  if (!count) { bar.innerHTML = ''; return; }
+  const offerAll = !D.allMatching && D.total > D.selected.size && onPage === D.pageIds.length;
+  bar.innerHTML = `
+    <span class="bulk-count"><strong>${n(count)}</strong> selected${D.allMatching ? ' (everything matching the filters)' : ''}</span>
+    ${offerAll ? `<button type="button" class="link-btn" onclick="selectAllMatchingDestinations()">Select all ${n(D.total)} matching</button>` : ''}
+    <span class="bulk-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick="setDestinationStatuses('published')">Publish</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="setDestinationStatuses('draft')">Move to draft</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="setDestinationStatuses('archived')">Archive</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="clearDestinationSelection()">Clear</button>
+    </span>`;
+}
+
+async function setDestinationStatuses(status) {
+  const count = D.allMatching ? D.total : D.selected.size;
+  if (!count) return;
+  const verb = { published: 'Publish', draft: 'Move to draft', archived: 'Archive' }[status];
+  const note = { published: 'Travelers will see them in the app and on the website.', draft: 'Travelers won\'t see them until they are published again. Featured or trending pins are removed.', archived: 'They are hidden from travelers. Featured or trending pins are removed.' }[status];
+  if (!confirm(`${verb} ${n(count)} place${count === 1 ? '' : 's'}?\n\n${note}`)) return;
+  const { sort, ...filter } = destinationFilters();
+  const body = D.allMatching ? { status, all: true, filter } : { status, ids: [...D.selected] };
+  const buttons = document.querySelectorAll('#destBulkBar button');
+  buttons.forEach(b => { b.disabled = true; });
+  const { ok, data } = await adminFetch('/api/v1/admin/destinations/status', { method: 'PATCH', body: JSON.stringify(body) });
+  buttons.forEach(b => { b.disabled = false; });
+  if (!ok) return showAdminToast(data.message || 'Could not change them.', 'error');
+  const { changed, matched } = data.data;
+  const done = { published: 'Published', draft: 'Moved to draft', archived: 'Archived' }[status];
+  showAdminToast(changed === matched ? `${done} ${n(changed)} place${changed === 1 ? '' : 's'}.` : `${done} ${n(changed)}; the other ${n(matched - changed)} already were.`, 'success');
+  D.selected.clear();
+  D.allMatching = false;
+  loadDestinationSummary();
+  ensureDestinationOptions(true);
+  loadDestinations(D.page);
 }
 
 const debouncedDestinations = makeDebounce(() => loadDestinations(1));
@@ -325,8 +436,9 @@ async function toggleTrendingPin(id, pinned) {
 async function loadDestinationCategories() {
   tableMessage('destinationCategoriesBody', 6, 'Loading categories...');
   const cats = await ensureDestinationCategories(true);
+  bulkRows('destinationCategories', cats);
   document.getElementById('destinationCategoriesBody').innerHTML = cats.length ? cats.map(c => `
-    <tr class="${c.active ? '' : 'is-muted'}">
+    <tr class="${c.active ? '' : 'is-muted'}" data-bulk-id="${E(c._id)}">
       <td><strong>${E(c.name)}</strong></td>
       <td lang="bn">${E(c.nameBn) || '—'}</td>
       <td style="color: var(--text-muted); font-size: 0.85rem;">${E(c.description) || '—'}</td>

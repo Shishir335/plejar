@@ -105,6 +105,31 @@ exports.myPayment = catchAsync(async (req, res, next) => {
   res.status(200).json({ status: 'success', data: { payment: bookingMoney.paymentView(payment) } });
 });
 
+// GET /payments?page= (signed in) — a traveler's own booking-money payments, newest first, 20 a page,
+// with the agency or hotel owner each one went to
+exports.myPayments = catchAsync(async (req, res) => {
+  const limit = 20;
+  const page = Math.max(1, Math.min(500, parseInt(req.query.page, 10) || 1));
+  const filter = { user: req.user._id, purpose: { $in: ['booking', 'stay'] } };
+  const [payments, total] = await Promise.all([
+    Payment.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate('agency', 'name'),
+    Payment.countDocuments(filter)
+  ]);
+  res.status(200).json({
+    status: 'success',
+    results: payments.length,
+    total,
+    page,
+    hasMore: page * limit < total,
+    data: {
+      payments: payments.map(p => ({
+        ...bookingMoney.paymentView(p),
+        agency: p.agency && p.agency.name ? { _id: p.agency._id, name: p.agency.name } : null
+      }))
+    }
+  });
+});
+
 // ---------- Admin ----------
 
 const PURPOSE_NAMES = { ad: 'Ad', booking: 'Tour booking money', stay: 'Hotel booking money' };
