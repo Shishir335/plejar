@@ -161,7 +161,8 @@ const run = async () => {
   // A dry run must not create districts: look them up instead
   const districtNode = async spot => {
     if (apply) {
-      const result = await ensureDistrict(spot.district.code, { status: 'published' });
+      // A district, division or country made here starts like the spots: a draft unless --publish
+      const result = await ensureDistrict(spot.district.code, { status: publish ? 'published' : 'draft' });
       result.createdNames.forEach(n => created.add(n));
       return result.node;
     }
@@ -196,7 +197,13 @@ const run = async () => {
     if (!apply) {
       added.push(spot);
       nearby.push({ name: spot.name, note: `${spot.district.name}, earlier in this import` });
-      if (!district) created.add(`${spot.district.name} (district)`);
+      if (!district) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await Destination.exists({ geoCode: geo.COUNTRY.code }))) created.add(`${geo.COUNTRY.name} (country)`);
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await Destination.exists({ geoCode: spot.division.code }))) created.add(`${spot.division.name} (division)`);
+        created.add(`${spot.district.name} (district)`);
+      }
       continue;
     }
     // eslint-disable-next-line no-await-in-loop
@@ -220,7 +227,7 @@ const run = async () => {
 
   const noCoords = added.filter(s => s.lat == null).length;
   console.log(`${apply ? 'Added' : 'Would add'} ${added.length} attraction${added.length === 1 ? '' : 's'}${noCoords ? ` (${noCoords} without coordinates)` : ''}.`);
-  if (created.size) console.log(`${apply ? 'Created' : 'Would also create'}: ${[...created].join(', ')}.`);
+  if (created.size) console.log(`${apply ? 'Created' : 'Would also create'}, as ${publish ? 'published' : 'drafts'}: ${[...created].join(', ')}.`);
   if (skipped.length) {
     console.log(`\nSkipped ${skipped.length} already there (the same place by name, in the same division):`);
     skipped.forEach(({ spot, as }) => console.log(`  ${spot.name} (${spot.district.name})  ~  ${as.name}${as.slug ? ` [${as.slug}]` : ''}${as.status ? `, ${as.status}` : ''}${as.note ? ` (${as.note})` : ''}`));
