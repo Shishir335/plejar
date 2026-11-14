@@ -1045,3 +1045,25 @@ tr.is-muted td { opacity: 0.6; }
 .bulk-bar .link-btn { font-size: 0.86rem; }
 .bulk-bar .bulk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 .bulk-bar button:disabled { opacity: 0.6; cursor: wait; }
+
+/* Sidebar item that opens into sub-items (Users: All users, Travelers, Vendors, Staff) */
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-caret {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-left: auto;
+  border-radius: 6px; color: var(--text-dim); font-size: 0.8rem; transition: transform 0.15s ease, background 0.15s ease;
+}
+.nav-count + .nav-caret { margin-left: 4px; }
+.nav-caret:hover, .nav-caret:focus-visible { background: var(--surface-subtle); color: var(--text-primary); outline: none; }
+.nav-group:not(.open) .nav-caret { transform: rotate(-90deg); }
+.nav-sub { display: none; flex-direction: column; gap: 2px; margin: 2px 0 4px 26px; padding-left: 10px; border-left: 1px solid var(--admin-border); }
+.nav-group.open .nav-sub { display: flex; }
+.nav-sub-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: none; border-radius: var(--radius-md);
+  background: transparent; color: var(--text-muted); font: inherit; font-size: 0.85rem; text-align: left; cursor: pointer;
+}
+.nav-sub-btn:hover { background: var(--nav-active-bg); color: var(--text-primary); }
+.nav-link-btn.active ~ .nav-sub .nav-sub-btn.active { color: var(--text-primary); background: var(--nav-active-bg); font-weight: 600; }
+.nav-sub-count { margin-left: auto; color: var(--text-dim); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) {
+  .nav-caret, .nav-sub { display: none !important; }
+}

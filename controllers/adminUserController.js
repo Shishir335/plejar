@@ -123,10 +123,16 @@ exports.summary = catchAsync(async (req, res, next) => {
     User.countDocuments({ ...live, $or: [{ 'restrictions.booking': true }, { 'restrictions.reviews': true }, { 'restrictions.messaging': true }, { 'restrictions.posting': true }] }),
     Complaint.countDocuments({ status: { $in: ['open', 'in_review'] } })
   ]);
+  // Accounts by role, for the sidebar (an account with two roles counts in both)
+  const [travelers, vendors, staff] = await Promise.all([
+    User.countDocuments({ $and: [live, roleFilter('user')] }),
+    User.countDocuments({ $and: [live, roleFilter('agent')] }),
+    User.countDocuments({ $and: [live, { $or: STAFF.map(r => roleFilter(r)) }] })
+  ]);
 
   res.status(200).json({
     status: 'success',
-    data: { summary: { total, active: total - suspended - deactivated, suspended, deactivated, deleted, pendingVerification, restricted, openComplaints } }
+    data: { summary: { total, active: total - suspended - deactivated, suspended, deactivated, deleted, pendingVerification, restricted, openComplaints, roles: { user: travelers, agent: vendors, staff } } }
   });
 });
 
@@ -139,6 +145,7 @@ exports.listUsers = catchAsync(async (req, res, next) => {
     and.push({ $or: [{ name: rx }, { email: rx }, { phone: rx }] });
   }
   if (ROLES.includes(q.role)) and.push(roleFilter(q.role));
+  else if (q.role === 'staff') and.push({ $or: STAFF.map(r => roleFilter(r)) }); // managers, admins and developers
 
   if (q.status === 'active') and.push({ status: { $nin: ['suspended', 'deactivated'] } });
   else if (['suspended', 'deactivated'].includes(q.status)) and.push({ status: q.status });

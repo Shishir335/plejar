@@ -156,6 +156,9 @@ async function loadUserSummary() {
     setBadge('subComplaintCount', s.openComplaints);
     if (typeof loadSocialSummary === 'function') loadSocialSummary();
     setBadge('usersAttentionCount', s.pendingVerification + s.openComplaints);
+    const fmt = v => new Intl.NumberFormat('en-US').format(v || 0);
+    const counts = { all: s.total, ...(s.roles || {}) };
+    document.querySelectorAll('#usersNavSub .nav-sub-count').forEach(el => { el.textContent = counts[el.dataset.count] != null ? fmt(counts[el.dataset.count]) : ''; });
   } catch (e) { /* badges are informational */ }
 }
 
@@ -173,8 +176,60 @@ function applyChip(key) {
 
 const debouncedUsers = makeDebounce(() => loadUsers(1));
 
+// ---------- Sidebar: Users opens into All users, Travelers, Vendors and Staff ----------
+
+const USER_GROUPS = { user: 'travelers', agent: 'vendors', staff: 'staff' };
+
+function openUsersByRole(role) {
+  switchTab('users', false);
+  setUsersNavOpen(true);
+  const select = document.getElementById('uRole');
+  select.value = role;
+  U.page = 1;
+  switchSub('all'); // loads the list, which marks the group in the sidebar
+  try {
+    const hash = role ? `#users/group/${USER_GROUPS[role]}` : '#users';
+    history.replaceState(null, '', hash);
+    sessionStorage.setItem('plezar_admin_tab', hash);
+  } catch (_) {}
+}
+
+// #users/group/travelers and similar
+function openUsersGroup(name) {
+  const role = Object.keys(USER_GROUPS).find(r => USER_GROUPS[r] === name) || '';
+  openUsersByRole(role);
+}
+
+function setUsersNavOpen(open) {
+  const group = document.getElementById('usersNavGroup');
+  if (!group) return;
+  group.classList.toggle('open', open);
+  const btn = group.querySelector('.nav-link-btn');
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+  try { localStorage.setItem('plezar_admin_users_nav', open ? 'open' : 'closed'); } catch (_) {}
+}
+
+function toggleUsersNav() {
+  const group = document.getElementById('usersNavGroup');
+  if (group) setUsersNavOpen(!group.classList.contains('open'));
+}
+
+// Light up the group that matches the role filter (a single staff role, such as Managers, lights Staff)
+function syncUsersNav() {
+  const role = val('uRole');
+  const group = ['manager', 'admin', 'dev'].includes(role) ? 'staff' : role;
+  document.querySelectorAll('#usersNavSub .nav-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.urole === group));
+}
+
+(() => {
+  let open = true;
+  try { open = localStorage.getItem('plezar_admin_users_nav') !== 'closed'; } catch (_) {}
+  setUsersNavOpen(open);
+})();
+
 async function loadUsers(page = 1) {
   U.page = page;
+  syncUsersNav();
   tableMessage('usersTableBody', 6, 'Loading accounts...');
   const q = queryString({
     search: val('uSearch').trim(), role: val('uRole'), status: val('uStatus'), verification: val('uVerif'),

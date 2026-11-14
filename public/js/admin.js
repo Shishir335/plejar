@@ -314,6 +314,10 @@ function navigateAdminToRoute() {
 
   // Detail views with IDs:
   // e.g. #users/:id or #users/:id/:tab
+  if (mainTab === 'users' && parts[1] === 'group' && typeof openUsersGroup === 'function') {
+    openUsersGroup(parts[2]);
+    return;
+  }
   if (mainTab === 'users' && parts[1]) {
     const userId = parts[1];
     const subTab = parts[2] || 'overview';
