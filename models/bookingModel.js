@@ -64,6 +64,11 @@ const bookingSchema = new mongoose.Schema(
       enum: ['unpaid', 'paid', 'partially_refunded', 'refunded'],
       default: 'unpaid'
     },
+    // Booking money the traveler paid online to Plejar (per traveler x travelers). Refunded when the agency declines or
+    // the traveler cancels before it's confirmed; kept (and paid out to the vendor) once confirmed.
+    depositAmount: { type: Number, min: 0, default: 0 },
+    depositPayment: { type: mongoose.Schema.ObjectId, ref: 'Payment' },
+    depositStatus: { type: String, enum: ['none', 'paid', 'refunding', 'refunded', 'refund_failed', 'kept'], default: 'none' },
     paidAt: Date,
     confirmedAt: Date,
     completedAt: Date,

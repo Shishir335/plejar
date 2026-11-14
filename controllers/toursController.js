@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const paymentConfig = require('../utils/payments/config');
 const Package = require('../models/packageModel');
 const Agency = require('../models/agencyModel');
 const Destination = require('../models/destinationModel');
@@ -499,9 +500,12 @@ exports.getTour = catchAsync(async (req, res, next) => {
         },
         guide: publicGuide(tour.guide && tour.guide.active ? tour.guide : null),
         reviews: { ...reviews, latest: latest.filter(r => r.user && r.user.status === 'active').map(reviewView) },
-        // "Book This Tour": request with POST /bookings { packageId, travelers }
+        // "Book This Tour": request with POST /bookings { packageId, travelers }. With bookingMoney, add
+        // payWith (one of paymentMethods) and pay at the redirectUrl that comes back before it's booked.
         booking: {
           price: card.price,
+          bookingMoney: tour.advanceAmount >= 1 ? { perTraveler: Math.round(tour.advanceAmount) } : null,
+          paymentMethods: paymentConfig.enabledMethods(),
           minTravelers: 1,
           maxTravelers: Math.max(maxTravelers, 0),
           dates: { start: tour.startDate, end: tour.endDate || tour.startDate, flexible: Boolean(tour.flexibleDates) },

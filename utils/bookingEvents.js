@@ -1,5 +1,7 @@
 const Notification = require('../models/notificationModel');
 const User = require('../models/userModel');
+const Booking = require('../models/bookingModel');
+const bookingMoney = require('./bookingMoney');
 const { awardBookingPoints } = require('./rewards');
 const { releaseVoucher } = require('./vouchers');
 const { releaseCoupon } = require('./coupons');
@@ -52,6 +54,11 @@ const bookingStatusChanged = async (booking, previous, { by } = {}) => {
   if (booking.status === 'cancelled' && booking.voucher) await releaseVoucher(booking.voucher);
   // A cancelled booking gives its coupon use back to the traveler
   if (booking.status === 'cancelled' && booking.couponRedemption) await releaseCoupon({ booking: booking._id });
+  // Booking money: the traveler gets it back unless they cancel a booking the agency already confirmed
+  if (booking.status === 'cancelled' && booking.depositStatus === 'paid') {
+    if (by === 'traveler' && ['confirmed', 'completed'].includes(previous)) await bookingMoney.keepDeposit(Booking, booking);
+    else await bookingMoney.refundDeposit(Booking, booking, { reason: by === 'traveler' ? 'Cancelled by the traveler before it was confirmed' : `Cancelled by ${by === 'admin' ? 'Plejar' : 'the agency'}` });
+  }
   // Tour group chat: confirmed travelers join, cancelled ones leave
   try {
     if (booking.status === 'confirmed') await joinTourGroup(booking, await User.findById(booking.user).select('name firstName'));

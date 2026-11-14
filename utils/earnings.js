@@ -19,6 +19,11 @@ const sums = rows => rows[0] || { amount: 0, commission: 0, plejarPays: 0, count
  * Plejar's coupons on accepted stays: earned once the guest has checked out, upcoming before that.
  * When commission is on for a hotel, the hotel owes Plejar its commission on accepted stays the
  * same way, so it is taken off (and `earned` or `available` can go below zero: the hotel owes Plejar).
+ * Booking money (utils/bookingMoney.js) is paid to Plejar online:
+ * - tours the traveler pays the rest of to the agency: the booking money, minus Plejar's commission
+ *   (with Plejar's coupon discount added), once the trip is completed; upcoming while confirmed
+ * - accepted stays: the booking money, once the guest has checked out; upcoming before that
+ * - kept on a cancellation (the traveler cancelled after it was confirmed): all of it, straight away
  */
 const earningsFor = async agencyId => {
   const agency = oid(agencyId);
@@ -29,14 +34,24 @@ const earningsFor = async agencyId => {
   const stayGroup = { _id: null, amount: { $sum: '$discountAmount' }, count: { $sum: 1 } };
   const stayCommission = { agency, status: 'accepted', commissionAmount: { $gt: 0 } };
   const commissionGroup = { _id: null, amount: { $sum: '$commissionAmount' }, count: { $sum: 1 } };
-  const [done, upcoming, payouts, staysDone, staysAhead, owedDone, owedAhead] = await Promise.all([
+  const depositGroup = { _id: null, amount: { $sum: '$depositAmount' }, commission: { $sum: '$commissionAmount' }, plejarPays: { $sum: '$plejarPays' }, count: { $sum: 1 } };
+  const tourDeposits = { agency, paymentStatus: { $nin: PAID }, depositStatus: 'paid', depositAmount: { $gt: 0 } };
+  const stayDeposits = { agency, status: 'accepted', depositStatus: 'paid', depositAmount: { $gt: 0 } };
+  const kept = { agency, depositStatus: 'kept', depositAmount: { $gt: 0 } };
+  const [done, upcoming, payouts, staysDone, staysAhead, owedDone, owedAhead, depDone, depAhead, stayDepDone, stayDepAhead, keptTours, keptStays] = await Promise.all([
     Booking.aggregate([{ $match: { agency, status: 'completed', paymentStatus: { $in: PAID } } }, { $group: group }]),
     Booking.aggregate([{ $match: { agency, status: 'confirmed', paymentStatus: { $in: PAID } } }, { $group: group }]),
     Payout.aggregate([{ $match: { agency } }, { $group: { _id: '$status', amount: { $sum: '$amount' }, count: { $sum: 1 } } }]),
     StayRequest.aggregate([{ $match: { ...stayCoupons, checkOut: { $lte: now } } }, { $group: stayGroup }]),
     StayRequest.aggregate([{ $match: { ...stayCoupons, checkOut: { $gt: now } } }, { $group: stayGroup }]),
     StayRequest.aggregate([{ $match: { ...stayCommission, checkOut: { $lte: now } } }, { $group: commissionGroup }]),
-    StayRequest.aggregate([{ $match: { ...stayCommission, checkOut: { $gt: now } } }, { $group: commissionGroup }])
+    StayRequest.aggregate([{ $match: { ...stayCommission, checkOut: { $gt: now } } }, { $group: commissionGroup }]),
+    Booking.aggregate([{ $match: { ...tourDeposits, status: 'completed' } }, { $group: depositGroup }]),
+    Booking.aggregate([{ $match: { ...tourDeposits, status: 'confirmed' } }, { $group: depositGroup }]),
+    StayRequest.aggregate([{ $match: { ...stayDeposits, checkOut: { $lte: now } } }, { $group: depositGroup }]),
+    StayRequest.aggregate([{ $match: { ...stayDeposits, checkOut: { $gt: now } } }, { $group: depositGroup }]),
+    Booking.aggregate([{ $match: kept }, { $group: depositGroup }]),
+    StayRequest.aggregate([{ $match: kept }, { $group: depositGroup }])
   ]);
 
   const d = sums(done);
@@ -48,16 +63,24 @@ const earningsFor = async agencyId => {
   const byStatus = Object.fromEntries(payouts.map(p => [p._id, p]));
   const paidOut = (byStatus.paid || {}).amount || 0;
   const pending = (byStatus.pending || {}).amount || 0;
-  const earnedNet = d.amount - d.commission + (d.plejarPays || 0) + sd.amount - od.amount;
+  const dd = sums(depDone);
+  const da = sums(depAhead);
+  const money = {
+    earned: dd.amount - dd.commission + (dd.plejarPays || 0) + sums(stayDepDone).amount + sums(keptTours).amount + sums(keptStays).amount,
+    upcoming: da.amount - da.commission + (da.plejarPays || 0) + sums(stayDepAhead).amount
+  };
+  const earnedNet = d.amount - d.commission + (d.plejarPays || 0) + sd.amount - od.amount + money.earned;
 
   return {
-    completedTrips: d.count,
+    completedTrips: d.count + dd.count,
     gross: round(d.amount),
-    commission: round(d.commission + od.amount),
+    commission: round(d.commission + od.amount + dd.commission),
     // Of that, commission on stays the guest paid the hotel for, which the hotel owes Plejar
     stayCommission: round(od.amount),
     earned: round(earnedNet),
-    upcoming: round(u.amount - u.commission + (u.plejarPays || 0) + sa.amount - oa.amount),
+    upcoming: round(u.amount - u.commission + (u.plejarPays || 0) + sa.amount - oa.amount + money.upcoming),
+    // Of earned and upcoming: booking money travelers paid online (after commission on tours)
+    bookingMoney: { earned: round(money.earned), upcoming: round(money.upcoming) },
     // What Plejar's coupons added to the above (Plejar pays those discounts)
     plejarCoupons: round((d.plejarPays || 0) + sd.amount),
     upcomingTrips: u.count,
@@ -74,9 +97,10 @@ const monthlyEarnings = async (agencyId, months = 6) => {
   since.setMonth(since.getMonth() - (months - 1), 1);
   since.setHours(0, 0, 0, 0);
 
+  // Paid trips count in full; trips paid at the agency count for the booking money Plejar took
   const rows = await Booking.aggregate([
-    { $match: { agency: oid(agencyId), status: 'completed', paymentStatus: { $in: PAID }, completedAt: { $gte: since } } },
-    { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$completedAt', timezone: 'Asia/Dhaka' } }, gross: { $sum: '$amount' }, commission: { $sum: '$commissionAmount' }, plejarPays: { $sum: '$plejarPays' }, trips: { $sum: 1 } } }
+    { $match: { agency: oid(agencyId), status: 'completed', completedAt: { $gte: since }, $or: [{ paymentStatus: { $in: PAID } }, { depositStatus: 'paid', depositAmount: { $gt: 0 } }] } },
+    { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$completedAt', timezone: 'Asia/Dhaka' } }, gross: { $sum: { $cond: [{ $in: ['$paymentStatus', PAID] }, '$amount', '$depositAmount'] } }, commission: { $sum: '$commissionAmount' }, plejarPays: { $sum: '$plejarPays' }, trips: { $sum: 1 } } }
   ]);
   const map = new Map(rows.map(r => [r._id, r]));
 

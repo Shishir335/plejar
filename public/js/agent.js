@@ -251,6 +251,8 @@ document.addEventListener('click', e => {
   if (name === 'new-ad') openAdEditor(null);
   if (name === 'edit-ad') openAdEditor(state.ads.find(a => a._id === id));
   if (name === 'remove-ad') removeAd(id);
+  if (name === 'pay-ad') openAdPayment(state.ads.find(a => a._id === id));
+  if (name === 'pay-with') payForAd(action.dataset.method);
   if (name === 'new-guide') openGuideEditor(null);
   if (name === 'edit-guide') openGuideEditor(state.guides.find(g => g._id === id));
   if (name === 'delete-guide') deleteGuide(id);
@@ -317,6 +319,7 @@ async function boot() {
   setInterval(refreshMessagesBadge, 60000);
   connectChatSocket();
   showView(views.includes(start) ? start : (start === 'packages' ? 'events' : 'overview'));
+  showPaymentOutcome();
 }
 
 function logoHTML(agency, cls = '') {
@@ -735,8 +738,8 @@ function planMissing() {
   if (!len) missing.push('the dates');
   if (!form.seats.value) missing.push('the number of seats');
   if (form.priceFrom.value === '') missing.push('the price per person');
-  if (val('evAdvance') === '') missing.push('the booking advance (0 if none)');
-  else if (form.priceFrom.value !== '' && Number(val('evAdvance')) > Number(form.priceFrom.value)) missing.push('a booking advance no higher than the price');
+  if (!(Number(val('evAdvance')) >= 1)) missing.push('the booking money per traveler (at least 1 taka)');
+  else if (form.priceFrom.value !== '' && Number(val('evAdvance')) > Number(form.priceFrom.value)) missing.push('booking money no higher than the price');
   if (val('evRegularPrice') !== '' && form.priceFrom.value !== '' && Number(val('evRegularPrice')) < Number(form.priceFrom.value)) missing.push('a regular price no lower than the price (or leave it empty when there is no sale)');
   if (!val('evMeeting')) missing.push('the meeting point');
   if (!val('evStartDistrict')) missing.push('the district the tour starts from');
@@ -1040,7 +1043,7 @@ function openEventEditor(ev) {
 }
 
 function closeDrawers() {
-  ['eventDrawer', 'announcementDrawer', 'adDrawer', 'guideDrawer', 'wallDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
+  ['eventDrawer', 'announcementDrawer', 'adDrawer', 'adPayDrawer', 'guideDrawer', 'wallDrawer', 'cancelDialog'].forEach(id => { $(id).hidden = true; });
   state.wall.editing = null;
   state.editingAd = null;
   state.editingGuide = null;
@@ -1265,7 +1268,7 @@ async function loadRegistrations() {
             <span class="cell-sub">${u.phone ? `<a href="tel:${escapeHTML(u.phone)}">${escapeHTML(u.phone)}</a>` : ''}${u.phone && u.email ? ', ' : ''}${u.email ? `<a href="mailto:${escapeHTML(u.email)}">${escapeHTML(u.email)}</a>` : ''}</span>
             ${r.note ? `<span class="cell-sub">Note: ${escapeHTML(r.note)}</span>` : ''}</td>
           <td>${r.travelers}</td>
-          <td>${taka(r.amount)}<span class="cell-sub">${escapeHTML(PAY_TEXT[r.paymentStatus] || r.paymentStatus)}</span></td>
+          <td>${taka(r.amount)}<span class="cell-sub">${escapeHTML(PAY_TEXT[r.paymentStatus] || r.paymentStatus)}</span>${r.depositAmount > 0 ? `<span class="cell-sub">${escapeHTML(DEPOSIT_TEXT[r.depositStatus] || 'Booking money')}: ${taka(r.depositAmount)}</span>` : ''}</td>
           <td>${escapeHTML(fmtDate(r.createdAt))}<span class="cell-sub">${escapeHTML(r.reference)}</span></td>
           <td><span class="badge badge-${escapeHTML(r.status)}">${escapeHTML(REG_TEXT[r.status])}</span>${r.status === 'cancelled' && r.cancelReason ? `<span class="cell-sub">${escapeHTML(r.cancelReason)}</span>` : ''}</td>
           <td class="actions">${actions.join('')}</td>
@@ -1432,8 +1435,20 @@ async function deleteAnnouncement(id) {
 
 state.ads = [];
 state.editingAd = null;
+state.adPricing = { pricePerDay: 0, methods: [], sandbox: true };
+state.payingAd = null;
+
+// Booking money a traveler paid online to Plejar for a registration
+const DEPOSIT_TEXT = { paid: 'Booking money paid online', kept: 'Booking money kept (cancelled after confirming)', refunding: 'Booking money being refunded', refunded: 'Booking money refunded', refund_failed: 'Booking money refund pending' };
+
+const PAY_METHODS = {
+  bkash: ['bKash', 'Pay from your bKash account'],
+  sslcommerz: ['Card or mobile banking', 'Visa, Mastercard, Nagad, Rocket and internet banking, through SSLCommerz']
+};
+const PAY_NAMES = { bkash: 'bKash', sslcommerz: 'SSLCommerz' };
 
 const AD_STATES = {
+  unpaid: ['badge-pending', 'Waiting for payment'],
   pending: ['badge-pending', 'Waiting for review'],
   live: ['badge-published', 'Showing in the app'],
   scheduled: ['badge-confirmed', 'Accepted, starts soon'],
@@ -1459,6 +1474,7 @@ async function loadAds() {
   try {
     const { data } = await api('/api/v1/agency/me/ads');
     state.ads = data.ads;
+    state.adPricing = data.pricing || state.adPricing;
     renderAds();
   } catch (err) {
     $('adList').innerHTML = `<div class="alert alert-error">${escapeHTML(err.message)}</div>`;
@@ -1478,7 +1494,8 @@ function renderAds() {
   $('adList').innerHTML = `<div class="ad-grid">${state.ads.map(a => {
     const id = escapeHTML(a._id);
     const [badge, label] = AD_STATES[a.state] || AD_STATES.pending;
-    const canEdit = a.state === 'pending' || a.state === 'rejected';
+    const canEdit = a.state === 'unpaid' || a.state === 'pending' || a.state === 'rejected';
+    const paid = a.payment && a.payment.paidAt ? a.payment : null;
     const canStop = a.state === 'live' || a.state === 'scheduled';
     return `
     <article class="ad-card">
@@ -1489,7 +1506,10 @@ function renderAds() {
       </div>
       ${a.state === 'rejected' && a.rejectedReason ? `<div class="alert alert-error" style="margin-top: 10px;">Plejar's note: ${escapeHTML(a.rejectedReason)}</div>` : ''}
       <div class="ann-meta">${a.startsAt ? `${escapeHTML(fmtDate(a.startsAt))} to ` : 'Until '}${escapeHTML(fmtDate(a.endsAt))}${a.state === 'pending' ? '' : ` · ${Number(a.views || 0).toLocaleString()} ${a.views === 1 ? 'view' : 'views'} · ${Number(a.clicks)} ${a.clicks === 1 ? 'tap' : 'taps'}`}</div>
+      ${a.state === 'unpaid' && a.due ? `<div class="ad-paid">${escapeHTML(taka(a.due.amount))} for ${a.due.days} ${a.due.days === 1 ? 'day' : 'days'}. Pay to send it for review.</div>` : ''}
+      ${paid ? `<div class="ad-paid">Paid ${escapeHTML(taka(paid.amount))} by ${escapeHTML(PAY_NAMES[paid.method] || paid.method)}${paid.trxId ? ` · Transaction ${escapeHTML(paid.trxId)}` : ''}${paid.sandbox ? ' · test payment' : ''}</div>` : ''}
       <div class="pkg-actions">
+        ${a.state === 'unpaid' ? `<button class="btn btn-primary btn-sm" data-action="pay-ad" data-id="${id}">Pay ${a.due ? escapeHTML(taka(a.due.amount)) : ''}</button>` : ''}
         ${canEdit ? `<button class="btn btn-quiet btn-sm" data-action="edit-ad" data-id="${id}">${a.state === 'rejected' ? 'Fix and send again' : 'Edit'}</button>` : ''}
         ${canEdit ? `<button class="btn btn-quiet btn-sm" data-action="remove-ad" data-id="${id}">Delete</button>` : ''}
         ${canStop ? `<button class="btn btn-quiet btn-sm" data-action="remove-ad" data-id="${id}">Stop ad</button>` : ''}
@@ -1512,6 +1532,38 @@ function renderAdPreview() {
   });
 }
 ['adTitle', 'adSubtitle', 'adHighlight', 'adCta'].forEach(id => $(id).addEventListener('input', renderAdPreview));
+
+// Days from the start day (or today) to the end day (or the tour's day), both counted
+function adDaysFromForm() {
+  const today = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+  const option = $('adTour').selectedOptions[0];
+  const from = $('adStarts').value || today;
+  const until = $('adEnds').value || (option && option.dataset.day) || '';
+  if (!until || until < from) return 0;
+  return Math.round((Date.parse(until) - Date.parse(from)) / 86400000) + 1;
+}
+
+// What the ad will cost, and whether saving it leads to payment
+function renderAdPrice() {
+  const price = state.adPricing.pricePerDay;
+  const ad = state.editingAd;
+  const paidFor = ad && ad.payment && ad.payment.paidAt;
+  const box = $('adPrice');
+  box.hidden = !price && !paidFor;
+  if (paidFor) {
+    box.innerHTML = `Paid ${escapeHTML(taka(ad.payment.amount))} for ${ad.payment.days} ${ad.payment.days === 1 ? 'day' : 'days'}. The tour and dates can't change now.`;
+  } else if (price) {
+    const days = adDaysFromForm();
+    box.innerHTML = days
+      ? `${escapeHTML(taka(price))} a day × ${days} ${days === 1 ? 'day' : 'days'} = <strong>${escapeHTML(taka(price * days))}</strong>`
+      : `Ads cost ${escapeHTML(taka(price))} a day. Choose a tour to see the total.`;
+  }
+  const needsPayment = price && !paidFor && (!ad || ad.state === 'unpaid');
+  let label = ad && ad.state === 'pending' ? 'Save changes' : 'Send for review';
+  if (needsPayment) label = 'Continue to payment';
+  $('adSubmit').textContent = label;
+}
+['adTour', 'adStarts', 'adEnds'].forEach(id => $(id).addEventListener('change', renderAdPrice));
 $('adImage').addEventListener('change', renderAdPreview);
 
 async function openAdEditor(ad) {
@@ -1523,7 +1575,7 @@ async function openAdEditor(ad) {
   const today = new Date().toISOString().slice(0, 10);
   try {
     const events = (await fetchEvents()).filter(e => e.status === 'published' && e.startDate && isoDay(e.startDate) >= today);
-    $('adTour').innerHTML = `<option value="">${events.length ? 'Choose a tour' : 'No published upcoming tours yet'}</option>${events.map(e => `<option value="${escapeHTML(e._id)}">${escapeHTML(e.title)}, ${escapeHTML(dateRange(e.startDate, e.endDate))}</option>`).join('')}`;
+    $('adTour').innerHTML = `<option value="">${events.length ? 'Choose a tour' : 'No published upcoming tours yet'}</option>${events.map(e => `<option value="${escapeHTML(e._id)}" data-day="${escapeHTML(isoDay(e.startDate))}">${escapeHTML(e.title)}, ${escapeHTML(dateRange(e.startDate, e.endDate))}</option>`).join('')}`;
   } catch (err) {
     showAlert('adError', err.message);
   }
@@ -1538,7 +1590,10 @@ async function openAdEditor(ad) {
     $('adStarts').value = day(ad.startsAt);
     $('adEnds').value = day(ad.endsAt);
   }
-  $('adSubmit').textContent = ad && ad.state === 'pending' ? 'Save changes' : 'Send for review';
+  // A paid ad keeps its tour and dates
+  const paidFor = Boolean(ad && ad.payment && ad.payment.paidAt);
+  ['adTour', 'adStarts', 'adEnds'].forEach(id => { $(id).disabled = paidFor; });
+  renderAdPrice();
   renderAdPreview();
   $('adDrawer').hidden = false;
 }
@@ -1559,10 +1614,13 @@ $('adForm').addEventListener('submit', async e => {
   setBusy(btn, true);
   try {
     const editing = state.editingAd;
-    const { message } = await api(editing ? `/api/v1/agency/me/ads/${editing._id}` : '/api/v1/agency/me/ads', { method: editing ? 'PATCH' : 'POST', form });
+    const { message, data } = await api(editing ? `/api/v1/agency/me/ads/${editing._id}` : '/api/v1/agency/me/ads', { method: editing ? 'PATCH' : 'POST', form });
     closeDrawers();
-    toast(message);
     await loadAds();
+    // Saved but not paid yet: go straight on to paying
+    const saved = data && data.ad && state.ads.find(a => a._id === data.ad._id);
+    if (saved && saved.state === 'unpaid') openAdPayment(saved);
+    else toast(message);
   } catch (err) {
     showAlert('adError', err.message);
   } finally {
@@ -1574,14 +1632,77 @@ async function removeAd(id) {
   const ad = state.ads.find(a => a._id === id);
   if (!ad) return;
   const running = ad.state === 'live' || ad.state === 'scheduled';
-  if (!window.confirm(running ? `Stop "${ad.title}"? It leaves the app right away, and you'd need to apply again to bring it back.` : `Delete "${ad.title}"?`)) return;
+  const paid = ad.payment && ad.payment.status === 'paid' ? ad.payment : null;
+  const question = running
+    ? `Stop "${ad.title}"? It leaves the app right away, and you'd need to apply again to bring it back.${paid ? ' Ads that have started running are not refunded.' : ''}`
+    : `Delete "${ad.title}"?${paid ? ` The ${taka(paid.amount)} you paid goes back to you through ${PAY_NAMES[paid.method] || paid.method}.` : ''}`;
+  if (!window.confirm(question)) return;
   try {
-    await api(`/api/v1/agency/me/ads/${id}`, { method: 'DELETE' });
-    toast(running ? 'Ad stopped.' : 'Ad deleted.');
+    const result = await api(`/api/v1/agency/me/ads/${id}`, { method: 'DELETE' });
+    toast((result && result.message) || (running ? 'Ad stopped.' : 'Ad deleted.'), result && result.data && result.data.refund && result.data.refund.status !== 'refunded' ? 'error' : 'ok');
     await loadAds();
   } catch (err) {
     toast(err.message, 'error');
   }
+}
+
+// ---------- Paying for an ad ----------
+
+function openAdPayment(ad) {
+  if (!ad) return;
+  state.payingAd = ad;
+  showAlert('adPayError', '');
+  const methods = state.adPricing.methods || [];
+  const due = ad.due || { amount: 0, days: 0 };
+  $('adPaySummary').innerHTML = `
+    <div class="pay-summary">
+      <div><div class="muted">${escapeHTML(ad.title)}</div><div class="muted" style="font-size: 0.82rem;">${due.days} ${due.days === 1 ? 'day' : 'days'} × ${escapeHTML(taka(due.days ? due.amount / due.days : 0))}</div></div>
+      <strong>${escapeHTML(taka(due.amount))}</strong>
+    </div>`;
+  $('adPaySandbox').hidden = !state.adPricing.sandbox;
+  $('adPayOptions').innerHTML = methods.length
+    ? methods.map(m => `<button type="button" class="pay-option" data-action="pay-with" data-method="${escapeHTML(m)}"><strong>${escapeHTML(PAY_METHODS[m][0])}</strong><span>${escapeHTML(PAY_METHODS[m][1])}</span></button>`).join('')
+    : '<div class="alert alert-error">Online payment isn\'t available right now. Please try again later or contact Plejar.</div>';
+  $('adPayDrawer').hidden = false;
+}
+
+async function payForAd(method) {
+  const ad = state.payingAd;
+  if (!ad) return;
+  showAlert('adPayError', '');
+  const buttons = [...$('adPayOptions').querySelectorAll('button')];
+  buttons.forEach(b => { b.disabled = true; });
+  try {
+    const { data, message } = await api(`/api/v1/agency/me/ads/${ad._id}/pay`, { method: 'POST', body: { method } });
+    if (data && data.redirectUrl) {
+      window.location.assign(data.redirectUrl);
+      return;
+    }
+    closeDrawers();
+    toast(message || 'Your ad was sent for review.');
+    await loadAds();
+  } catch (err) {
+    showAlert('adPayError', err.message);
+  }
+  buttons.forEach(b => { b.disabled = false; });
+}
+
+// Back from bKash or SSLCommerz: /agent?payment=paid#ads
+function showPaymentOutcome() {
+  const params = new URLSearchParams(window.location.search);
+  const outcome = params.get('payment');
+  if (!outcome) return;
+  params.delete('payment');
+  const rest = params.toString();
+  window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+  const messages = {
+    paid: ['Payment received. Your ad was sent to Plejar for review.', 'ok'],
+    refunded: ['This ad was already paid for, so that payment is being refunded to you.', 'ok'],
+    cancelled: ['Payment cancelled. Your ad is saved; pay whenever you are ready.', 'error'],
+    failed: ['The payment did not go through. Your ad is saved; you can try again.', 'error']
+  };
+  const [text, type] = messages[outcome] || messages.failed;
+  toast(text, type);
 }
 
 // ---------- Notifications ----------

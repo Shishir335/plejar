@@ -8,10 +8,12 @@ const Email = require('../utils/email');
 const { logActivity } = require('../utils/activity');
 const { saveContentImage, removeContentImage, removeContentFolder } = require('../utils/uploads');
 const { district } = require('../utils/places');
+const adPayments = require('../utils/adPayments');
 
 /**
- * Vendor ads on the app's Tours screen. A vendor applies with a tour, a picture and the wording;
- * a Plejar admin accepts or rejects it. An accepted ad is an ordinary banner (a slide), so the
+ * Vendor ads on the app's Tours screen. A vendor applies with a tour, a picture and the wording,
+ * pays for the days it runs when ads cost money (utils/adPayments.js), and a Plejar admin accepts
+ * or rejects it. An accepted ad is an ordinary banner (a slide), so the
  * existing banner list and the app's slides need nothing special.
  */
 
@@ -27,6 +29,7 @@ const tourDay = tour => isoDay(tour.startDate);
 
 // What the vendor (and the admin) sees about where an ad stands
 const adState = (ad, now = new Date()) => {
+  if (ad.reviewStatus === 'unpaid') return 'unpaid';
   if (ad.reviewStatus === 'pending') return 'pending';
   if (ad.reviewStatus === 'rejected') return 'rejected';
   if (ad.stoppedAt || !ad.active) return 'stopped';
@@ -34,6 +37,21 @@ const adState = (ad, now = new Date()) => {
   if (ad.endsAt && ad.endsAt < now) return 'ended';
   return 'live';
 };
+
+// What was paid for the ad, when its payment is loaded
+const paymentSummary = p => (p && p.amount ? {
+  amount: p.amount,
+  days: p.days,
+  method: p.method,
+  status: p.status,
+  trxId: p.trxId || '',
+  paidAt: p.paidAt || null,
+  flagged: Boolean(p.flagged),
+  sandbox: Boolean(p.sandbox),
+  refundRef: (p.refund && p.refund.ref) || ''
+} : null);
+
+const PAYMENT_FIELDS = 'amount days method status trxId paidAt flagged sandbox refund';
 
 const adView = ad => ({
   _id: ad._id,
@@ -50,6 +68,7 @@ const adView = ad => ({
   reviewedAt: ad.reviewedAt || null,
   clicks: ad.clicks || 0,
   views: ad.views || 0,
+  payment: paymentSummary(ad.payment),
   createdAt: ad.createdAt
 });
 
@@ -95,20 +114,26 @@ const openAdFor = (tourId, exceptId) => Promotion.exists({
   source: 'vendor',
   tour: tourId,
   _id: { $ne: exceptId },
-  $or: [{ reviewStatus: 'pending' }, { reviewStatus: 'approved', active: true, $or: [{ endsAt: null }, { endsAt: { $gte: new Date() } }] }]
+  $or: [{ reviewStatus: { $in: ['unpaid', 'pending'] } }, { reviewStatus: 'approved', active: true, $or: [{ endsAt: null }, { endsAt: { $gte: new Date() } }] }]
 });
 
 // ---------- Vendor ----------
 
 // GET /agency/me/ads
 exports.myAds = catchAsync(async (req, res) => {
-  const rows = await Promotion.find({ source: 'vendor', agency: req.agency._id }).sort({ createdAt: -1 }).populate('tour', 'title startDate status').lean();
-  res.status(200).json({ status: 'success', data: { ads: rows.map(adView) } });
+  const [rows, pricing] = await Promise.all([
+    Promotion.find({ source: 'vendor', agency: req.agency._id }).sort({ createdAt: -1 }).populate('tour', 'title startDate status').populate('payment', PAYMENT_FIELDS).lean(),
+    adPayments.pricing()
+  ]);
+  // An unpaid ad shows what it would cost today
+  const ads = await Promise.all(rows.map(async ad => (ad.reviewStatus === 'unpaid' ? { ...adView(ad), due: await adPayments.quote(ad) } : adView(ad))));
+  res.status(200).json({ status: 'success', data: { ads, pricing } });
 });
 
 /**
  * POST /agency/me/ads (multipart: image) tour, title, subtitle, highlight, ctaLabel, startsAt, endsAt
- * Waits for a Plejar admin; nothing shows in the app before that.
+ * When ads cost money the ad waits for payment (POST /agency/me/ads/:id/pay) and then for a Plejar
+ * admin; nothing shows in the app before that.
  */
 exports.applyForAd = catchAsync(async (req, res) => {
   const ad = new Promotion({ source: 'vendor', reviewStatus: 'pending', active: false, target: 'tours', agency: req.agency._id, createdBy: req.user._id });
@@ -117,10 +142,16 @@ exports.applyForAd = catchAsync(async (req, res) => {
   if (tour && !errors.tour && await openAdFor(tour._id, ad._id)) errors.tour = 'This tour already has an ad waiting for review or running.';
   if (Object.keys(errors).length) return fieldErrors(res, errors);
   await ad.validate();
+  const due = await adPayments.quote(ad);
+  if (due.amount) ad.reviewStatus = 'unpaid';
   ad.image = await saveContentImage(req.file, 'promotions', ad._id, { width: 1600 });
   await ad.save();
-  await logActivity(req, { action: 'ad.requested', summary: `Applied for an ad: ${ad.title} (${tour.title})`, agency: req.agency._id });
-  res.status(201).json({ status: 'success', message: 'Your ad was sent for review. It shows in the app once Plejar accepts it.', data: { ad: adView({ ...ad.toObject(), tour }) } });
+  await logActivity(req, { action: 'ad.requested', summary: `Applied for an ad: ${ad.title} (${tour.title})${due.amount ? `, ${due.amount} BDT to pay` : ''}`, agency: req.agency._id });
+  res.status(201).json({
+    status: 'success',
+    message: due.amount ? `Your ad is saved. Pay ${due.amount} taka to send it for review.` : 'Your ad was sent for review. It shows in the app once Plejar accepts it.',
+    data: { ad: { ...adView({ ...ad.toObject(), tour }), ...(due.amount ? { due } : {}) } }
+  });
 });
 
 const findMyAd = async req => {
@@ -133,7 +164,14 @@ const findMyAd = async req => {
 exports.updateMyAd = catchAsync(async (req, res, next) => {
   const ad = await findMyAd(req);
   if (ad.reviewStatus === 'approved') return next(new AppError("An accepted ad can't be changed. Stop it and apply again.", 400));
+  const paidDates = ad.payment ? [ad.startsAt, ad.endsAt].map(d => (d ? d.getTime() : 0)).join() : null;
+  const paidTour = ad.payment ? String(ad.tour) : null;
   const { errors, tour } = await applyAdForm(ad, req.body, req.agency._id);
+  // The days and the tour were paid for; changing them means withdrawing (refunded) and applying again
+  if (paidDates !== null && !errors.startsAt && !errors.endsAt && [ad.startsAt, ad.endsAt].map(d => (d ? d.getTime() : 0)).join() !== paidDates) {
+    errors.startsAt = 'The dates of a paid ad can\'t change. Delete it for a refund and apply again with new dates.';
+  }
+  if (paidTour !== null && !errors.tour && String(ad.tour) !== paidTour) errors.tour = 'The tour of a paid ad can\'t change. Delete it for a refund and apply again.';
   if (tour && !errors.tour && await openAdFor(tour._id, ad._id)) errors.tour = 'This tour already has an ad waiting for review or running.';
   if (Object.keys(errors).length) return fieldErrors(res, errors);
   if (req.file) {
@@ -142,6 +180,12 @@ exports.updateMyAd = catchAsync(async (req, res, next) => {
     await removeContentImage(old);
   }
   const resent = ad.reviewStatus === 'rejected';
+  const unpaid = ad.reviewStatus === 'unpaid' && (await adPayments.quote(ad)).amount > 0;
+  if (unpaid) {
+    await ad.save();
+    await logActivity(req, { action: 'ad.updated', summary: `Changed an unpaid ad: ${ad.title}`, agency: req.agency._id });
+    return res.status(200).json({ status: 'success', message: 'Your ad was saved. Pay for it to send it for review.', data: { ad: { ...adView({ ...ad.toObject(), tour }), due: await adPayments.quote(ad) } } });
+  }
   ad.reviewStatus = 'pending';
   ad.rejectedReason = '';
   ad.reviewedBy = undefined;
@@ -161,10 +205,44 @@ exports.removeMyAd = catchAsync(async (req, res) => {
     await logActivity(req, { action: 'ad.stopped', summary: `Stopped an ad: ${ad.title}`, agency: req.agency._id });
     return res.status(200).json({ status: 'success', message: 'Your ad no longer shows in the app.', data: { ad: adView(ad.toObject()) } });
   }
+  // An ad that never ran gets its money back
+  const paid = await adPayments.paidPaymentFor(ad);
+  const refund = paid ? await adPayments.refundPayment(paid, { reason: 'Ad withdrawn before it ran', by: req.user._id }) : null;
   await removeContentFolder('promotions', ad._id);
   await ad.deleteOne();
-  await logActivity(req, { action: 'ad.withdrawn', summary: `Withdrew an ad: ${ad.title}`, agency: req.agency._id });
-  res.status(204).json({ status: 'success', data: null });
+  await logActivity(req, { action: 'ad.withdrawn', summary: `Withdrew an ad: ${ad.title}${refund ? `. Refund of ${refund.amount} BDT: ${refund.status}` : ''}`, agency: req.agency._id });
+  if (!refund) return res.status(204).json({ status: 'success', data: null });
+  const name = adPayments.GATEWAY_NAMES[refund.method];
+  res.status(200).json({
+    status: 'success',
+    message: refund.status === 'refunded'
+      ? `Ad deleted. ${refund.amount} taka is on its way back to you through ${name}.`
+      : `Ad deleted. ${name} couldn't refund the ${refund.amount} taka automatically, so Plejar will refund you by hand.`,
+    data: { refund: { amount: refund.amount, method: refund.method, status: refund.status, ref: refund.refund.ref || '' } }
+  });
+});
+
+/**
+ * POST /agency/me/ads/:id/pay { method: 'bkash' | 'sslcommerz' } — opens a payment for an unpaid ad.
+ * Returns { redirectUrl } for the gateway's page; the gateway sends the vendor back to /agent.
+ */
+exports.payForAd = catchAsync(async (req, res, next) => {
+  const ad = await findMyAd(req);
+  if (ad.reviewStatus !== 'unpaid') return next(new AppError('This ad is already paid for.', 400));
+  const tour = await Package.findOne({ _id: ad.tour, agency: req.agency._id }).select('status hiddenByAdmin startDate');
+  const today = isoDay(new Date(Date.now() + 6 * 3600 * 1000));
+  if (!tour || tour.status !== 'published' || tour.hiddenByAdmin) return next(new AppError('Only a published tour can be advertised. Publish the tour, then pay.', 400));
+  if ((ad.startsAt && isoDay(new Date(ad.startsAt.getTime() + 6 * 3600 * 1000)) < today) || (ad.endsAt && ad.endsAt < new Date())) {
+    return next(new AppError('The dates on this ad have passed. Edit it with new dates, then pay.', 400));
+  }
+  const started = await adPayments.startAdPayment(req, ad, String(req.body.method || ''));
+  if (started.free) {
+    // Ads became free since it was saved
+    ad.reviewStatus = 'pending';
+    await ad.save();
+    return res.status(200).json({ status: 'success', message: 'Ads are free right now, so your ad went straight to review.', data: { free: true } });
+  }
+  res.status(200).json({ status: 'success', data: { redirectUrl: started.redirectUrl, amount: started.quote.amount, days: started.quote.days } });
 });
 
 // ---------- Admin ----------
@@ -197,10 +275,11 @@ const loadForReview = async (id, next) => {
 
 // GET /admin/ad-requests?status=pending|approved|rejected
 exports.adminAdRequests = catchAsync(async (req, res) => {
-  const status = Promotion.REVIEW_STATUSES.includes(req.query.status) ? req.query.status : 'pending';
+  // Unpaid ads stay with the vendor until they pay
+  const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';
   const [rows, counts] = await Promise.all([
     Promotion.find({ source: 'vendor', reviewStatus: status }).sort({ createdAt: status === 'pending' ? 1 : -1 }).limit(100)
-      .populate('agency', 'name logo verified').populate('tour', 'title startDate status').populate('createdBy', 'name email').populate('reviewedBy', 'name').lean(),
+      .populate('agency', 'name logo verified').populate('tour', 'title startDate status').populate('createdBy', 'name email').populate('reviewedBy', 'name').populate('payment', PAYMENT_FIELDS).lean(),
     Promotion.aggregate([{ $match: { source: 'vendor' } }, { $group: { _id: '$reviewStatus', n: { $sum: 1 } } }])
   ]);
   const byStatus = Object.fromEntries(counts.map(c => [c._id, c.n]));

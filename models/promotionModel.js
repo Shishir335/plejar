@@ -7,7 +7,8 @@ const mongoose = require('mongoose');
  * which shows only after a Plejar admin accepts it (controllers/adController.js).
  */
 const TARGETS = ['sale_tours', 'tours', 'destination', 'agency', 'tour_type'];
-const REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
+// 'unpaid': a vendor ad waiting for its payment, before it reaches the review queue
+const REVIEW_STATUSES = ['unpaid', 'pending', 'approved', 'rejected'];
 
 const promotionSchema = new mongoose.Schema(
   {
@@ -45,7 +46,9 @@ const promotionSchema = new mongoose.Schema(
     reviewedBy: { type: mongoose.Schema.ObjectId, ref: 'User' },
     reviewedAt: Date,
     // The vendor took an accepted ad down, or its tour was cancelled
-    stoppedAt: Date
+    stoppedAt: Date,
+    // What the vendor paid for the ad (models/paymentModel.js)
+    payment: { type: mongoose.Schema.ObjectId, ref: 'Payment' }
   },
   { timestamps: true }
 );

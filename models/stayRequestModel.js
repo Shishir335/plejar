@@ -48,6 +48,11 @@ const stayRequestSchema = new mongoose.Schema(
     commissionRate: { type: Number, min: 0, max: 100, default: 0 },
     commissionFlat: { type: Number, min: 0, default: 0 },
     commissionAmount: { type: Number, min: 0, default: 0 },
+    // Booking money the traveler paid online to Plejar (per room x rooms). Refunded when the hotel declines or
+    // the traveler cancels before it's accepted; kept (and paid out to the vendor) once accepted.
+    depositAmount: { type: Number, min: 0, default: 0 },
+    depositPayment: { type: mongoose.Schema.ObjectId, ref: 'Payment' },
+    depositStatus: { type: String, enum: ['none', 'paid', 'refunding', 'refunded', 'refund_failed', 'kept'], default: 'none' },
     guestName: { type: String, trim: true, maxlength: 80, default: '' },
     phone: { type: String, trim: true, maxlength: 20, default: '' },
     note: { type: String, trim: true, maxlength: 1000, default: '' },

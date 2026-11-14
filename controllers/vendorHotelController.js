@@ -2,6 +2,7 @@
 // photos, room types and rates, amenities and policies) and answers travelers' stay requests.
 // Plejar publishes the listing the first time; after that the hotel's edits show in the app straight away.
 const Hotel = require('../models/hotelModel');
+const bookingMoney = require('../utils/bookingMoney');
 const StayRequest = require('../models/stayRequestModel');
 const Notification = require('../models/notificationModel');
 const catchAsync = require('../utils/catchAsync');
@@ -84,6 +85,7 @@ const hotelView = h => ({
   checkOut: h.checkOut,
   rooms: h.rooms,
   pricePerNight: h.pricePerNight,
+  bookingMoney: h.bookingMoney || null,
   photos: h.photos,
   highlights: h.highlights,
   amenities: h.amenities,
@@ -113,6 +115,8 @@ const requestView = r => ({
   coupon: r.discountAmount ? { code: r.couponCode, discount: r.discountAmount, subtotal: r.subtotal, fundedBy: r.couponFundedBy } : null,
   // Plejar's commission on this stay, which the hotel owes Plejar after the stay
   commission: r.commissionAmount > 0 ? { amount: r.commissionAmount, type: r.commissionType, value: r.commissionType === 'amount' ? r.commissionFlat : r.commissionRate } : null,
+  // Booking money the guest paid Plejar online: Plejar pays it to the hotel after the stay
+  bookingMoney: r.depositAmount > 0 ? { amount: r.depositAmount, status: r.depositStatus } : null,
   guestName: r.guestName || (r.user && r.user.name) || '',
   phone: r.phone || (r.user && r.user.phone) || '',
   email: r.user && r.user.email ? r.user.email : '',
@@ -176,6 +180,11 @@ exports.updateHotel = catchAsync(async (req, res) => {
   if (has(b, 'rooms')) hotel.rooms = whole(b.rooms, 'the number of rooms', { min: 1, max: 5000, empty: null });
   if (has(b, 'pricePerNight') && !(hotel.roomTypes || []).some(r => r.active !== false)) {
     hotel.pricePerNight = whole(b.pricePerNight, 'the price per night', { empty: hotel.pricePerNight });
+  }
+  if (has(b, 'bookingMoney')) {
+    const money = whole(b.bookingMoney, 'the booking money per room', { min: 1, max: 1000000, empty: null });
+    if (money == null) throw new AppError('Enter the booking money per room. Guests pay it online to request a stay.', 400);
+    hotel.bookingMoney = money;
   }
   if (has(b, 'amenities')) hotel.amenities = list(b.amenities, 40, 40);
   if (has(b, 'highlights')) hotel.highlights = list(b.highlights, 6, 60);
@@ -390,6 +399,8 @@ exports.decideRequest = catchAsync(async (req, res) => {
   await request.save();
   // A declined request gives its coupon use back to the guest
   if (decision === 'declined' && request.couponRedemption) await releaseCoupon({ stayRequest: request._id });
+  // ...and its booking money
+  if (decision === 'declined') await bookingMoney.refundDeposit(StayRequest, request, { reason: `Declined by the hotel: ${note}`.slice(0, 200), by: req.user._id });
 
   const hotel = req.hotel;
   const dates = `${fmtDay(request.checkIn)} to ${fmtDay(request.checkOut)}`;

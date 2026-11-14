@@ -54,7 +54,7 @@ const applyPlan = async (pkg, raw) => {
     pkg.accommodation = { type, details: text(plan.accommodation && plan.accommodation.details, 300) };
   }
   if (plan.childPrice !== undefined) pkg.childPrice = money(plan.childPrice, 'child price');
-  if (plan.advanceAmount !== undefined) pkg.advanceAmount = money(plan.advanceAmount, 'booking advance');
+  if (plan.advanceAmount !== undefined) pkg.advanceAmount = money(plan.advanceAmount, 'booking money');
   if (plan.excluded !== undefined) pkg.excluded = list(plan.excluded);
   if (plan.whatToBring !== undefined) pkg.whatToBring = list(plan.whatToBring);
   if (plan.difficulty !== undefined) {
@@ -145,8 +145,9 @@ const planProblems = pkg => {
   if (!pkg.startDate) missing.push('the start date');
   if (!pkg.seats) missing.push('the number of seats');
   if (pkg.priceFrom === undefined || pkg.priceFrom === null) missing.push('the price per person');
-  if (pkg.advanceAmount === undefined || pkg.advanceAmount === null) missing.push('the booking advance (0 if none)');
-  else if (pkg.priceFrom != null && pkg.advanceAmount > pkg.priceFrom) missing.push('a booking advance no higher than the price');
+  // Booking money: what each traveler pays online to book (Plejar holds it until the tour)
+  if (!(pkg.advanceAmount >= 1)) missing.push('the booking money per traveler (at least 1 taka)');
+  else if (pkg.priceFrom != null && pkg.advanceAmount > pkg.priceFrom) missing.push('booking money no higher than the price');
   if (pkg.regularPrice != null && pkg.priceFrom != null && pkg.regularPrice < pkg.priceFrom) missing.push('a regular price no lower than the price (or leave it empty when there is no sale)');
   if (!pkg.meetingPoint) missing.push('the meeting point');
   if (!district(pkg.startDistrict)) missing.push('the district the tour starts from');

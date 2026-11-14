@@ -14,6 +14,15 @@ const { claimCoupon, releaseCoupon } = require('../utils/coupons');
 const { CouponRedemption } = require('../models/couponModel');
 const Agency = require('../models/agencyModel');
 const { termsFor, snapshot } = require('../utils/commission');
+const bookingMoney = require('../utils/bookingMoney');
+
+// What a stay request may carry, kept on a booking-money payment until the money arrives
+const draftOf = b => ({
+  ...(Array.isArray(b.items) && b.items.length ? { items: b.items.slice(0, 10).map(i => ({ roomType: String((i && i.roomType) || '').slice(0, 30), quantity: Number(i && i.quantity) || 1 })) } : {}),
+  ...Object.fromEntries(['roomType', 'rooms', 'checkIn', 'checkOut', 'guests', 'note', 'phone', 'couponCode']
+    .filter(k => b[k] !== undefined && b[k] !== null && b[k] !== '')
+    .map(k => [k, typeof b[k] === 'number' ? b[k] : String(b[k]).slice(0, k === 'note' ? 1000 : 40)]))
+});
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_NIGHTS = 30;
@@ -62,6 +71,8 @@ const myView = r => ({
   estimatedTotal: r.estimatedTotal,
   // A coupon the guest used; estimatedTotal is already after it
   coupon: r.discountAmount ? { code: r.couponCode, discount: r.discountAmount, subtotal: r.subtotal } : null,
+  // Booking money paid online: { amount, status } (refunded if cancelled before the hotel accepts)
+  bookingMoney: bookingMoney.depositView(r),
   note: r.note,
   hotelNote: r.hotelNote,
   decidedAt: r.decidedAt,
@@ -97,28 +108,29 @@ const stayDates = b => {
 // POST /api/v1/hotels/:id/stay-requests
 //   { items: [{ roomType, quantity }], checkIn, checkOut, guests, note, phone }
 //   (older app versions send { roomType, rooms } for a single room type, which still works)
-exports.create = catchAsync(async (req, res, next) => {
-  const hotel = validId(req.params.id) ? await Hotel.findOne({ _id: req.params.id, status: 'published' }) : null;
-  if (!hotel) return next(new AppError('This hotel is not available.', 404));
-  if (!hotel.agency) return next(new AppError('This hotel takes bookings by phone. Call them to ask for a room.', 400));
-  const b = req.body || {};
+const prepareStay = async ctx => {
+  const { user, hotelId } = ctx;
+  const hotel = validId(hotelId) ? await Hotel.findOne({ _id: hotelId, status: 'published' }) : null;
+  if (!hotel) throw new AppError('This hotel is not available.', 404);
+  if (!hotel.agency) throw new AppError('This hotel takes bookings by phone. Call them to ask for a room.', 400);
+  const b = ctx.body || {};
 
   // The rooms asked for, with the same room type added up if it appears twice
   const asked = Array.isArray(b.items) ? b.items : [{ roomType: b.roomType, quantity: b.rooms || 1 }];
   const wanted = new Map();
   for (const line of asked) {
     const room = line && validId(line.roomType) ? hotel.roomTypes.id(line.roomType) : null;
-    if (!room || room.active === false) return next(new AppError(asked.length > 1 ? 'One of those room types is no longer available. Choose again.' : 'Choose a room type.', 400));
+    if (!room || room.active === false) throw new AppError(asked.length > 1 ? 'One of those room types is no longer available. Choose again.' : 'Choose a room type.', 400);
     const quantity = Number(line.quantity == null ? 1 : line.quantity);
-    if (!Number.isInteger(quantity) || quantity < 1) return next(new AppError(`Choose how many ${room.name} rooms you need.`, 400));
+    if (!Number.isInteger(quantity) || quantity < 1) throw new AppError(`Choose how many ${room.name} rooms you need.`, 400);
     const id = String(room._id);
     wanted.set(id, { room, quantity: ((wanted.get(id) || {}).quantity || 0) + quantity });
   }
-  if (!wanted.size) return next(new AppError('Choose a room type.', 400));
-  if (wanted.size > MAX_ROOM_TYPES) return next(new AppError(`You can ask for up to ${MAX_ROOM_TYPES} room types at a time.`, 400));
+  if (!wanted.size) throw new AppError('Choose a room type.', 400);
+  if (wanted.size > MAX_ROOM_TYPES) throw new AppError(`You can ask for up to ${MAX_ROOM_TYPES} room types at a time.`, 400);
 
   const dates = stayDates(b);
-  if (dates.error) return next(new AppError(dates.error, 400));
+  if (dates.error) throw new AppError(dates.error, 400);
   const { checkIn, checkOut, nights } = dates;
 
   // Only rooms not held by other guests' waiting or accepted stays on those dates can be asked for
@@ -126,9 +138,9 @@ exports.create = catchAsync(async (req, res, next) => {
   for (const [id, { room, quantity }] of wanted) {
     const left = free[id] ? free[id].available : 0;
     if (quantity > left) {
-      return next(new AppError(left
+      throw new AppError(left
         ? `Only ${left} ${room.name} room${left === 1 ? ' is' : 's are'} free for those dates. Choose fewer.`
-        : `${room.name} is fully booked for those dates. Choose other dates or another room type.`, 400));
+        : `${room.name} is fully booked for those dates. Choose other dates or another room type.`, 400);
     }
   }
 
@@ -136,21 +148,21 @@ exports.create = catchAsync(async (req, res, next) => {
   const rooms = items.reduce((n, i) => n + i.quantity, 0);
   const fits = [...wanted.values()].reduce((n, { room, quantity }) => n + (room.maxGuests || 1) * quantity, 0);
   const guests = Number(b.guests || 1);
-  if (!Number.isInteger(guests) || guests < 1) return next(new AppError('Enter how many guests are staying.', 400));
-  if (guests > fits) return next(new AppError(`Those rooms fit ${fits} guest${fits === 1 ? '' : 's'}. Add a room or choose fewer guests.`, 400));
-  const phone = text(b.phone || req.user.phone, 20).replace(/[\s-]/g, '');
-  if (!BD_PHONE.test(phone)) return next(new AppError('Enter a mobile number the hotel can call, for example 01712345678.', 400));
+  if (!Number.isInteger(guests) || guests < 1) throw new AppError('Enter how many guests are staying.', 400);
+  if (guests > fits) throw new AppError(`Those rooms fit ${fits} guest${fits === 1 ? '' : 's'}. Add a room or choose fewer guests.`, 400);
+  const phone = text(b.phone || user.phone, 20).replace(/[\s-]/g, '');
+  if (!BD_PHONE.test(phone)) throw new AppError('Enter a mobile number the hotel can call, for example 01712345678.', 400);
 
-  await expireStayRequests({ user: req.user._id, hotel: hotel._id });
-  const pending = await StayRequest.countDocuments({ user: req.user._id, hotel: hotel._id, status: 'pending' });
-  if (pending >= MAX_PENDING) return next(new AppError('You already have requests waiting for this hotel. Wait for their answer, or cancel one first.', 429));
+  await expireStayRequests({ user: user._id, hotel: hotel._id });
+  const pending = await StayRequest.countDocuments({ user: user._id, hotel: hotel._id, status: 'pending' });
+  if (pending >= MAX_PENDING) throw new AppError('You already have requests waiting for this hotel. Wait for their answer, or cancel one first.', 429);
 
   const nightlyTotal = items.reduce((n, i) => n + i.pricePerNight * i.quantity, 0);
   const summary = roomsSummary(items);
   // A coupon from Plejar or from this hotel takes money off what the guest pays the hotel
   const subtotal = nightlyTotal * nights;
   const coupon = String(b.couponCode || '').trim()
-    ? await claimCoupon(b.couponCode, { user: req.user._id, kind: 'hotel', vendor: hotel.agency, subtotal })
+    ? await claimCoupon(b.couponCode, { user: user._id, kind: 'hotel', vendor: hotel.agency, subtotal })
     : null;
   const couponFields = coupon ? {
     subtotal,
@@ -164,12 +176,26 @@ exports.create = catchAsync(async (req, res, next) => {
   const estimatedTotal = subtotal - (coupon ? coupon.discount : 0);
   const vendor = await Agency.findById(hotel.agency).select('commission').lean();
   const commission = snapshot(coupon && coupon.coupon.fundedBy === 'plejar' ? subtotal : estimatedTotal, termsFor(vendor));
+  // Booking money: what the hotel set per room, never more than the stay costs after its coupon
+  const depositPer = hotel.bookingMoney >= 1 ? Math.round(hotel.bookingMoney) : 0;
+  const deposit = Math.max(0, Math.min(depositPer * rooms, Math.floor(estimatedTotal)));
+  return { hotel, items, rooms, guests, phone, nights, checkIn, checkOut, nightlyTotal, summary, wanted, coupon, couponFields, commission, estimatedTotal, depositPer, deposit, note: text(b.note, 1000) };
+};
+
+const releaseStayClaims = async ({ coupon }) => {
+  if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
+};
+
+/** Send the stay request a prepared one describes; `payment` is the booking money it was paid with */
+const placeStay = async (ctx, prepared, payment = null) => {
+  const { user } = ctx;
+  const { hotel, items, rooms, guests, phone, nights, checkIn, checkOut, nightlyTotal, summary, wanted, coupon, couponFields, commission, estimatedTotal } = prepared;
   let request;
   try {
     request = await StayRequest.create({
       hotel: hotel._id,
       agency: hotel.agency,
-      user: req.user._id,
+      user: user._id,
       items,
       roomType: items[0].roomType,
       roomName: summary.length > 120 ? `${summary.slice(0, 119)}…` : summary,
@@ -183,9 +209,10 @@ exports.create = catchAsync(async (req, res, next) => {
       estimatedTotal,
       ...couponFields,
       ...commission,
-      guestName: text(req.user.name, 80),
+      guestName: text(user.name, 80),
       phone,
-      note: text(b.note, 1000)
+      note: prepared.note,
+      ...(payment ? { depositAmount: payment.amount, depositPayment: payment._id, depositStatus: 'paid' } : {})
     });
   } catch (err) {
     if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
@@ -200,24 +227,60 @@ exports.create = catchAsync(async (req, res, next) => {
   if (over) {
     await StayRequest.deleteOne({ _id: request._id });
     if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
-    return next(new AppError(`${over.name} was just booked by someone else for those dates. Check what's free and try again.`, 409));
+    throw new AppError(`${over.name} was just booked by someone else for those dates. Check what's free and try again.`, 409);
   }
 
   // Tell the hotel's team by email; a slow or blocked mail server never holds up the guest
   User.find({ ...membership.memberOf(hotel.agency), deletedAt: null }).select('name email').lean().then(team => Promise.all(team.filter(u => u.email).map(u =>
-    new Email(u, `${req.protocol}://${req.get('host')}/hotel#requests`, {
+    new Email(u, `${ctx.base}/hotel#requests`, {
       hotelName: hotel.name, guestName: request.guestName, roomName: summary, nights, rooms, guests,
       dates: `${checkIn.toISOString().slice(0, 10)} to ${checkOut.toISOString().slice(0, 10)}`
     }).sendStayRequest().catch(err => console.warn(`[MAIL WARNING] Stay request email to ${u.email} not sent:`, err.message))
   ))).catch(() => {});
 
   await request.populate('hotel', 'name photos address phone');
-  res.status(201).json({
-    status: 'success',
-    message: `Request sent to ${hotel.name}. They will accept or decline it, and we will let you know.`,
-    data: { request: myView(request) }
-  });
+  return request;
+};
+
+const sentMessage = hotel => `Request sent to ${hotel.name}. They will accept or decline it, and we will let you know.`;
+
+/*
+ * A hotel with booking money: send payWith ("bkash" or "sslcommerz") too. Nothing is sent to the hotel
+ * yet; the answer (202) has the payment and a redirectUrl to pay at. Once the gateway confirms the money
+ * the request goes to the hotel (GET /payments/:id shows it), or the money is refunded if the rooms went.
+ */
+exports.create = catchAsync(async (req, res) => {
+  const ctx = { user: req.user, hotelId: req.params.id, body: req.body || {}, base: `${req.protocol}://${req.get('host')}` };
+  const prepared = await prepareStay(ctx);
+  if (prepared.deposit > 0) {
+    await releaseStayClaims(prepared);
+    const started = await bookingMoney.start(req, {
+      purpose: 'stay',
+      method: ctx.body.payWith,
+      agency: prepared.hotel.agency,
+      amount: prepared.deposit,
+      perUnit: prepared.depositPer,
+      units: prepared.rooms,
+      description: `Booking money: ${prepared.hotel.name}`,
+      draft: { hotelId: String(prepared.hotel._id), base: ctx.base, ...draftOf(ctx.body) }
+    });
+    return res.status(202).json({ status: 'success', message: 'Pay the booking money to send your request to the hotel.', data: started });
+  }
+  const request = await placeStay(ctx, prepared);
+  res.status(201).json({ status: 'success', message: sentMessage(prepared.hotel), data: { request: myView(request) } });
 });
+
+/** Send a paid-for stay request from its payment's draft (utils/bookingMoney.js). Throws AppError when it can't. */
+exports.placePaidStay = async (user, payment) => {
+  const draft = payment.draft || {};
+  const ctx = { user, hotelId: draft.hotelId, body: draft, base: draft.base || '' };
+  const prepared = await prepareStay(ctx);
+  if (prepared.deposit !== payment.amount || String(prepared.hotel.agency) !== String(payment.agency)) {
+    await releaseStayClaims(prepared);
+    throw new AppError('The hotel changed its booking money while you were paying. It is being refunded; please ask again.', 409);
+  }
+  return placeStay(ctx, prepared, payment);
+};
 
 // GET /api/v1/hotels/stay-requests (the traveler's own)
 exports.mine = catchAsync(async (req, res) => {
@@ -237,9 +300,13 @@ exports.cancel = catchAsync(async (req, res, next) => {
   const request = validId(req.params.id) ? await StayRequest.findOne({ _id: req.params.id, user: req.user._id }).populate('hotel', 'name photos address phone') : null;
   if (!request) return next(new AppError('No stay request found with that ID.', 404));
   if (!myView(request).canCancel) return next(new AppError('This request can no longer be cancelled here. Call the hotel.', 400));
+  const previous = request.status;
   request.status = 'cancelled';
   request.cancelledAt = new Date();
   await request.save();
   if (request.couponRedemption) await releaseCoupon({ stayRequest: request._id });
+  // Booking money comes back while the hotel hasn't answered; once it accepted, the hotel keeps it
+  if (previous === 'pending') await bookingMoney.refundDeposit(StayRequest, request, { reason: 'Cancelled by the guest before the hotel answered', by: req.user._id });
+  else await bookingMoney.keepDeposit(StayRequest, request);
   res.status(200).json({ status: 'success', data: { request: myView(request) } });
 });

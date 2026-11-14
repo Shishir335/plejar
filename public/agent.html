@@ -590,8 +590,9 @@
             <input id="evChildPrice" type="number" min="0" step="50" inputmode="numeric" placeholder="Same as adult">
           </div>
           <div class="field">
-            <label for="evAdvance">Booking advance (৳) *</label>
-            <input id="evAdvance" type="number" min="0" step="50" inputmode="numeric" placeholder="0 if none">
+            <label for="evAdvance">Booking money per traveler (৳) *</label>
+            <input id="evAdvance" type="number" min="1" step="50" inputmode="numeric" placeholder="500">
+            <span class="hint">Travelers pay this online by bKash or card to book. Plejar adds it to your earnings, less commission.</span>
           </div>
         </div>
         <div class="field-row">
@@ -967,6 +968,7 @@
         </div>
       </div>
       <p class="muted" style="font-size: 0.8rem; margin: -6px 0 14px;">Leave the dates empty to show it from when it's accepted until the tour leaves.</p>
+      <div class="ad-price" id="adPrice" hidden></div>
       <div class="field">
         <label>Preview</label>
         <div id="adPreview"></div>
@@ -974,6 +976,20 @@
       <div class="alert alert-error" id="adError" hidden></div>
       <button type="submit" class="btn btn-primary btn-block" id="adSubmit">Send for review</button>
     </form>
+  </div>
+
+  <div class="drawer-bg" id="adPayDrawer" hidden>
+    <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="adPayTitle">
+      <div class="drawer-head">
+        <h2 id="adPayTitle">Pay for your ad</h2>
+        <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
+      </div>
+      <div id="adPaySummary"></div>
+      <p class="muted" style="font-size: 0.85rem;">Your ad goes to Plejar for review as soon as the payment goes through. If Plejar asks for changes, fix the ad and send it again at no extra cost. Delete it before it runs and you get your money back.</p>
+      <div class="alert alert-warn" id="adPaySandbox" hidden>Test mode: payments go to the gateway's sandbox and no real money moves.</div>
+      <div class="pay-options" id="adPayOptions"></div>
+      <div class="alert alert-error" id="adPayError" hidden></div>
+    </div>
   </div>
 
   <div class="drawer-bg" id="announcementDrawer" hidden>

@@ -25,6 +25,8 @@ const hotelSchema = new mongoose.Schema(
     // Taka per night; regularPrice shows struck through when higher (a sale)
     pricePerNight: { type: Number, min: [0, 'The price cannot be negative'], required: [true, 'Enter the price per night'] },
     regularPrice: { type: Number, min: [0, 'The regular price cannot be negative'], default: null },
+    // Booking money: taka per room a guest pays online to request a stay (Plejar holds it, then pays the hotel)
+    bookingMoney: { type: Number, min: [1, 'The booking money must be at least 1 taka'], default: null },
     // Short selling points, such as "Free breakfast available"
     highlights: { type: [String], default: [] },
     amenities: { type: [String], default: [] },
