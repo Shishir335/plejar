@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { cancelRefundView } = require('../utils/cancelRefund');
+const paymentConfig = require('../utils/payments/config');
 const Package = require('../models/packageModel');
 const Agency = require('../models/agencyModel');
 const Destination = require('../models/destinationModel');
@@ -23,6 +25,7 @@ const { publicGuide } = require('./guideController');
 const { userCard } = require('../utils/social');
 const { HOLDS_SEAT } = require('../utils/events');
 const { pointsPerTaka } = require('../utils/rewards');
+const { topRatedAgencies } = require('./agencyDirectoryController');
 
 // The app's Tours tab: the home screen in one call, search with filters, a tour's page,
 // hearts (wishlist), recently viewed and "Continue Your Search"
@@ -499,9 +502,12 @@ exports.getTour = catchAsync(async (req, res, next) => {
         },
         guide: publicGuide(tour.guide && tour.guide.active ? tour.guide : null),
         reviews: { ...reviews, latest: latest.filter(r => r.user && r.user.status === 'active').map(reviewView) },
-        // "Book This Tour": request with POST /bookings { packageId, travelers }
+        // "Book This Tour": request with POST /bookings { packageId, travelers }. With bookingMoney, add
+        // payWith (one of paymentMethods) and pay at the redirectUrl that comes back before it's booked.
         booking: {
           price: card.price,
+          bookingMoney: tour.advanceAmount >= 1 ? { perTraveler: Math.round(tour.advanceAmount), cancelRefund: cancelRefundView(tour) } : null,
+          paymentMethods: paymentConfig.enabledMethods(),
           minTravelers: 1,
           maxTravelers: Math.max(maxTravelers, 0),
           dates: { start: tour.startDate, end: tour.endDate || tour.startDate, flexible: Boolean(tour.flexibleDates) },
@@ -670,13 +676,14 @@ exports.home = catchAsync(async (req, res) => {
 
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
-  const [banners, searches, recent, hotels, types, unread] = await Promise.all([
-    liveBanners(),
+  const [banners, searches, recent, hotels, types, unread, topAgents] = await Promise.all([
+    liveBanners(req, { count: true }),
     req.user ? recentSearches(req.user, 5) : [],
     req.user ? recentlyViewed(req.user, 10) : [],
     nearbyHotels({ lat, lng, user: req.user, limit: 10 }),
     typeCounts(),
-    req.user ? Notification.countDocuments({ user: req.user._id, readAt: null, ...Notification.NOT_CHAT }) : 0
+    req.user ? Notification.countDocuments({ user: req.user._id, readAt: null, ...Notification.NOT_CHAT }) : 0,
+    topRatedAgencies(req.user, 10)
   ]);
 
   res.status(200).json({
@@ -696,13 +703,17 @@ exports.home = catchAsync(async (req, res) => {
       resultCount: ranked ? ranked.length : null,
       results: ranked ? ranked.slice(0, 20) : null,
       unreadNotifications: unread,
-      banners: banners.map(bannerView),
+      banners: banners.banners.map(bannerView),
+      // How many agents' ads are live; the app can offer a "See all" screen (GET /promotions/ads)
+      adsTotal: banners.adsTotal,
       continueSearch: searches,
       popularDestinations: popular,
       recentlyViewed: recent,
       hotelsNearYou: hotels.hotels,
       hotelsNearYouBasis: hotels.basis,
-      specialOffers: offers
+      specialOffers: offers,
+      // "Top rated agents": agencies with reviews, best rated first (see agencyDirectoryController)
+      topAgents
     }
   });
 });

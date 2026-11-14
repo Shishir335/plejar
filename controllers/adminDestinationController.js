@@ -79,8 +79,8 @@ exports.summary = catchAsync(async (req, res) => {
 
 // ---------- List ----------
 
-exports.listDestinations = catchAsync(async (req, res) => {
-  const q = req.query;
+// The list's filters (also used to change the status of every match at once)
+const listFilter = (q = {}) => {
   const filter = {};
   if (Destination.TYPES.includes(q.type)) filter.type = q.type;
   if (['draft', 'published', 'archived'].includes(q.status)) filter.status = q.status;
@@ -99,6 +99,12 @@ exports.listDestinations = catchAsync(async (req, res) => {
     const rx = { $regex: escapeRegex(String(q.search).trim()), $options: 'i' };
     filter.$and = [{ $or: [{ name: rx }, { nameBn: rx }, { slug: rx }, { address: rx }] }];
   }
+  return filter;
+};
+
+exports.listDestinations = catchAsync(async (req, res) => {
+  const q = req.query;
+  const filter = listFilter(q);
 
   const page = pageParams(q);
   const statSorts = ['popular', 'trending', 'travelers'];
@@ -341,6 +347,32 @@ exports.updateDestination = catchAsync(async (req, res, next) => {
   if (dest.ancestors.map(String).join('/') !== oldPath) await refreshDescendants(dest);
   await logActivity(req, { action: 'destination.updated', summary: `Edited ${dest.type} "${dest.name}" (${dest.status})` });
   res.status(200).json({ status: 'success', data: await detailPayload(dest) });
+});
+
+// Publish, unpublish or archive many places at once:
+//   { status, ids: [...] }                    the ticked rows
+//   { status, all: true, filter: {...} }      every place matching the list's filters (same names as the list's query)
+exports.setStatuses = catchAsync(async (req, res, next) => {
+  const { status } = req.body;
+  if (!['draft', 'published', 'archived'].includes(status)) return next(new AppError('Status must be draft, published or archived.', 400));
+  let filter;
+  if (req.body.all === true) {
+    filter = listFilter(req.body.filter && typeof req.body.filter === 'object' ? req.body.filter : {});
+  } else {
+    const ids = [].concat(req.body.ids || []).filter(validId);
+    if (!ids.length) return next(new AppError('Choose at least one place.', 400));
+    if (ids.length > 1000) return next(new AppError('Choose at most 1000 places at a time.', 400));
+    filter = { _id: { $in: ids.map(toId) } };
+  }
+  const matched = await Destination.countDocuments(filter);
+  // Only published places can be featured or pinned as trending
+  const set = { status, updatedBy: req.user._id, ...(status === 'published' ? {} : { featured: false, featuredOrder: 0, trendingPinned: false }) };
+  const result = await Destination.updateMany({ $and: [filter, { status: { $ne: status } }] }, { $set: set });
+  const changed = result.modifiedCount || 0;
+  if (changed) {
+    await logActivity(req, { action: 'destination.status_bulk', summary: `${{ published: 'Published', draft: 'Moved to draft', archived: 'Archived' }[status]} ${changed} destination${changed === 1 ? '' : 's'}` });
+  }
+  res.status(200).json({ status: 'success', data: { matched, changed, status } });
 });
 
 exports.deleteDestination = catchAsync(async (req, res, next) => {

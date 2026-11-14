@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CANCEL_REFUND } = require('./cancelRefundSchema');
 
 /**
  * Hotels and resorts listed by Plejar, for "Hotels Near You" on the Tours screen
@@ -25,6 +26,11 @@ const hotelSchema = new mongoose.Schema(
     // Taka per night; regularPrice shows struck through when higher (a sale)
     pricePerNight: { type: Number, min: [0, 'The price cannot be negative'], required: [true, 'Enter the price per night'] },
     regularPrice: { type: Number, min: [0, 'The regular price cannot be negative'], default: null },
+    // Booking money: taka per room a guest pays online to request a stay (Plejar holds it, then pays the hotel)
+    bookingMoney: { type: Number, min: [1, 'The booking money must be at least 1 taka'], default: null },
+    // Booking money back when a guest cancels an accepted stay at least `days` days before check-in:
+    // `percent` of it. Later than that, none. Not set: none once accepted.
+    cancelRefund: { type: CANCEL_REFUND, default: null },
     // Short selling points, such as "Free breakfast available"
     highlights: { type: [String], default: [] },
     amenities: { type: [String], default: [] },

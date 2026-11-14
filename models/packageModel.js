@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CANCEL_REFUND } = require('./cancelRefundSchema');
 
 // The full tour plan a vendor declares before publishing (see utils/tourPlan.js for what's required)
 const STOP_KINDS = ['departure', 'stop', 'activity', 'meal', 'stay', 'return'];
@@ -90,6 +91,8 @@ const packageSchema = new mongoose.Schema(
     registrationDeadline: Date,
     seats: { type: Number, min: [1, 'An event needs at least 1 seat'], max: [1000, 'An event can have at most 1000 seats'] },
     meetingPoint: { type: String, trim: true, maxlength: [200, 'Meeting point must be 200 characters or fewer'], default: '' },
+    // The district the tour leaves from (a code from data/bangladesh.js), so ads can be shown to travelers nearby
+    startDistrict: { type: String, default: '' },
     departureTime: { type: String, default: '', validate: { validator: v => !v || TIME.test(v), message: 'Use a 24-hour departure time like 21:30' } },
     returnInfo: { type: String, trim: true, maxlength: [200, 'Keep the return details under 200 characters'], default: '' },
 
@@ -108,6 +111,9 @@ const packageSchema = new mongoose.Schema(
     excluded: { type: [String], default: [] },
     whatToBring: { type: [String], default: [] },
     difficulty: { type: String, enum: { values: ['easy', 'moderate', 'challenging'], message: 'Choose easy, moderate or challenging' } },
+    // Booking money back when a traveler cancels a confirmed booking at least `days` days before the
+    // start date: `percent` of it. Later than that, none. Not set: none once confirmed.
+    cancelRefund: { type: CANCEL_REFUND, default: null },
     cancellationPolicy: { type: String, trim: true, maxlength: [1500, 'Keep the cancellation policy under 1500 characters'], default: '' },
 
     // How the tour is shown on the app's Tours screen

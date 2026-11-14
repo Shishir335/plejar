@@ -17,6 +17,7 @@ const xss = require('xss-clean');
 const hpp = require('hpp');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
+const { clientInfo } = require('./utils/client');
 const cors = require('cors');
 
 const userRouter = require('./routes/userRoutes');
@@ -34,6 +35,7 @@ const couponRouter = require('./routes/couponRoutes');
 const reviewRouter = require('./routes/reviewRoutes');
 const complaintRouter = require('./routes/complaintRoutes');
 const agencyRouter = require('./routes/agencyRoutes');
+const paymentRouter = require('./routes/paymentRoutes');
 const hotelPanelRouter = require('./routes/hotelPanelRoutes');
 const adminAgencyRouter = require('./routes/adminAgencyRoutes');
 const adminUserRouter = require('./routes/adminUserRoutes');
@@ -62,6 +64,9 @@ app.enable('trust proxy');
 // visitor's IP from CF-Connecting-IP, which can't be faked, rather than X-Forwarded-For, which can
 app.use(cloudflare.originGuard);
 app.use(cloudflare.realClientIp);
+
+// WHICH CLIENT: the Plejar app or the website (req.client, for counting; see utils/client.js)
+app.use(clientInfo);
 
 // COMPRESS RESPONSES (first, so pages, scripts and styles are compressed as well as the API)
 app.use(compression());
@@ -276,6 +281,7 @@ app.use('/api/v1/help', socialRoutes.help);
 app.use('/api/v1/pages', socialRoutes.pages);
 app.use('/api/v1/agency-application', socialRoutes.agencyApplication);
 app.use('/api/v1/bookings', bookingRouter);
+app.use('/api/v1/payments', paymentRouter);
 app.use('/api/v1/coupons', couponRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/complaints', complaintRouter);

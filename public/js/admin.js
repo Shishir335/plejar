@@ -314,6 +314,10 @@ function navigateAdminToRoute() {
 
   // Detail views with IDs:
   // e.g. #users/:id or #users/:id/:tab
+  if (mainTab === 'users' && parts[1] === 'group' && typeof openUsersGroup === 'function') {
+    openUsersGroup(parts[2]);
+    return;
+  }
   if (mainTab === 'users' && parts[1]) {
     const userId = parts[1];
     const subTab = parts[2] || 'overview';
@@ -634,10 +638,11 @@ function renderSubscribersTable() {
     return;
   }
 
+  bulkRows('subscribers', adminState.subscribers);
   tbody.innerHTML = adminState.subscribers.map(sub => {
     const date = sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : 'N/A';
     return `
-      <tr>
+      <tr data-bulk-id="${escapeHTML(sub._id)}">
         <td style="font-weight: 600;">${escapeHTML(sub.email)}</td>
         <td><span class="badge badge-active">${escapeHTML(sub.status || 'active')}</span></td>
         <td style="color: var(--text-muted);">${escapeHTML(sub.source || 'newsletter')}</td>
@@ -862,8 +867,9 @@ async function loadPendingAgencies() {
     const reviewBody = document.getElementById('pendingReviewBody');
     if (!review.length) pendingRowMessage('pendingReviewBody', 'Nothing to review. New document submissions will appear here.');
     else {
+      bulkRows('pendingReview', review);
       reviewBody.innerHTML = review.map(a => `
-        <tr>
+        <tr data-bulk-id="${escapeHTML(a.id)}">
           <td>${agencyCell(a)}</td>
           <td>${ownerCell(a)}</td>
           <td>${escapeHTML(fmt(a.verificationSubmittedAt))}</td>
@@ -874,8 +880,9 @@ async function loadPendingAgencies() {
     const inviteBody = document.getElementById('pendingInviteBody');
     if (!invited.length) pendingRowMessage('pendingInviteBody', 'Every invited owner has signed up.');
     else {
+      bulkRows('pendingInvite', invited);
       inviteBody.innerHTML = invited.map(a => `
-        <tr>
+        <tr data-bulk-id="${escapeHTML(a.id)}">
           <td>${agencyCell(a)}</td>
           <td>${ownerCell(a)}</td>
           <td>${escapeHTML(fmt(a.createdAt))}</td>
@@ -1127,6 +1134,23 @@ function recentCard(title, linkLabel, onClick, items, render) {
 }
 
 const ROLE_LABELS = { user: 'Travelers', agent: 'Agency accounts', manager: 'Managers', admin: 'Administrators', dev: 'Developers' };
+const CLIENT_LABELS = { android: 'App on Android', ios: 'App on iPhone', app_older: 'App (older build)', web: 'Website', app: 'App', unknown: 'Not known (before tracking)' };
+
+// App or website, last 30 days. Missing on a server that predates it.
+function clientSection(c) {
+  if (!c) return '';
+  const versions = c.appVersions || [];
+  return `
+    <section class="dash-section">
+      <h3 class="dash-title">App and website <span class="dash-sub">last 30 days</span></h3>
+      <div class="chart-grid">
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">People signed in</div></div>${barList(c.activeUsers.map(r => ({ label: CLIENT_LABELS[r.key] || r.key, count: r.count })))}<p class="recent-empty">Someone who used both counts on each.</p></div>
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">Bookings and stay requests made</div></div>${barList(c.bookings.filter(r => r.count || r.key !== 'unknown').map(r => ({ label: CLIENT_LABELS[r.key] || r.key, count: r.count })))}</div>
+        <div class="chart-card"><div class="chart-head"><div class="chart-title">App versions in use</div></div>${versions.length ? barList(versions.map(v => ({ label: `Version ${v.version}`, count: v.count }))) : '<p class="recent-empty">None yet. Versions show once people update to an app build that reports it.</p>'}</div>
+      </div>
+    </section>`;
+}
+
 const VERIFY_KEY_LABELS = { verified: 'Verified', pending: 'Awaiting review', rejected: 'Changes requested', none: 'Not submitted' };
 
 function renderDashboard(d) {
@@ -1184,6 +1208,8 @@ function renderDashboard(d) {
         <div class="chart-card"><div class="chart-head"><div class="chart-title">Membership applications</div></div>${barList(bd.leadStatus.filter(r => r.count || !['contacted', 'archived'].includes(r.status)).map(r => ({ label: APPLICATION_LABELS[r.status] || r.status, count: r.count })))}</div>
       </div>
     </section>
+
+    ${clientSection(d.clients)}
 
     <section class="dash-section">
       <h3 class="dash-title">Latest activity</h3>

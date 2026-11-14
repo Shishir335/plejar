@@ -90,13 +90,24 @@ const userSchema = new mongoose.Schema({
     walletBalance: { type: Number, default: 0 },
 
     lastLoginAt: Date,
+    // When the person last used the app and the website (utils/client.js), saved at most hourly
+    seen: {
+      app: { at: Date, version: String, platform: String },
+      web: { at: Date, platform: String }
+    },
     loginCount: { type: Number, default: 0 },
 
     // Identity verification (NID, passport...) reviewed by the master admin
     verification: {
         status: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
         documents: [{
-            kind: { type: String, enum: ['nid', 'passport', 'driving_license', 'selfie'], required: true },
+            // nid_front + nid_back (or birth_certificate under 18), and three face photos:
+            // selfie (straight on), face_left and face_right. nid, passport and driving_license come from older app builds.
+            kind: {
+                type: String,
+                enum: ['nid', 'nid_front', 'nid_back', 'birth_certificate', 'passport', 'driving_license', 'selfie', 'face_left', 'face_right'],
+                required: true
+            },
             // Stored outside /public and served only through an authenticated route
             file: { type: String, required: true, select: false },
             originalName: { type: String, default: '' },
@@ -104,6 +115,14 @@ const userSchema = new mongoose.Schema({
             uploadedAt: { type: Date, default: Date.now }
         }],
         note: { type: String, trim: true, maxlength: 500, default: '' },
+        // What the app saw during the head-turn check, for the reviewer
+        liveness: {
+            order: [String], // e.g. ['left', 'right']
+            leftYaw: Number,
+            rightYaw: Number,
+            durationMs: Number,
+            platform: String
+        },
         submittedAt: Date,
         reviewedAt: Date,
         reviewedBy: { type: mongoose.Schema.ObjectId, ref: 'User' }

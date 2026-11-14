@@ -16,9 +16,9 @@
     })();
   </script>
   <link rel="stylesheet" href="/css/admin.css">
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png?v=2">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -32,7 +32,7 @@
     </button>
     <div class="login-card">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png" alt="" width="40" height="40">
+        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png?v=2" alt="" width="40" height="40">
         <div>
           <h2 style="font-size: 1.3rem; font-weight: 700;">Admin Console</h2>
           <p style="font-size: 0.84rem; color: var(--text-muted);">Sign in with administrator privileges</p>
@@ -82,9 +82,9 @@
     <!-- Sidebar -->
     <aside class="admin-sidebar">
       <div class="sidebar-header">
-        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png" alt="" width="34" height="34">
+        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png?v=2" alt="" width="34" height="34">
         <div class="sidebar-brand-name">
-          <img class="sidebar-brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74">
+          <img class="sidebar-brand-logo" src="/assets/brand/plejar-logo-light.png?v=2" alt="Plejar" width="500" height="160">
           <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;">Admin Console</span>
         </div>
       </div>
@@ -95,11 +95,20 @@
           <span class="sidebar-text">Dashboard</span>
         </button>
 
-        <button class="nav-link-btn" data-tab="users" onclick="switchTab('users')">
-          <span>👥</span>
-          <span class="sidebar-text">Users</span>
-          <span id="usersAttentionCount" class="nav-count" hidden>0</span>
-        </button>
+        <div class="nav-group" id="usersNavGroup">
+          <button class="nav-link-btn" data-tab="users" onclick="openUsersByRole('')" aria-controls="usersNavSub">
+            <span>👥</span>
+            <span class="sidebar-text">Users</span>
+            <span id="usersAttentionCount" class="nav-count" hidden>0</span>
+            <span class="nav-caret" role="button" tabindex="0" aria-label="Show or hide the user groups" onclick="event.stopPropagation(); toggleUsersNav()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); toggleUsersNav(); }">▾</span>
+          </button>
+          <div class="nav-sub" id="usersNavSub">
+            <button class="nav-sub-btn" data-urole="" onclick="openUsersByRole('')"><span class="sidebar-text">All users</span><span class="nav-sub-count" data-count="all"></span></button>
+            <button class="nav-sub-btn" data-urole="user" onclick="openUsersByRole('user')"><span class="sidebar-text">Travelers</span><span class="nav-sub-count" data-count="user"></span></button>
+            <button class="nav-sub-btn" data-urole="agent" onclick="openUsersByRole('agent')"><span class="sidebar-text">Vendors</span><span class="nav-sub-count" data-count="agent"></span></button>
+            <button class="nav-sub-btn" data-urole="staff" onclick="openUsersByRole('staff')"><span class="sidebar-text">Staff</span><span class="nav-sub-count" data-count="staff"></span></button>
+          </div>
+        </div>
 
         <button class="nav-link-btn" data-tab="subscribers" onclick="switchTab('subscribers')">
           <span>📬</span>
@@ -212,7 +221,8 @@
                 <select id="uRole" class="form-select" aria-label="Role" onchange="loadUsers(1)">
                   <option value="">All roles</option>
                   <option value="user">Travelers</option>
-                  <option value="agent">Agency accounts</option>
+                  <option value="agent">Vendors</option>
+                  <option value="staff">Staff (all)</option>
                   <option value="manager">Managers</option>
                   <option value="admin">Administrators</option>
                   <option value="dev">Developers</option>
@@ -450,6 +460,14 @@
           </div>
 
           <div class="subpane" id="csub-ads">
+            <form id="adPriceForm" class="ad-price-card" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 14px 16px; margin: 0 0 16px; border: 1px solid var(--admin-border); border-radius: 12px;">
+              <div>
+                <label for="adPricePerDay" style="display: block; font-weight: 600; margin-bottom: 4px;">Ad price per day (৳)</label>
+                <input id="adPricePerDay" type="number" min="0" max="100000" step="1" inputmode="numeric" style="width: 140px;" placeholder="0">
+              </div>
+              <button type="submit" class="btn btn-primary">Save price</button>
+              <p class="lead-sub" id="adPriceNote" style="margin: 0; flex: 1 1 260px;">Vendors pay this for every day their ad runs, when they apply. 0 keeps ads free.</p>
+            </form>
             <p class="lead-sub" style="margin: 0 0 12px;">Vendors apply here to advertise a tour. An accepted ad becomes a slide on the app's Tours screen during its dates, and joins the Tours banners list.</p>
             <div class="control-bar">
               <div class="filters" id="adRequestChips"></div>
@@ -459,6 +477,18 @@
               <table class="admin-table lead-table">
                 <thead><tr><th>Ad</th><th>Vendor</th><th>Tour</th><th>Shows</th><th>Sent</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="adRequestsTableBody"></tbody>
+              </table>
+            </div>
+            <h3 style="margin: 28px 0 8px;">Payments: ads and booking money</h3>
+            <p class="lead-sub" style="margin: 0 0 12px;">What vendors paid for ads, and the booking money travelers paid for tours and hotel stays. Refunds happen automatically (an ad deleted before it runs, a booking declined or cancelled in time); when the gateway refuses, the refund waits here for you.</p>
+            <div class="control-bar">
+              <div class="filters" id="adPaymentChips"></div>
+              <div class="actions"><button class="btn btn-secondary" onclick="loadAdPayments()">↻ Refresh</button></div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>For</th><th>Vendor</th><th>Amount</th><th>Paid with</th><th>When</th><th style="text-align: right;">Refund</th></tr></thead>
+                <tbody id="adPaymentsTableBody"></tbody>
               </table>
             </div>
           </div>
@@ -619,9 +649,10 @@
                 <button class="btn btn-primary" onclick="openNewDestination()">+ Add destination</button>
               </div>
             </div>
+            <div id="destBulkBar" class="bulk-bar" hidden role="region" aria-label="Selected destinations"></div>
             <div class="table-container">
               <table class="admin-table">
-                <thead><tr><th>Destination</th><th>Type</th><th>Map &amp; media</th><th>Availability</th><th>Events</th><th>Travelers</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead><tr><th class="sel-col"><input type="checkbox" id="destSelectPage" aria-label="Select every place on this page" onchange="selectDestinationPage(this.checked)"></th><th>Destination</th><th>Type</th><th>Map &amp; media</th><th>Availability</th><th>Events</th><th>Travelers</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="destinationsTableBody"></tbody>
               </table>
             </div>
@@ -1847,6 +1878,7 @@
   <script src="/js/google-auth.js"></script>
   <script src="/js/admin.js"></script>
   <script src="/js/admin-users.js"></script>
+  <script src="/js/admin-bulk.js"></script>
   <script src="/js/admin-social.js"></script>
   <script src="/js/admin-vendors.js"></script>
   <script src="/js/admin-vendor-profile.js"></script>
@@ -1858,5 +1890,6 @@
   <script src="/js/admin-rewards.js"></script>
   <script src="/js/coupons-panel.js"></script>
   <script src="/js/admin-notifications.js"></script>
+  <script src="/js/admin-bulk-lists.js"></script>
 </body>
 </html>

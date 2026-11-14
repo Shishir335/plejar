@@ -152,7 +152,6 @@ async function handleApply(e) {
   const rooms = get('rooms');
 
   if (!get('agencyName')) return showFormError('applyError', t(hotel ? 'errHotel' : 'errAgency'), form.agencyName);
-  if (!get('tradeLicenseNumber')) return showFormError('applyError', t('errLicenseNo'), form.tradeLicenseNumber);
   if (year && !/^(19[5-9]\d|20\d\d)$/.test(year)) return showFormError('applyError', t(hotel ? 'errYearHotel' : 'errYear'), form.yearStarted);
   if (hotel) {
     if (!get('officeAddress')) return showFormError('applyError', t('errHotelAddress'), form.officeAddress);
@@ -163,7 +162,6 @@ async function handleApply(e) {
   if (!get('contactName')) return showFormError('applyError', t('errName'), form.contactName);
   if (!BD_PHONE.test(phone)) return showFormError('applyError', t('errPhone'), form.phone);
   if (!EMAIL.test(get('email'))) return showFormError('applyError', t('errEmail'), form.email);
-  if (!picked.trade_license.length) return showFormError('applyError', t('errLicenseFile'), form.querySelector('[data-kind="trade_license"]'));
   if (!picked.nid.length) return showFormError('applyError', t('errNidFile'), form.querySelector('[data-kind="nid"]'));
   if (!form.agreedToTerms.checked) return showFormError('applyError', t('errAgree'), form.querySelector('.agree'));
   clearFormError('applyError');

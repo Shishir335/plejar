@@ -1,3 +1,4 @@
+const { noteSeen } = require('../utils/client');
 const crypto = require('crypto');
 const { promisify } = require('util');
 const jwt = require('jsonwebtoken');
@@ -325,6 +326,8 @@ exports.protect = catchAsync(async (req, res, next) => {
     // Grant access to protected route
     req.user = currentUser;
     res.locals.user = currentUser;
+    // The app or the website, for counting who uses which (at most hourly; doesn't wait)
+    noteSeen(currentUser, req.client);
 
     next();
 });

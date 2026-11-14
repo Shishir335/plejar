@@ -121,7 +121,6 @@ exports.createApplication = catchAsync(async (req, res, next) => {
   };
 
   if (!values.agencyName) return next(new AppError(isHotel ? 'Enter your hotel name.' : 'Enter your agency name.', 400));
-  if (!values.tradeLicenseNumber) return next(new AppError('Enter your trade license number.', 400));
   if (!values.contactName) return next(new AppError('Enter your name.', 400));
   if (!BD_PHONE.test(values.phone)) return next(new AppError('Enter a Bangladeshi mobile number, for example 01712345678.', 400));
   if (values.yearStarted !== undefined && !Number.isInteger(values.yearStarted)) return next(new AppError(`Enter the year your ${isHotel ? 'hotel' : 'agency'} started, for example 2018.`, 400));
@@ -134,7 +133,7 @@ exports.createApplication = catchAsync(async (req, res, next) => {
   }
 
   const files = req.files || {};
-  if (!files.trade_license || !files.trade_license.length) return next(new AppError('Upload a photo or PDF of your trade license.', 400));
+  // Only the owner's NID is required; the trade license, tourism license and other files are optional
   if (!files.nid || !files.nid.length) return next(new AppError("Upload the owner's national ID card.", 400));
   if (text(b.agreedToTerms) !== 'true') return next(new AppError('Please confirm the details are true and agree to the member terms.', 400));
 
@@ -144,7 +143,8 @@ exports.createApplication = catchAsync(async (req, res, next) => {
     vendorType: isHotel ? 'hotel' : { $ne: 'hotel' },
     $or: [
       { email: values.email },
-      { tradeLicenseNumber: { $regex: `^${escapeRegex(values.tradeLicenseNumber)}$`, $options: 'i' } }
+      // The trade license number is optional; only a given one is matched
+      ...(values.tradeLicenseNumber ? [{ tradeLicenseNumber: { $regex: `^${escapeRegex(values.tradeLicenseNumber)}$`, $options: 'i' } }] : [])
     ]
   }).select('_id');
   if (open) {

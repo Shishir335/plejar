@@ -65,8 +65,9 @@ async function loadApplications(page = AP.page) {
       : 'No applications match. Agencies apply on the website at /apply.';
     tableMessage('applicationsTableBody', 7, empty);
   } else {
+    bulkRows('applications', rows);
     document.getElementById('applicationsTableBody').innerHTML = rows.map(r => `
-      <tr class="row-link" onclick="openApplication('${E(r._id)}')">
+      <tr class="row-link" onclick="openApplication('${E(r._id)}')" data-bulk-id="${E(r._id)}">
         <td><span class="lead-main">${E(r.agencyName)}${r.vendorType === 'hotel' ? ' <span class="tag">Hotel</span>' : ''}</span><span class="lead-sub">${r.reference ? E(r.reference) : 'From the old contact form'}${r.source === 'app' ? ' · from the app' : ''}</span></td>
         <td><span class="lead-main">${E(r.contactName)}</span><span class="lead-sub">${E(r.phone)}</span></td>
         <td><span class="lead-sub" style="margin-top:0">${E([r.district, r.regions].filter(Boolean).join(': ')) || '—'}</span></td>
@@ -128,11 +129,14 @@ function appRow(name, value) {
 function applicationChecks(app, checks) {
   const notes = [];
   const has = kind => app.documents.some(d => d.kind === kind);
-  if (!has('trade_license')) notes.push(['warn', 'No trade license file. Ask for it before accepting.']);
   if (app.source === 'app') {
+    if (!has('trade_license')) notes.push(['warn', 'No trade license file. Ask for it before accepting.']);
     if (!has('insurance')) notes.push(['warn', 'No proof of insurance. Ask for it before accepting.']);
     if (!has('tax_id')) notes.push(['warn', 'No tax ID document. Ask for it before accepting.']);
-  } else if (!has('nid')) notes.push(['warn', "No owner's national ID. Ask for it before accepting."]);
+  } else {
+    if (!has('nid')) notes.push(['warn', "No owner's national ID. Ask for it before accepting."]);
+    if (!has('trade_license')) notes.push(['info', 'No trade license file. It is optional, so you can accept without it.']);
+  }
   if (checks.account) {
     const roles = (checks.account.roles && checks.account.roles.length ? checks.account.roles : [checks.account.role]).map(r => ROLE_NAMES[r] || r).join(', ');
     if (checks.account.agency) notes.push(['error', `${app.email} already belongs to an agency (${checks.account.name}). Accepting needs a different email.`]);

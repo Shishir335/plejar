@@ -14,6 +14,7 @@ router.get('/destinations/geography', d.geography);
 router.get('/destinations/statistics', d.statistics);
 router.get('/destinations/trending', d.listTrending);
 router.route('/destinations/featured').get(d.listFeatured).put(d.setFeatured);
+router.patch('/destinations/status', d.setStatuses);
 router.route('/destinations').get(d.listDestinations).post(d.createDestination);
 router.route('/destinations/:id').get(d.getDestination).patch(d.updateDestination).delete(adminOnly, d.deleteDestination);
 router.route('/destinations/:id/photos').post(imageUpload.array('photos', 10), d.addPhotos).patch(d.updatePhotos);

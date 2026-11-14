@@ -364,6 +364,17 @@ img { display: block; max-width: 100%; }
 
 /* Tour ads: the slide as the app shows it */
 .ad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.ad-price { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--tea-wash); font-size: 0.9rem; }
+.ad-price strong { font-size: 1rem; }
+.ad-paid { margin-top: 6px; font-size: 0.82rem; color: var(--ink-faint); }
+.pay-summary { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.pay-summary strong { font-size: 1.5rem; }
+.pay-options { display: grid; gap: 10px; margin: 16px 0; }
+.pay-option { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); font: inherit; text-align: left; cursor: pointer; }
+.pay-option:hover, .pay-option:focus-visible { border-color: var(--tea); }
+.pay-option[disabled] { opacity: 0.6; cursor: wait; }
+.pay-option strong { font-size: 1rem; }
+.pay-option span { font-size: 0.82rem; color: var(--ink-faint); }
 .ad-card { display: flex; flex-direction: column; background: var(--white); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
 .ad-slide { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; min-height: 150px; padding: 18px; border-radius: 12px; color: #fff; background-color: var(--ink); background-size: cover; background-position: center; background-blend-mode: multiply; background-image: none; overflow-wrap: anywhere; }
 .ad-slide[style] { background-color: rgba(0, 0, 0, 0.45); }

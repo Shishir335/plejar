@@ -3,6 +3,7 @@ const authController = require('../controllers/authController');
 const hotels = require('../controllers/hotelController');
 const promotions = require('../controllers/promotionController');
 const ads = require('../controllers/adController');
+const payments = require('../controllers/paymentController');
 const vouchers = require('../controllers/voucherController');
 const coupons = require('../controllers/couponController');
 const help = require('../controllers/helpController');
@@ -23,6 +24,10 @@ router.route('/promotions/:id').patch(imageUpload.single('image'), promotions.ad
 router.get('/ad-requests', ads.adminAdRequests);
 router.post('/ad-requests/:id/approve', ads.adminApprove);
 router.post('/ad-requests/:id/reject', ads.adminReject);
+// What ads cost (the master admin sets it) and what vendors paid
+router.route('/ad-settings').get(payments.adSettings).patch(adminOnly, payments.adSettings);
+router.get('/ad-payments', payments.adPayments);
+router.post('/ad-payments/:id/refund', adminOnly, payments.settleRefund);
 
 router.route('/vouchers').get(vouchers.adminList).post(imageUpload.single('image'), vouchers.adminCreate);
 router.route('/vouchers/:id').patch(imageUpload.single('image'), vouchers.adminUpdate).delete(adminOnly, vouchers.adminDelete);

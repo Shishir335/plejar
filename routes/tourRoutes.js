@@ -6,6 +6,7 @@ const promotions = require('../controllers/promotionController');
 const chat = require('../controllers/chatController');
 const guides = require('../controllers/guideController');
 const stays = require('../controllers/stayController');
+const { requireVerifiedIdentity } = require('../utils/identity');
 
 // The app's Tours tab (anyone can browse; hearts, searches and recently viewed need sign-in)
 const tourRouter = express.Router();
@@ -32,12 +33,13 @@ hotelRouter.get('/stay-requests', protect, stays.mine);
 hotelRouter.post('/stay-requests/:id/cancel', protect, stays.cancel);
 hotelRouter.get('/:id', optionalAuth, hotels.getHotel);
 hotelRouter.get('/:id/availability', stays.availability);
-hotelRouter.post('/:id/stay-requests', protect, stays.create);
+hotelRouter.post('/:id/stay-requests', protect, requireVerifiedIdentity, stays.create);
 hotelRouter.route('/:id/save').post(protect, tours.save('hotel')).delete(protect, tours.unsave('hotel'));
 
 // Banners at the top of the Tours screen
 const promotionRouter = express.Router();
 promotionRouter.get('/', promotions.listLive);
+promotionRouter.get('/ads', optionalAuth, promotions.listAds);
 
 // Local guides travelers can hire ("Guide" in My Bookings)
 const guideRouter = express.Router();

@@ -4,15 +4,40 @@
     {
       "name": "plezar",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["server.js"],
-      "env": { "PORT": "3917" },
+      "runtimeArgs": [
+        "server.js"
+      ],
+      "env": {
+        "PORT": "3917"
+      },
       "port": 3917
     },
     {
       "name": "plezar-dev",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["server.js"],
-      "env": { "PORT": "3918", "NODE_ENV": "development" },
+      "runtimeArgs": [
+        "server.js"
+      ],
+      "env": {
+        "PORT": "3918",
+        "NODE_ENV": "development"
+      },
+      "port": 3918
+    },
+    {
+      "name": "plezar-safe",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server.js"
+      ],
+      "env": {
+        "PORT": "3918",
+        "NODE_ENV": "development",
+        "GMAIL_USER": "",
+        "GMAIL_PASS": "",
+        "CLOUDINARY_CLOUD_NAME": "",
+        "REPORT_SCHEDULER": "off"
+      },
       "port": 3918
     }
   ]

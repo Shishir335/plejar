@@ -24,7 +24,7 @@ function switchContentSub(name) {
     b.setAttribute('aria-selected', String(on));
   });
   document.querySelectorAll('#tab-content .subpane').forEach(p => p.classList.toggle('active', p.id === `csub-${name}`));
-  if (name === 'ads') loadAdRequests();
+  if (name === 'ads') { loadAdRequests(); loadAdPrice(); loadAdPayments(); }
   else if (name === 'vouchers') loadVouchers();
   else if (name === 'coupons') loadAdminCoupons();
   else if (name === 'help') loadHelp();
@@ -46,6 +46,7 @@ async function loadBanners() {
   if (!ok) return tableMessage('bannersTableBody', 6, data.message || 'Could not load banners.', true);
   C.banners = data.data.promotions;
   if (!C.banners.length) return tableMessage('bannersTableBody', 6, 'No banners yet. Add one to show it on the Tours screen.');
+  bulkRows('banners', C.banners);
   document.getElementById('bannersTableBody').innerHTML = C.banners.map(b => {
     const opens = {
       sale_tours: `${TARGET_TEXT.sale_tours}${b.minDiscount ? `, ${b.minDiscount}%+ off` : ''}`,
@@ -55,7 +56,7 @@ async function loadBanners() {
       tour_type: `${E(b.tourType)} tours`
     }[b.target];
     return `
-      <tr class="${b.live ? '' : 'row-muted'}">
+      <tr class="${b.live ? '' : 'row-muted'}" data-bulk-id="${E(b._id)}">
         <td><div style="display:flex; gap:10px; align-items:center;">
           ${b.image ? `<img src="${E(b.image)}" alt="" style="width:72px; height:40px; object-fit:cover; border-radius:6px;">` : ''}
           <div><strong>${E(b.title)}</strong><span class="lead-sub">${E(b.subtitle || '')}</span></div></div></td>
@@ -203,13 +204,14 @@ async function loadAdRequests(status = C.adStatus || 'pending') {
   setAdCounts(counts.pending);
   document.getElementById('adRequestChips').innerHTML = AD_FILTERS.map(([key, text]) => `<button type="button" class="chip ${status === key ? 'chip-active' : ''}" aria-pressed="${status === key}" onclick="loadAdRequests('${key}')"><strong>${counts[key]}</strong> ${E(text)}</button>`).join('');
   if (!ads.length) return tableMessage('adRequestsTableBody', 6, { pending: 'No ads waiting for review.', approved: 'No accepted ads yet.', rejected: 'No rejected ads.' }[status]);
+  bulkRows('adRequests', ads);
   document.getElementById('adRequestsTableBody').innerHTML = ads.map(a => `
-    <tr>
+    <tr data-bulk-id="${E(a._id)}">
       <td>${adSlidePreview(a)}</td>
       <td><strong>${E(a.agency ? a.agency.name : 'Vendor')}</strong><span class="lead-sub">${E(a.submittedBy ? a.submittedBy.name : '')}</span></td>
       <td>${E(a.tour && a.tour.title ? a.tour.title : 'Tour')}${a.tour && a.tour.startDate ? `<span class="lead-sub">Leaves ${E(fmtDate(a.tour.startDate))}</span>` : ''}</td>
       <td style="white-space:nowrap;">${a.startsAt ? E(fmtDate(a.startsAt)) : 'When accepted'} to ${E(fmtDate(a.endsAt))}${status === 'approved' ? `<span class="lead-sub">${Number(a.clicks)} taps</span>` : ''}</td>
-      <td style="white-space:nowrap;">${E(fmtDate(a.createdAt))}${a.reviewedBy ? `<span class="lead-sub">By ${E(a.reviewedBy)}</span>` : ''}</td>
+      <td style="white-space:nowrap;">${E(fmtDate(a.createdAt))}${a.reviewedBy ? `<span class="lead-sub">By ${E(a.reviewedBy)}</span>` : ''}${a.payment ? `<span class="lead-sub">Paid ${E(taka(a.payment.amount))} by ${E(PAY_NAMES[a.payment.method] || a.payment.method)}${a.payment.sandbox ? ' (test)' : ''}</span>${a.payment.flagged ? '<span class="lead-sub" style="color:#b45309;">SSLCommerz flagged this payment as risky</span>' : ''}` : ''}</td>
       <td style="text-align:right; white-space:nowrap;">
         ${a.state === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="approveAd('${E(a._id)}')">Accept</button>
         <button class="btn btn-danger btn-sm" onclick="rejectAd('${E(a._id)}')">Reject</button>` : `<span class="badge ${AD_STATE_BADGE[a.state] || 'badge-inactive'}">${E(a.state)}</span>${a.rejectedReason ? `<span class="lead-sub" style="white-space:normal;">${E(a.rejectedReason)}</span>` : ''}`}
@@ -239,6 +241,89 @@ function rejectAd(id) {
   });
 }
 
+// ---------- Ad price and payments ----------
+
+const PAY_NAMES = { bkash: 'bKash', sslcommerz: 'SSLCommerz' };
+const PAYMENT_FILTERS = [['paid', 'Paid'], ['refund_due', 'Refund due'], ['refunded', 'Refunded']];
+
+function describeAdPricing(s) {
+  const gateways = s.methods.length ? s.methods.map(m => PAY_NAMES[m] || m).join(' and ') : 'no gateway yet (add the bKash or SSLCommerz keys to the server settings)';
+  return `Vendors pay this for every day their ad runs, when they apply. 0 keeps ads free. Paying with ${gateways}${s.methods.length && !s.live ? ', in sandbox mode (no real money)' : ''}.`;
+}
+
+async function loadAdPrice() {
+  const { ok, data } = await adminFetch('/api/v1/admin/ad-settings');
+  if (!ok) return;
+  document.getElementById('adPricePerDay').value = data.data.settings.pricePerDay;
+  document.getElementById('adPriceNote').textContent = describeAdPricing(data.data.settings);
+}
+
+document.getElementById('adPriceForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const value = document.getElementById('adPricePerDay').value.trim();
+  const { ok, data } = await adminFetch('/api/v1/admin/ad-settings', { method: 'PATCH', body: JSON.stringify({ pricePerDay: Number(value || 0) }) });
+  if (!ok) return showAdminToast(data.message || 'Could not save the ad price.', 'error');
+  const s = data.data.settings;
+  document.getElementById('adPriceNote').textContent = describeAdPricing(s);
+  showAdminToast(s.pricePerDay ? `Ads now cost ${taka(s.pricePerDay)} a day.` : 'Ads are free now.', 'success');
+});
+
+async function loadAdPayments(status = C.paymentStatus || 'paid') {
+  C.paymentStatus = status;
+  tableMessage('adPaymentsTableBody', 6, 'Loading...');
+  const { ok, data } = await adminFetch(`/api/v1/admin/ad-payments?status=${status}`);
+  if (!ok) return tableMessage('adPaymentsTableBody', 6, data.message || 'Could not load payments.', true);
+  const { payments, counts } = data.data;
+  C.adPayments = payments;
+  document.getElementById('adPaymentChips').innerHTML = PAYMENT_FILTERS.map(([key, text]) => `<button type="button" class="chip ${status === key ? 'chip-active' : ''}" aria-pressed="${status === key}" onclick="loadAdPayments('${key}')"><strong>${counts[key]}</strong> ${E(text)}</button>`).join('');
+  if (!payments.length) return tableMessage('adPaymentsTableBody', 6, { paid: 'No payments yet.', refund_due: 'No refunds waiting.', refunded: 'No refunds yet.' }[status]);
+  bulkRows('adPayments', payments);
+  document.getElementById('adPaymentsTableBody').innerHTML = payments.map(p => {
+    const refund = p.refund;
+    let refundCell = '<span class="lead-sub">None</span>';
+    if (p.status === 'refund_failed') {
+      refundCell = `<span class="lead-sub" style="white-space:normal; color:#b4233c;">${E(refund && refund.error ? refund.error : 'The gateway refused')}</span>
+        <button class="btn btn-secondary btn-sm" onclick="retryRefund('${E(p._id)}')">Try again</button>
+        <button class="btn btn-primary btn-sm" onclick="recordRefund('${E(p._id)}')">Refunded by hand</button>`;
+    } else if (p.status === 'refunding') refundCell = '<span class="badge badge-manager">In progress</span>';
+    else if (p.status === 'refunded') refundCell = `<span class="badge badge-inactive">Refunded${refund && refund.amount && refund.amount < p.amount ? ` ${taka(refund.amount)} of ${taka(p.amount)}` : ''}</span>${refund && refund.ref ? `<span class="lead-sub">${E(refund.manual ? 'By hand: ' : '')}${E(refund.ref)}</span>` : ''}${refund && refund.reason ? `<span class="lead-sub" style="white-space:normal;">${E(refund.reason)}</span>` : ''}`;
+    return `
+    <tr data-bulk-id="${E(p._id)}">
+      <td>${E(p.description)}<span class="lead-sub">${E(p.purposeName || 'Ad')} · ${E(p.invoice)}</span></td>
+      <td><strong>${E(p.agency ? p.agency.name : 'Vendor')}</strong><span class="lead-sub">${p.purpose === 'ad' ? '' : 'Paid by traveler '}${E(p.paidBy)}</span></td>
+      <td style="white-space:nowrap;">${E(taka(p.amount))}<span class="lead-sub">${p.purpose === 'ad'
+    ? `${p.days} ${p.days === 1 ? 'day' : 'days'} × ${E(taka(p.pricePerDay))}`
+    : `${p.units} ${p.purpose === 'stay' ? (p.units === 1 ? 'room' : 'rooms') : (p.units === 1 ? 'traveler' : 'travelers')} × ${E(taka(p.perUnit))}`}</span></td>
+      <td style="white-space:nowrap;">${E(PAY_NAMES[p.method] || p.method)}${p.sandbox ? ' (test)' : ''}<span class="lead-sub">${E(p.trxId)}</span>${p.flagged ? '<span class="lead-sub" style="color:#b45309;">Flagged as risky</span>' : ''}</td>
+      <td style="white-space:nowrap;">${E(fmtDate(p.paidAt || p.createdAt))}</td>
+      <td style="text-align:right;">${refundCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function retryRefund(id) {
+  const p = C.adPayments.find(x => x._id === id);
+  if (!p || !confirm(`Ask ${PAY_NAMES[p.method] || p.method} again to refund ${taka((p.refund && p.refund.amount) || p.amount)} to ${p.purpose === 'ad' ? (p.agency ? p.agency.name : 'the vendor') : 'the traveler'}?`)) return;
+  const { ok, data } = await adminFetch(`/api/v1/admin/ad-payments/${id}/refund`, { method: 'POST', body: JSON.stringify({}) });
+  showAdminToast(data.message || (ok ? 'Refunded.' : 'Could not refund.'), ok ? 'success' : 'error');
+  loadAdPayments();
+}
+
+function recordRefund(id) {
+  const p = C.adPayments.find(x => x._id === id);
+  askReason({
+    title: 'Record a refund made by hand',
+    lead: `Send ${taka(p ? p.amount : 0)} back to ${p && p.agency ? p.agency.name : 'the vendor'} yourself (bKash, Nagad or bank), then enter its transaction ID here.`,
+    label: 'Transaction ID of the refund', confirmLabel: 'Mark refunded', maxLength: 100,
+    onSubmit: async ref => {
+      const { ok, data } = await adminFetch(`/api/v1/admin/ad-payments/${id}/refund`, { method: 'POST', body: JSON.stringify({ ref }) });
+      if (!ok) throw new Error(data.message || 'Could not record the refund.');
+      showAdminToast('Refund recorded.', 'success');
+      loadAdPayments();
+    }
+  });
+}
+
 // ---------- Hotels ----------
 
 const debouncedHotels = makeDebounce(() => loadHotels(1));
@@ -252,8 +337,9 @@ async function loadHotels(page = C.page) {
   C.hotels = data.data.hotels;
   renderPager('hotelsPager', data.data, 'loadHotels');
   if (!C.hotels.length) return tableMessage('hotelsTableBody', 6, 'No hotels yet. Add one to show it in "Hotels Near You".');
+  bulkRows('hotels', C.hotels);
   document.getElementById('hotelsTableBody').innerHTML = C.hotels.map(h => `
-    <tr class="${h.status === 'published' ? '' : 'row-muted'}">
+    <tr class="${h.status === 'published' ? '' : 'row-muted'}" data-bulk-id="${E(h._id)}">
       <td><div style="display:flex; gap:10px; align-items:center;">
         ${h.photo ? `<img src="${E(h.photo)}" alt="" style="width:56px; height:42px; object-fit:cover; border-radius:6px;">` : ''}
         <div><strong>${E(h.name)}</strong>${h.featured ? ' <span class="badge badge-manager">Featured</span>' : ''}<span class="lead-sub">${E(h.type.replace('_', ' '))}${h.starRating ? `, ${'★'.repeat(h.starRating)}` : ''}</span></div></div></td>

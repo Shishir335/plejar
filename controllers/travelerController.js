@@ -1,3 +1,4 @@
+const { cancelRefundView } = require('../utils/cancelRefund');
 const Package = require('../models/packageModel');
 const Agency = require('../models/agencyModel');
 const Announcement = require('../models/announcementModel');
@@ -46,6 +47,7 @@ const publicEvent = (event, stats) => {
     returnInfo: e.returnInfo,
     childPrice: e.childPrice,
     advanceAmount: e.advanceAmount,
+    cancelRefund: cancelRefundView(e),
     excluded: e.excluded,
     whatToBring: e.whatToBring,
     difficulty: e.difficulty,

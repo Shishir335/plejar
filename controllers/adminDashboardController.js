@@ -5,6 +5,8 @@ const User = require('../models/userModel');
 const AgentLead = require('../models/agentLeadModel');
 const Subscriber = require('../models/subscriberModel');
 const Hotel = require('../models/hotelModel');
+const Booking = require('../models/bookingModel');
+const StayRequest = require('../models/stayRequestModel');
 const catchAsync = require('../utils/catchAsync');
 
 const TZ = 'Asia/Dhaka';
@@ -41,6 +43,42 @@ const hotelAttention = async () => {
     Hotel.countDocuments({ status: 'draft', agency: { $ne: null } })
   ]);
   return { hotelLeads, hotelPendingVerification, draftListings };
+};
+
+/**
+ * App or website, over the last 30 days (utils/client.js): people active on each, bookings and stay
+ * requests made on each, and the app versions people are on. Users count once per client they used.
+ * Older app builds (before the client header) show as "App (older build)".
+ */
+const clientUse = async since => {
+  const [android, ios, olderApp, web, bookings, stays, versions] = await Promise.all([
+    User.countDocuments({ 'seen.app.at': { $gte: since }, 'seen.app.platform': 'android' }),
+    User.countDocuments({ 'seen.app.at': { $gte: since }, 'seen.app.platform': 'ios' }),
+    User.countDocuments({ 'seen.app.at': { $gte: since }, 'seen.app.platform': { $nin: ['android', 'ios'] } }),
+    User.countDocuments({ 'seen.web.at': { $gte: since } }),
+    Booking.aggregate([{ $match: { createdAt: { $gte: since } } }, { $group: { _id: { $ifNull: ['$source.type', 'unknown'] }, count: { $sum: 1 } } }]),
+    StayRequest.aggregate([{ $match: { createdAt: { $gte: since } } }, { $group: { _id: { $ifNull: ['$source.type', 'unknown'] }, count: { $sum: 1 } } }]),
+    User.aggregate([
+      { $match: { 'seen.app.at': { $gte: since }, 'seen.app.version': { $nin: [null, ''] } } },
+      { $group: { _id: '$seen.app.version', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 6 }
+    ])
+  ]);
+  const made = ['app', 'web', 'unknown'].map(key => ({
+    key,
+    count: [...bookings, ...stays].filter(r => r._id === key).reduce((n, r) => n + r.count, 0)
+  }));
+  return {
+    activeUsers: [
+      { key: 'android', count: android },
+      { key: 'ios', count: ios },
+      { key: 'app_older', count: olderApp },
+      { key: 'web', count: web }
+    ],
+    bookings: made,
+    appVersions: versions.map(v => ({ version: v._id, count: v.count }))
+  };
 };
 
 exports.getDashboard = catchAsync(async (req, res, next) => {
@@ -186,6 +224,8 @@ exports.getDashboard = catchAsync(async (req, res, next) => {
         // The hotels' share of the two above, so the dashboard can send each to Travel agents or Hotels
         ...(await hotelAttention())
       },
+      // The app or the website (users.seen, bookings' and stays' source)
+      clients: await clientUse(since),
       breakdowns: {
         userRoles: byRole,
         leadStatus: leads,

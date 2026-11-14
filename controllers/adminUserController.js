@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { ID_KINDS, FACE_KINDS, ageOn } = require('../utils/identity');
 const User = require('../models/userModel');
 const Booking = require('../models/bookingModel');
 const Review = require('../models/reviewModel');
@@ -88,8 +89,14 @@ const userView = u => {
       reviewedAt: v.reviewedAt || null,
       documents: (v.documents || []).map(d => ({
         id: d._id, kind: d.kind, originalName: d.originalName, mimeType: d.mimeType, uploadedAt: d.uploadedAt
-      }))
+      })),
+      // What the app recorded during the head-turn check
+      liveness: v.liveness && v.liveness.order && v.liveness.order.length ? {
+        order: v.liveness.order, leftYaw: v.liveness.leftYaw, rightYaw: v.liveness.rightYaw,
+        durationMs: v.liveness.durationMs, platform: v.liveness.platform || ''
+      } : null
     },
+    age: ageOn(u.dateOfBirth),
     // Accounts don't store a creation date, but their ID does
     joinedAt: u._id.getTimestamp()
   };
@@ -123,10 +130,16 @@ exports.summary = catchAsync(async (req, res, next) => {
     User.countDocuments({ ...live, $or: [{ 'restrictions.booking': true }, { 'restrictions.reviews': true }, { 'restrictions.messaging': true }, { 'restrictions.posting': true }] }),
     Complaint.countDocuments({ status: { $in: ['open', 'in_review'] } })
   ]);
+  // Accounts by role, for the sidebar (an account with two roles counts in both)
+  const [travelers, vendors, staff] = await Promise.all([
+    User.countDocuments({ $and: [live, roleFilter('user')] }),
+    User.countDocuments({ $and: [live, roleFilter('agent')] }),
+    User.countDocuments({ $and: [live, { $or: STAFF.map(r => roleFilter(r)) }] })
+  ]);
 
   res.status(200).json({
     status: 'success',
-    data: { summary: { total, active: total - suspended - deactivated, suspended, deactivated, deleted, pendingVerification, restricted, openComplaints } }
+    data: { summary: { total, active: total - suspended - deactivated, suspended, deactivated, deleted, pendingVerification, restricted, openComplaints, roles: { user: travelers, agent: vendors, staff } } }
   });
 });
 
@@ -139,6 +152,7 @@ exports.listUsers = catchAsync(async (req, res, next) => {
     and.push({ $or: [{ name: rx }, { email: rx }, { phone: rx }] });
   }
   if (ROLES.includes(q.role)) and.push(roleFilter(q.role));
+  else if (q.role === 'staff') and.push({ $or: STAFF.map(r => roleFilter(r)) }); // managers, admins and developers
 
   if (q.status === 'active') and.push({ status: { $nin: ['suspended', 'deactivated'] } });
   else if (['suspended', 'deactivated'].includes(q.status)) and.push({ status: q.status });
@@ -512,6 +526,11 @@ exports.verifyUser = catchAsync(async (req, res, next) => {
   if (decision === 'reject' && !note) return next(new AppError('Add a note telling the user what to fix.', 400));
   if (decision === 'approve' && !user.verification.documents.length) {
     return next(new AppError('This user has not uploaded any documents.', 400));
+  }
+  if (decision === 'approve') {
+    const kinds = user.verification.documents.map(d => d.kind);
+    if (!kinds.some(k => ID_KINDS.includes(k))) return next(new AppError('There is no ID document to check. Reject and ask for one.', 400));
+    if (!kinds.some(k => FACE_KINDS.includes(k))) return next(new AppError('There is no face photo to compare with the ID. Reject and ask for one.', 400));
   }
 
   user.verification.status = { approve: 'approved', reject: 'rejected', reset: 'none' }[decision];

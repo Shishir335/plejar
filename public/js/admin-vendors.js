@@ -192,6 +192,7 @@ async function loadPackages(page = 1) {
     document.getElementById('packageTotals').textContent = data.data.total ? `${data.data.total} tour package${data.data.total === 1 ? '' : 's'}` : '';
     V.pkgList = data.data.packages;
     if (!V.pkgList.length) return tableMessage('packagesTableBody', 7, 'No tour packages match these filters.');
+    bulkRows('packages', V.pkgList);
     document.getElementById('packagesTableBody').innerHTML = V.pkgList.map(packageRow).join('');
   } catch (e) {
     tableMessage('packagesTableBody', 7, 'Failed to load tour packages.', true);
@@ -204,7 +205,7 @@ function packageRow(p) {
   const photos = (p.photos || []).length;
   const missing = p.planMissing && p.planMissing.length;
   const seats = p.seats ? `${Number(p.travelers)} / ${Number(p.seats)}` : (p.travelers ? `${Number(p.travelers)} booked` : '—');
-  return `<tr class="${p.status === 'published' ? '' : 'row-muted'}">
+  return `<tr class="${p.status === 'published' ? '' : 'row-muted'}" data-bulk-id="${E(p._id)}">
     <td><span class="lead-main">${E(p.title)}</span><span class="lead-sub">${E(p.destination || '')}${p.destination ? ', ' : ''}${photos} photo${photos === 1 ? '' : 's'}</span></td>
     <td>${a._id ? `<a href="#" onclick="openVendor('${aid}'); return false;">${E(a.name)}</a>${a.status && a.status !== 'active' ? `<span class="lead-sub">${E(label(a.status))}</span>` : ''}` : '<span class="lead-sub" style="margin:0">Removed</span>'}</td>
     <td style="white-space: nowrap;">${p.startDate ? `${E(fmtDate(p.startDate))}${p.endDate && p.endDate !== p.startDate ? `<span class="lead-sub">to ${E(fmtDate(p.endDate))}</span>` : ''}` : '<span class="lead-sub" style="margin:0">No date</span>'}<span class="lead-sub">${Number(p.durationDays) || 0}D / ${Number(p.durationNights || 0)}N</span></td>
@@ -263,7 +264,7 @@ const hotelVendorRow = v => {
   const [badge, text] = l ? (LISTING_BADGE[l.status] || ['badge-inactive', l.status]) : ['badge-admin', 'No listing'];
   const st = v.stays || { total: 0, pending: 0, accepted: 0 };
   return `
-      <tr>
+      <tr data-bulk-id="${E(v.id)}">
         <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info">
           <span class="user-cell-name">${E(v.name)}</span>
           <span class="user-cell-email">${E(v.phone || '') || '—'}</span></div></div></td>
@@ -309,13 +310,14 @@ async function loadVendors(page = 1) {
         ? 'No hotels match these filters. Hotels join by applying at /apply.'
         : 'No travel agents match these filters. Invite one, or approve an application.');
     }
+    bulkRows('vendors', data.data.vendors);
     if (isHotels) {
       document.getElementById('vendorsTableBody').innerHTML = data.data.vendors.map(hotelVendorRow).join('');
       loadVendorSummary();
       return;
     }
     document.getElementById('vendorsTableBody').innerHTML = data.data.vendors.map(v => `
-      <tr>
+      <tr data-bulk-id="${E(v.id)}">
         <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info">
           <span class="user-cell-name">${E(v.name)}</span>
           <span class="user-cell-email">${E((v.regions || []).join(', ')) || 'No areas listed'}</span>
@@ -343,8 +345,9 @@ async function loadCategories() {
   const canEdit = isMoneyAdmin();
   document.getElementById('newCategoryBtn').hidden = !canEdit;
   if (!cats.length) return tableMessage('categoriesTableBody', 5, 'No categories yet. Add the kinds of trips your vendors run, such as hill treks or houseboat trips.');
+  bulkRows('categories', cats);
   document.getElementById('categoriesTableBody').innerHTML = cats.map(c => `
-    <tr class="${c.active ? '' : 'row-muted'}">
+    <tr class="${c.active ? '' : 'row-muted'}" data-bulk-id="${E(c._id)}">
       <td><span class="lead-main">${E(c.name)}</span></td>
       <td><div class="lead-message">${E(c.description) || '—'}</div></td>
       <td>${c.vendors}</td>
@@ -413,7 +416,7 @@ const KIND_LABEL = { tour: 'Tour', hotel: 'Hotel stay', guide: 'Guide' };
 function bookingRow(b, { withVendor = true } = {}) {
   V.bookings.set(b._id, b);
   return `
-    <tr>
+    <tr data-bulk-id="${E(b._id)}">
       <td><span class="lead-main">${E(b.packageTitle)}</span><span class="lead-sub">${E(KIND_LABEL[b.kind || 'tour'])} · ${E(b.reference)} · booked ${E(fmtDate(b.createdAt))}</span></td>
       <td>${b.user ? `<a href="#" onclick="event.preventDefault(); openUser('${E(b.user._id)}')">${E(b.user.name)}</a><span class="lead-sub">${b.travelers} traveler${b.travelers === 1 ? '' : 's'}</span>` : '—'}</td>
       ${withVendor ? `<td>${b.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(b.agency._id)}')">${E(b.agency.name)}</a>` : (b.kind === 'hotel' ? '<span class="lead-sub" style="display:inline;">Plejar confirms</span>' : '—')}</td>` : ''}
@@ -439,6 +442,7 @@ async function loadBookings(page = 1) {
       ? `${data.data.total} booking${data.data.total === 1 ? '' : 's'} · ${takaFmt(data.data.totals.amount)} booked · ${takaFmt(data.data.totals.commission)} Plejar commission`
       : '';
     if (!data.data.bookings.length) return tableMessage('bookingsTableBody', 8, 'No bookings match these filters.');
+    bulkRows('bookings', data.data.bookings);
     document.getElementById('bookingsTableBody').innerHTML = data.data.bookings.map(b => bookingRow(b)).join('');
   } catch (e) {
     tableMessage('bookingsTableBody', 8, 'Failed to load bookings.', true);
@@ -500,7 +504,7 @@ function payoutRows(payouts, { withVendor = true } = {}) {
   return payouts.map(p => {
     V.payouts.set(p._id, p);
     return `
-    <tr>
+    <tr data-bulk-id="${E(p._id)}">
       ${withVendor ? `<td>${p.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(p.agency._id)}')">${E(p.agency.name)}</a>` : '—'}<span class="lead-sub">${E(fmtDate(p.createdAt))}</span></td>` : `<td>${E(fmtDate(p.createdAt))}</td>`}
       <td style="white-space: nowrap; font-weight: 700;">${takaFmt(p.amount)}</td>
       <td>${E(METHOD_LABEL[p.method] || p.method)}<span class="lead-sub">${E(p.account)}</span></td>
@@ -527,6 +531,7 @@ async function loadPayouts(page = 1) {
       <div class="kpi"><div class="kpi-label">Rejected</div><div class="kpi-value">${get('rejected').count}</div><div class="kpi-note">${takaFmt(get('rejected').amount)} released back</div></div>`;
     renderPager('payoutsPager', data.data, 'loadPayouts');
     if (!data.data.payouts.length) return tableMessage('payoutsTableBody', 6, 'No payouts match these filters.');
+    bulkRows('payouts', data.data.payouts);
     document.getElementById('payoutsTableBody').innerHTML = payoutRows(data.data.payouts);
   } catch (e) {
     tableMessage('payoutsTableBody', 6, 'Failed to load payouts.', true);
@@ -611,7 +616,8 @@ async function loadCommissionPane(page = 1) {
       ? `Commission is off for every ${who}. Choose "Everyone" to turn it on for one.`
       : `No ${who} matches that name.`);
   }
-  document.getElementById('commissionTableBody').innerHTML = vendors.map(v => `<tr>
+  bulkRows('commission', vendors);
+  document.getElementById('commissionTableBody').innerHTML = vendors.map(v => `<tr data-bulk-id="${E(v.id)}">
       <td><div class="user-cell">${agencyLogo(v)}<div class="user-cell-info"><span class="user-cell-name">${E(v.name)}</span></div></div></td>
       <td>${commissionCell(v.commission)}</td>
       <td>${v.commission.changedAt ? E(new Date(v.commission.changedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })) : '—'}</td>
@@ -688,7 +694,7 @@ const debouncedVendorActivity = makeDebounce(() => loadVendorActivity(1));
 
 function activityRows(entries, withVendor = true) {
   return entries.map(a => `
-    <tr>
+    <tr data-bulk-id="${E(a._id)}">
       <td style="white-space: nowrap;">${E(fmtDateTime(a.createdAt))}</td>
       <td>${E(a.summary)}</td>
       ${withVendor ? `<td>${a.agency ? `<a href="#" onclick="event.preventDefault(); openVendor('${E(a.agency._id)}')">${E(a.agency.name)}</a>` : '—'}</td>` : ''}
@@ -705,6 +711,7 @@ async function loadVendorActivity(page = 1) {
     if (!ok) return tableMessage('vendorActivityBody', 4, data.message || 'Could not load activity.', true);
     renderPager('vendorActivityPager', data.data, 'loadVendorActivity');
     if (!data.data.entries.length) return tableMessage('vendorActivityBody', 4, 'No vendor activity recorded yet.');
+    bulkRows('vendorActivity', data.data.entries);
     document.getElementById('vendorActivityBody').innerHTML = activityRows(data.data.entries);
   } catch (e) {
     tableMessage('vendorActivityBody', 4, 'Failed to load activity.', true);
