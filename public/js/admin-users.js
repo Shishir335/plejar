@@ -89,7 +89,14 @@ const LOGIN_REASON = {
   wrong_password: 'Wrong password', unknown_email: 'No account with this email', invite_not_accepted: 'Invite not accepted',
   blocked_suspended: 'Blocked: suspended', blocked_deactivated: 'Blocked: deactivated', blocked_deleted: 'Blocked: deleted', agency_not_active: 'Agency not active'
 };
-const USER_DOC_LABELS = { nid: 'National ID', passport: 'Passport', driving_license: 'Driving license', selfie: 'Selfie' };
+const USER_DOC_LABELS = {
+  nid_front: 'NID front', nid_back: 'NID back', birth_certificate: 'Birth certificate',
+  selfie: 'Face: straight', face_left: 'Face: left', face_right: 'Face: right',
+  nid: 'National ID', passport: 'Passport', driving_license: 'Driving license'
+};
+// The order the reviewer compares them in
+const ID_DOC_KINDS = ['nid_front', 'nid_back', 'birth_certificate', 'nid', 'passport', 'driving_license'];
+const FACE_DOC_KINDS = ['selfie', 'face_left', 'face_right'];
 
 function shortAgent(ua) {
   const s = String(ua || '');
@@ -242,8 +249,9 @@ async function loadUsers(page = 1) {
     renderPager('usersPager', data.data, 'loadUsers');
     if (!users.length) return tableMessage('usersTableBody', 6, 'No accounts match these filters.');
 
+    bulkRows('users', users);
     document.getElementById('usersTableBody').innerHTML = users.map(u => `
-      <tr class="${u.deleted ? 'row-muted' : ''}">
+      <tr class="${u.deleted ? 'row-muted' : ''}" data-bulk-id="${E(u.id)}">
         <td><div class="user-cell">${avatarOf(u.name)}<div class="user-cell-info">
           <span class="user-cell-name">${E(u.name) || 'Unnamed'}</span>
           <span class="user-cell-email">${E(u.email)}${u.phone ? ` · ${E(u.phone)}` : ''}</span></div></div></td>
@@ -274,10 +282,11 @@ async function loadVerificationQueue(page = 1) {
     if (!ok) return tableMessage('verifyTableBody', 5, data.message || 'Could not load the queue.', true);
     renderPager('verifyPager', data.data, 'loadVerificationQueue');
     if (!data.data.users.length) return tableMessage('verifyTableBody', 5, 'Nobody is waiting. Submitted documents will appear here.');
+    bulkRows('verify', data.data.users);
     document.getElementById('verifyTableBody').innerHTML = data.data.users.map(u => `
-      <tr>
+      <tr data-bulk-id="${E(u.id)}">
         <td><div class="user-cell">${avatarOf(u.name)}<div class="user-cell-info"><span class="user-cell-name">${E(u.name)}</span><span class="user-cell-email">${E(u.email)}</span></div></div></td>
-        <td>${u.verification.documents.map(d => `<span class="badge badge-inactive" style="margin-right:4px">${E(USER_DOC_LABELS[d.kind] || d.kind)}</span>`).join('') || '—'}</td>
+        <td>${verifyDocsSummary(u.verification.documents)}</td>
         <td>${E(fmtDate(u.verification.submittedAt))}</td>
         <td>${standingBadges(u)}</td>
         <td style="text-align: right;"><button class="btn btn-primary btn-sm" onclick="openUser('${E(u.id)}', 'documents')">Review</button></td>
@@ -285,6 +294,16 @@ async function loadVerificationQueue(page = 1) {
   } catch (e) {
     tableMessage('verifyTableBody', 5, 'Failed to load the queue.', true);
   }
+}
+
+// "NID + 3 face photos", "Birth certificate + 3 face photos"
+function verifyDocsSummary(docs) {
+  if (!docs.length) return '—';
+  const kinds = docs.map(d => d.kind);
+  const id = kinds.includes('nid_front') || kinds.includes('nid_back') ? 'NID'
+    : (ID_DOC_KINDS.map(k => kinds.includes(k) && USER_DOC_LABELS[k]).find(Boolean) || 'No ID');
+  const faces = kinds.filter(k => FACE_DOC_KINDS.includes(k)).length;
+  return `<span class="badge badge-inactive" style="margin-right:4px">${E(id)}</span><span class="badge badge-inactive">${faces ? `${faces} face photo${faces === 1 ? '' : 's'}` : 'No face photo'}</span>`;
 }
 
 // ---------- Complaints ----------
@@ -300,8 +319,9 @@ async function loadComplaints(page = 1) {
     renderPager('complaintsPager', data.data, 'loadComplaints');
     data.data.complaints.forEach(c => U.complaints.set(c._id, c));
     if (!data.data.complaints.length) return tableMessage('complaintsTableBody', 7, 'No complaints match these filters.');
+    bulkRows('complaints', data.data.complaints);
     document.getElementById('complaintsTableBody').innerHTML = data.data.complaints.map(c => `
-      <tr>
+      <tr data-bulk-id="${E(c._id)}">
         <td><span class="lead-main">${E(c.subject)}</span><span class="lead-sub">${E(label(c.category))} · ${E(c.message.slice(0, 80))}${c.message.length > 80 ? '…' : ''}</span></td>
         <td>${c.reporter ? `<a href="#" onclick="event.preventDefault(); openUser('${E(c.reporter._id)}')">${E(c.reporter.name)}</a><span class="lead-sub">${E(c.reporter.email)}</span>` : '—'}</td>
         <td>${c.againstAgency ? E(c.againstAgency.name) : (c.againstUser ? E(c.againstUser.name) : '—')}${c.booking ? `<span class="lead-sub">${E(c.booking.reference)}</span>` : ''}</td>
@@ -378,7 +398,7 @@ const debouncedReviews = makeDebounce(() => loadReviews(1));
 
 function reviewRows(reviews, withUser = true) {
   return reviews.map(r => `
-    <tr class="${r.status === 'hidden' ? 'row-muted' : ''}">
+    <tr class="${r.status === 'hidden' ? 'row-muted' : ''}" data-bulk-id="${E(r._id)}">
       ${withUser ? `<td>${r.user ? `<a href="#" onclick="event.preventDefault(); openUser('${E(r.user._id)}')">${E(r.user.name)}</a><span class="lead-sub">${E(r.user.email)}</span>` : '—'}</td>` : ''}
       <td>${r.agency ? E(r.agency.name) : '—'}<span class="lead-sub">${r.booking ? `${E(r.booking.packageTitle || '')} · ${E(r.booking.reference || '')}` : ''}</span></td>
       <td><span class="stars" aria-label="${r.rating} out of 5">${stars(r.rating)}</span></td>
@@ -398,6 +418,7 @@ async function loadReviews(page = 1) {
     if (!ok) return tableMessage('reviewsTableBody', 6, data.message || 'Could not load reviews.', true);
     renderPager('reviewsPager', data.data, 'loadReviews');
     if (!data.data.reviews.length) return tableMessage('reviewsTableBody', 6, 'No reviews match these filters.');
+    bulkRows('reviews', data.data.reviews);
     document.getElementById('reviewsTableBody').innerHTML = reviewRows(data.data.reviews);
   } catch (e) {
     tableMessage('reviewsTableBody', 6, 'Failed to load reviews.', true);
@@ -437,7 +458,7 @@ const debouncedActivity = makeDebounce(() => loadActivity(1));
 
 function loginRows(events, withAccount = true) {
   return events.map(ev => `
-    <tr>
+    <tr data-bulk-id="${E(ev._id)}">
       <td style="white-space: nowrap;">${E(fmtDateTime(ev.createdAt))}</td>
       ${withAccount ? `<td>${ev.user ? `<a href="#" onclick="event.preventDefault(); openUser('${E(ev.user._id)}')">${E(ev.user.name)}</a><span class="lead-sub">${E(ev.email)}</span>` : `<span class="lead-main">${E(ev.email) || 'Unknown'}</span><span class="lead-sub">No matching account</span>`}</td>` : ''}
       <td>${ev.success ? '<span class="badge badge-active">Signed in</span>' : `<span class="badge badge-admin">Failed</span><span class="lead-sub">${E(LOGIN_REASON[ev.reason] || ev.reason || '')}</span>`}</td>
@@ -455,6 +476,7 @@ async function loadLogins(page = 1) {
     if (!ok) return tableMessage('loginsTableBody', 6, data.message || 'Could not load sign-ins.', true);
     renderPager('loginsPager', data.data, 'loadLogins');
     if (!data.data.events.length) return tableMessage('loginsTableBody', 6, 'No sign-ins match these filters.');
+    bulkRows('logins', data.data.events);
     document.getElementById('loginsTableBody').innerHTML = loginRows(data.data.events);
   } catch (e) {
     tableMessage('loginsTableBody', 6, 'Failed to load sign-ins.', true);
@@ -469,8 +491,9 @@ async function loadActivity(page = 1) {
     if (!ok) return tableMessage('activityTableBody', 5, data.message || 'Could not load activity.', true);
     renderPager('activityPager', data.data, 'loadActivity');
     if (!data.data.entries.length) return tableMessage('activityTableBody', 5, 'No activity recorded yet.');
+    bulkRows('activity', data.data.entries);
     document.getElementById('activityTableBody').innerHTML = data.data.entries.map(a => `
-      <tr>
+      <tr data-bulk-id="${E(a._id)}">
         <td style="white-space: nowrap;">${E(fmtDateTime(a.createdAt))}</td>
         <td>${E(a.summary)}</td>
         <td>${a.user ? `<a href="#" onclick="event.preventDefault(); openUser('${E(a.user._id)}')">${E(a.user.name)}</a>` : '—'}</td>
@@ -771,18 +794,41 @@ function documentsPanel() {
   const v = u.verification;
   const banners = {
     approved: ['callout-ok', 'Identity verified', `Reviewed ${E(fmtDate(v.reviewedAt))}.`],
-    pending: ['callout-warn', 'Waiting for your review', `Submitted ${E(fmtDate(v.submittedAt))}.`],
+    pending: ['callout-warn', 'Waiting for your review', `Submitted ${E(fmtDate(v.submittedAt))}. Check the ID is real and readable, the name and date of birth match the profile, and the face is the same person in all photos.`],
     rejected: ['callout-error', 'Rejected', E(v.note || '')],
     none: ['', 'No verification submitted', 'The user has not uploaded identity documents.']
   };
   const [cls, title, text] = banners[v.status] || banners.none;
   const canAct = !u.deleted && !(!isMoneyAdmin() && !isTravelerOnly(u)) && String(adminState.currentUser._id || adminState.currentUser.id) !== String(u.id);
+  const byOrder = kinds => v.documents.filter(d => kinds.includes(d.kind)).sort((a, b) => kinds.indexOf(a.kind) - kinds.indexOf(b.kind));
+  const idDocs = byOrder(ID_DOC_KINDS);
+  const faceDocs = byOrder(FACE_DOC_KINDS);
+  const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.name;
+  const under18 = u.age != null && u.age < 18;
+  const l = v.liveness;
+  const yaw = n => (n == null ? '' : `${Math.abs(n).toFixed(0)}°`);
+  const tile = d => {
+    const url = `/api/v1/admin/users/${E(u.id)}/documents/${E(d.id)}`;
+    const isImage = /^image\//.test(d.mimeType || '');
+    return `<figure class="id-tile ${FACE_DOC_KINDS.includes(d.kind) ? 'id-tile-face' : ''}">
+      <a href="${url}" target="_blank" rel="noopener" title="Open full size">
+        ${isImage ? `<img src="${url}" alt="${E(USER_DOC_LABELS[d.kind] || d.kind)}" loading="lazy">` : '<span class="id-tile-file">PDF<small>Open file</small></span>'}
+      </a>
+      <figcaption>${E(USER_DOC_LABELS[d.kind] || d.kind)}<span>${E(fmtDate(d.uploadedAt))}</span></figcaption>
+    </figure>`;
+  };
   return `
     <div class="callout ${cls}"><div><strong>${E(title)}</strong>${text}</div></div>
-    <ul class="detail-docs">
-      ${v.documents.length ? v.documents.map(d => `<li><span>${E(USER_DOC_LABELS[d.kind] || d.kind)}<span class="lead-sub">${E(d.originalName)} · uploaded ${E(fmtDate(d.uploadedAt))}</span></span>
-        <a class="btn btn-secondary btn-sm" href="/api/v1/admin/users/${E(u.id)}/documents/${E(d.id)}" target="_blank" rel="noopener">View</a></li>`).join('') : '<li><span>No documents uploaded.</span></li>'}
-    </ul>
+    <dl class="id-facts">
+      <div><dt>Name on profile</dt><dd>${E(fullName)}</dd></div>
+      <div><dt>Date of birth</dt><dd>${u.dateOfBirth ? `${E(fmtDate(u.dateOfBirth))}${u.age != null ? ` · ${E(u.age)} years${under18 ? ' (under 18)' : ''}` : ''}` : '<span class="money-out">Not set</span>'}</dd></div>
+      <div><dt>Expected ID</dt><dd>${u.age == null ? '—' : under18 ? 'Birth certificate' : 'National ID (front and back)'}</dd></div>
+      <div><dt>Head-turn check</dt><dd>${l ? `Passed in the app: ${E(l.order.join(' → '))}${l.leftYaw != null ? ` · left ${E(yaw(l.leftYaw))}, right ${E(yaw(l.rightYaw))}` : ''}${l.platform ? ` · ${E(l.platform)}` : ''}` : (faceDocs.length ? 'Not recorded (older app)' : '—')}</dd></div>
+    </dl>
+    ${v.documents.length ? `<div class="id-review">
+      <section><h4>ID document</h4><div class="id-tiles">${idDocs.map(tile).join('') || '<p class="empty-note">No ID document.</p>'}</div></section>
+      <section><h4>Face check</h4><div class="id-tiles id-tiles-face">${faceDocs.map(tile).join('') || '<p class="empty-note">No face photos.</p>'}</div></section>
+    </div>` : '<ul class="detail-docs"><li><span>No documents uploaded.</span></li></ul>'}
     ${canAct && v.documents.length ? `<div class="profile-actions">
       ${v.status !== 'approved' ? '<button class="btn btn-primary" onclick="verifyUserDecision(\'approve\')">Approve identity</button>' : ''}
       ${v.status !== 'rejected' ? '<button class="btn btn-danger" onclick="verifyUserDecision(\'reject\')">Reject</button>' : ''}

@@ -103,6 +103,14 @@ meRoutes.post(
   users.saveMyVerificationDocuments,
   account.documentsSaved
 );
+// The full submission from the guided screen: documentType (nid | birth_certificate),
+// nidFront + nidBack or birthCertificate, then selfie, faceLeft, faceRight and the head-turn check (liveness JSON)
+meRoutes.post(
+  '/verification/identity',
+  userDocumentUpload.fields(Object.keys(users.IDENTITY_FIELDS).map(name => ({ name, maxCount: 1 }))),
+  users.submitIdentity,
+  account.documentsSaved
+);
 
 // Vouchers & Rewards
 const voucherRoutes = express.Router();

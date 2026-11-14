@@ -13,6 +13,8 @@ router.post('/sslcommerz/cancel', payments.sslCancel);
 router.post('/sslcommerz/ipn', payments.sslIpn);
 router.get('/done', payments.done);
 
+// A traveler's own booking-money payments, newest first (Transaction history in the app)
+router.get('/', authController.protect, payments.myPayments);
 // A traveler's own booking-money payment (the app checks it after the payment browser closes)
 router.get('/:id', authController.protect, payments.myPayment);
 

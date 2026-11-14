@@ -20,7 +20,8 @@ const validId = id => mongoose.isValidObjectId(id);
 const agencyNumbers = async (ids, viewer) => {
   const now = new Date();
   const [ratings, followers, upcoming, mine] = await Promise.all([
-    Review.aggregate([{ $match: { agency: { $in: ids } } }, { $group: { _id: '$agency', average: { $avg: '$rating' }, count: { $sum: 1 } } }]),
+    // Reviews an admin hid don't count (as the admin panel promises)
+    Review.aggregate([{ $match: { agency: { $in: ids }, status: { $ne: 'hidden' } } }, { $group: { _id: '$agency', average: { $avg: '$rating' }, count: { $sum: 1 } } }]),
     Follow.aggregate([{ $match: { targetType: 'agency', target: { $in: ids } } }, { $group: { _id: '$target', count: { $sum: 1 } } }]),
     Package.aggregate([{ $match: { agency: { $in: ids }, status: 'published', startDate: { $gte: now } } }, { $group: { _id: '$agency', count: { $sum: 1 } } }]),
     viewer ? Follow.find({ follower: viewer._id, targetType: 'agency', target: { $in: ids } }).select('target').lean() : []
@@ -28,6 +29,14 @@ const agencyNumbers = async (ids, viewer) => {
   const map = rows => new Map(rows.map(r => [String(r._id), r]));
   return { ratings: map(ratings), followers: map(followers), upcoming: map(upcoming), following: new Set(mine.map(f => String(f.target))) };
 };
+
+// How well rated an agency is, weighing how many reviews back it up: a single 5-star review counts for less
+// than fifty 4.9s. Agencies without reviews come last.
+const RATING_PRIOR = 4;
+const RATING_WEIGHT = 3;
+const ratingScore = c => (c.rating.count
+  ? (c.rating.average * c.rating.count + RATING_PRIOR * RATING_WEIGHT) / (c.rating.count + RATING_WEIGHT)
+  : -1);
 
 const agencyCardView = (a, n) => {
   const r = n.ratings.get(String(a._id));
@@ -79,11 +88,25 @@ exports.listAgencies = catchAsync(async (req, res) => {
   const n = await agencyNumbers(rows.map(r => r._id), req.user);
   const cards = rows.map(a => agencyCardView(a, n));
   const score = sortKey === 'rating'
-    ? c => (c.rating.average || 0) * 1000 + c.rating.count
+    ? c => ratingScore(c) * 1e6 + c.rating.count
     : c => (c.verified ? 1e6 : 0) + c.followers * 3 + c.upcomingTours * 5 + c.rating.count * 2 + (c.rating.average || 0);
   cards.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
   res.status(200).json({ status: 'success', data: { agencies: cards.slice(page.skip, page.skip + page.limit), ...paged(cards.length, page) } });
 });
+
+/**
+ * The best-rated agencies for the app's Home screen ("Top rated agents"): active travel agencies with at
+ * least one visible review, best first.
+ */
+exports.topRatedAgencies = async (viewer, limit = 10) => {
+  const rows = await Agency.find({ status: 'active', kind: { $ne: 'hotel' } }).populate('categories', 'name').lean();
+  if (!rows.length) return [];
+  const n = await agencyNumbers(rows.map(r => r._id), viewer);
+  return rows.map(a => agencyCardView(a, n))
+    .filter(c => c.rating.count > 0)
+    .sort((a, b) => ratingScore(b) - ratingScore(a) || b.rating.count - a.rating.count || a.name.localeCompare(b.name))
+    .slice(0, limit);
+};
 
 // Filters for the Agents tab: regions agencies cover and the vendor categories
 exports.filters = catchAsync(async (req, res) => {
@@ -101,7 +124,7 @@ exports.getAgency = catchAsync(async (req, res, next) => {
   const [events, reviews, announcements, counts] = await Promise.all([
     Package.find({ agency: agency._id, status: 'published', startDate: { $gte: new Date() } }).sort({ startDate: 1 }).limit(10)
       .select('title destination startDate endDate priceFrom seats photos durationDays durationNights').lean(),
-    Review.find({ agency: agency._id }).sort({ createdAt: -1 }).limit(5).populate('user', 'name photo verification.status').select('rating comment createdAt user').lean(),
+    Review.find({ agency: agency._id, status: { $ne: 'hidden' } }).sort({ createdAt: -1 }).limit(5).populate('user', 'name photo verification.status').select('rating comment createdAt user').lean(),
     Announcement.find({ agency: agency._id, status: 'published' }).sort({ pinned: -1, publishedAt: -1 }).limit(5).select('title body pinned publishedAt').lean(),
     wallCounts(agency._id)
   ]);

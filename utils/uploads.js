@@ -43,11 +43,11 @@ const documentUpload = multer({
   limits: { fileSize: MAX_FILE_SIZE, files: 2 }
 });
 
-// Traveler identity documents: up to four files (ID, passport, driving license, selfie)
+// Traveler identity documents: the ID (NID front and back, or a birth certificate) and three face photos
 const userDocumentUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: fileFilter(DOCUMENT_TYPES),
-  limits: { fileSize: MAX_FILE_SIZE, files: 4 }
+  limits: { fileSize: MAX_FILE_SIZE, files: 6 }
 });
 
 // Membership applications from the website: trade license, NID (front and back), tourism license, other
@@ -255,6 +255,7 @@ const removePrivateFolder = async folder => {
 };
 
 module.exports = {
+  IMAGE_TYPES,
   imageUpload,
   documentUpload,
   userDocumentUpload,

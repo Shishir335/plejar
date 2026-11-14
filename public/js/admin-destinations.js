@@ -436,8 +436,9 @@ async function toggleTrendingPin(id, pinned) {
 async function loadDestinationCategories() {
   tableMessage('destinationCategoriesBody', 6, 'Loading categories...');
   const cats = await ensureDestinationCategories(true);
+  bulkRows('destinationCategories', cats);
   document.getElementById('destinationCategoriesBody').innerHTML = cats.length ? cats.map(c => `
-    <tr class="${c.active ? '' : 'is-muted'}">
+    <tr class="${c.active ? '' : 'is-muted'}" data-bulk-id="${E(c._id)}">
       <td><strong>${E(c.name)}</strong></td>
       <td lang="bn">${E(c.nameBn) || '—'}</td>
       <td style="color: var(--text-muted); font-size: 0.85rem;">${E(c.description) || '—'}</td>

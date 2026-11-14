@@ -1,4 +1,5 @@
 const Booking = require('../models/bookingModel');
+const { ID_KINDS, FACE_KINDS, ageOn, idOptions, canBook, verificationRequired } = require('../utils/identity');
 const PointsEntry = require('../models/pointsModel');
 const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
@@ -70,8 +71,6 @@ exports.pointsHistory = catchAsync(async (req, res) => {
 
 // ---------- ID Verification: email, phone, ID document, selfie ----------
 
-const ID_KINDS = ['nid', 'passport', 'driving_license'];
-
 // A document step follows the admin's review of everything uploaded
 const documentStep = (user, kinds) => {
   const v = user.verification || {};
@@ -84,16 +83,38 @@ const contactStep = (value, verifiedAt) => {
   return verifiedAt ? 'complete' : 'todo';
 };
 
+// The ID sent: 'nid' (front and back), 'birth_certificate', or an older upload
+const idDocumentKind = docs => {
+  const kinds = new Set(docs.map(d => d.kind));
+  if (kinds.has('nid_front') || kinds.has('nid_back')) return 'nid';
+  return ['birth_certificate', 'nid', 'passport', 'driving_license'].find(k => kinds.has(k)) || null;
+};
+
 const verificationSteps = user => {
   // Signing in with Google already proves the email address
   const emailVerifiedAt = user.emailVerifiedAt || (user.authProvider === 'google' && user.email ? user.createdAt || user._id.getTimestamp() : null);
   const v = user.verification || {};
-  const idDoc = (v.documents || []).find(d => ID_KINDS.includes(d.kind));
+  const docs = v.documents || [];
+  const age = ageOn(user.dateOfBirth);
+  const options = idOptions(age);
   const steps = [
     { key: 'email', title: 'Email Verification', value: user.email || null, status: contactStep(user.email, emailVerifiedAt), verifiedAt: emailVerifiedAt || null },
     { key: 'phone', title: 'Phone Verification', value: user.phone || null, status: contactStep(user.phone, user.phoneVerifiedAt), verifiedAt: user.phoneVerifiedAt || null },
-    { key: 'id', title: 'ID Verification', documentKind: idDoc ? idDoc.kind : null, status: documentStep(user, ID_KINDS), acceptedKinds: ID_KINDS },
-    { key: 'selfie', title: 'Selfie Verification', status: documentStep(user, ['selfie']) }
+    {
+      key: 'id',
+      title: 'ID Verification',
+      documentKind: idDocumentKind(docs),
+      status: documentStep(user, ID_KINDS),
+      // What this traveler may send: NID from 18, birth certificate below 18 (empty until a date of birth is set)
+      acceptedKinds: options,
+      dateOfBirthRequired: age == null
+    },
+    {
+      key: 'selfie',
+      title: 'Face Verification',
+      status: documentStep(user, FACE_KINDS),
+      photos: FACE_KINDS.filter(k => docs.some(d => d.kind === k)).length
+    }
   ];
   const done = steps.filter(s => s.status === 'complete').length;
   return {
@@ -103,6 +124,13 @@ const verificationSteps = user => {
     completedSteps: done,
     totalSteps: steps.length,
     nextStep: (steps.find(s => s.status !== 'complete' && s.status !== 'pending_review') || {}).key || null,
+    // Booking needs only the admin's approval of the ID and face photos
+    canBook: canBook(user),
+    verificationRequired: verificationRequired(),
+    age,
+    idOptions: options,
+    submittedAt: v.submittedAt || null,
+    reviewedAt: v.reviewedAt || null,
     steps
   };
 };

@@ -638,10 +638,11 @@ function renderSubscribersTable() {
     return;
   }
 
+  bulkRows('subscribers', adminState.subscribers);
   tbody.innerHTML = adminState.subscribers.map(sub => {
     const date = sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : 'N/A';
     return `
-      <tr>
+      <tr data-bulk-id="${escapeHTML(sub._id)}">
         <td style="font-weight: 600;">${escapeHTML(sub.email)}</td>
         <td><span class="badge badge-active">${escapeHTML(sub.status || 'active')}</span></td>
         <td style="color: var(--text-muted);">${escapeHTML(sub.source || 'newsletter')}</td>
@@ -866,8 +867,9 @@ async function loadPendingAgencies() {
     const reviewBody = document.getElementById('pendingReviewBody');
     if (!review.length) pendingRowMessage('pendingReviewBody', 'Nothing to review. New document submissions will appear here.');
     else {
+      bulkRows('pendingReview', review);
       reviewBody.innerHTML = review.map(a => `
-        <tr>
+        <tr data-bulk-id="${escapeHTML(a.id)}">
           <td>${agencyCell(a)}</td>
           <td>${ownerCell(a)}</td>
           <td>${escapeHTML(fmt(a.verificationSubmittedAt))}</td>
@@ -878,8 +880,9 @@ async function loadPendingAgencies() {
     const inviteBody = document.getElementById('pendingInviteBody');
     if (!invited.length) pendingRowMessage('pendingInviteBody', 'Every invited owner has signed up.');
     else {
+      bulkRows('pendingInvite', invited);
       inviteBody.innerHTML = invited.map(a => `
-        <tr>
+        <tr data-bulk-id="${escapeHTML(a.id)}">
           <td>${agencyCell(a)}</td>
           <td>${ownerCell(a)}</td>
           <td>${escapeHTML(fmt(a.createdAt))}</td>
