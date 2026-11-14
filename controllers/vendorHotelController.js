@@ -2,6 +2,7 @@
 // photos, room types and rates, amenities and policies) and answers travelers' stay requests.
 // Plejar publishes the listing the first time; after that the hotel's edits show in the app straight away.
 const Hotel = require('../models/hotelModel');
+const { cancelRefundOf, parseCancelRefund } = require('../utils/cancelRefund');
 const bookingMoney = require('../utils/bookingMoney');
 const StayRequest = require('../models/stayRequestModel');
 const Notification = require('../models/notificationModel');
@@ -86,6 +87,7 @@ const hotelView = h => ({
   rooms: h.rooms,
   pricePerNight: h.pricePerNight,
   bookingMoney: h.bookingMoney || null,
+  cancelRefund: cancelRefundOf(h),
   photos: h.photos,
   highlights: h.highlights,
   amenities: h.amenities,
@@ -116,7 +118,7 @@ const requestView = r => ({
   // Plejar's commission on this stay, which the hotel owes Plejar after the stay
   commission: r.commissionAmount > 0 ? { amount: r.commissionAmount, type: r.commissionType, value: r.commissionType === 'amount' ? r.commissionFlat : r.commissionRate } : null,
   // Booking money the guest paid Plejar online: Plejar pays it to the hotel after the stay
-  bookingMoney: r.depositAmount > 0 ? { amount: r.depositAmount, status: r.depositStatus } : null,
+  bookingMoney: bookingMoney.depositView(r, 'stay'),
   guestName: r.guestName || (r.user && r.user.name) || '',
   phone: r.phone || (r.user && r.user.phone) || '',
   email: r.user && r.user.email ? r.user.email : '',
@@ -186,6 +188,7 @@ exports.updateHotel = catchAsync(async (req, res) => {
     if (money == null) throw new AppError('Enter the booking money per room. Guests pay it online to request a stay.', 400);
     hotel.bookingMoney = money;
   }
+  if (has(b, 'cancelRefund')) hotel.cancelRefund = parseCancelRefund(b.cancelRefund);
   if (has(b, 'amenities')) hotel.amenities = list(b.amenities, 40, 40);
   if (has(b, 'highlights')) hotel.highlights = list(b.highlights, 6, 60);
   if (b.policies && typeof b.policies === 'object') {

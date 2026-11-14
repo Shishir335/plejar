@@ -597,6 +597,17 @@
         </div>
         <div class="field-row">
           <div class="field">
+            <label for="evRefundDays">Cancellation refund: days before</label>
+            <input id="evRefundDays" type="number" min="1" max="365" step="1" inputmode="numeric" placeholder="3">
+          </div>
+          <div class="field">
+            <label for="evRefundPercent">Booking money back (%)</label>
+            <input id="evRefundPercent" type="number" min="0" max="100" step="5" inputmode="numeric" placeholder="50">
+            <span class="hint">A traveler who cancels a confirmed booking at least this many days before the start date gets this share of the booking money back; later, none. Leave both empty for no refund once confirmed. Before you confirm, it's always refunded in full.</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
             <label for="evIncluded">Included in the price *</label>
             <textarea id="evIncluded" name="included" rows="4" placeholder="One per line:&#10;AC bus Dhaka to Khagrachari and back&#10;Jeep to Sajek&#10;Cottage, 3 per room&#10;All meals"></textarea>
           </div>

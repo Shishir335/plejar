@@ -17,6 +17,7 @@ const { UserVoucher } = require('../models/voucherModel');
 const { claimCoupon, releaseCoupon } = require('../utils/coupons');
 const { CouponRedemption } = require('../models/couponModel');
 const { hasRole } = require('../utils/roles');
+const { cancelRefundOf } = require('../utils/cancelRefund');
 const bookingMoney = require('../utils/bookingMoney');
 const { GATEWAY_NAMES } = require('../utils/payments/ledger');
 
@@ -92,7 +93,9 @@ const bookTour = async (req, travelers) => {
     amount,
     ...snapshot(amount, termsFor(agency)),
     // Booking money per traveler, set by the agency on the tour (older tours may have none)
-    depositPer: pkg.advanceAmount >= 1 ? Math.round(pkg.advanceAmount) : 0
+    depositPer: pkg.advanceAmount >= 1 ? Math.round(pkg.advanceAmount) : 0,
+    // And its cancellation refund, kept with the booking as it was when booked
+    cancelRefund: cancelRefundOf(pkg)
   };
 };
 
@@ -190,7 +193,9 @@ const prepareBooking = async ctx => {
 
   const fields = await { tour: bookTour, hotel: bookHotel, guide: bookGuide }[kind](ctx, travelers);
   const depositPer = fields.depositPer || 0;
+  const cancelRefund = fields.cancelRefund || null;
   delete fields.depositPer;
+  delete fields.cancelRefund;
   const hasCoupon = Boolean(String(body.couponCode || '').trim());
   if (hasCoupon && String(body.voucherCode || '').trim()) {
     throw new AppError('Use a voucher or a coupon on a booking, not both.', 400);
@@ -233,7 +238,7 @@ const prepareBooking = async ctx => {
   }
   // Never more than the booking costs after its discount
   const deposit = Math.max(0, Math.min(depositPer * travelers, Math.floor(fields.amount)));
-  return { kind, travelers, fields, deposit, depositPer, coupon, voucher };
+  return { kind, travelers, fields, deposit, depositPer, cancelRefund, coupon, voucher };
 };
 
 const releaseClaims = async ({ coupon, voucher }) => {
@@ -250,7 +255,8 @@ const placeBooking = async (ctx, prepared, payment = null) => {
       ...fields,
       user: ctx.user._id,
       note: ctx.body.note,
-      ...(payment ? { depositAmount: payment.amount, depositPayment: payment._id, depositStatus: 'paid' } : {})
+      ...(payment ? { depositAmount: payment.amount, depositPayment: payment._id, depositStatus: 'paid' } : {}),
+      ...(payment && prepared.cancelRefund ? { cancelRefund: prepared.cancelRefund } : {})
     });
   } catch (err) {
     await releaseClaims(prepared);
@@ -386,7 +392,7 @@ const bookingCards = async bookings => {
       days: b.kind === 'guide' ? b.units : null,
       paymentStatus: b.paymentStatus,
       // Booking money paid online: { amount, status } (refunded if cancelled before it's confirmed)
-      bookingMoney: bookingMoney.depositView(b),
+      bookingMoney: bookingMoney.depositView(b, 'booking'),
       pointsEarned: b.pointsAwarded || 0,
       canCancel: ['pending', 'confirmed'].includes(b.status),
       canReview: b.status === 'completed' && !reviews.has(String(b._id)),

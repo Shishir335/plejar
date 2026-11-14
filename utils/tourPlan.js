@@ -4,6 +4,7 @@ const { district } = require('./places');
 const Destination = require('../models/destinationModel');
 const Guide = require('../models/guideModel');
 const AppError = require('./appError');
+const { parseCancelRefund } = require('./cancelRefund');
 
 // A vendor must declare the whole plan before a tour event can be published:
 // price and payment, departure, transport, stay, a day-by-day itinerary with stops, and the policies.
@@ -55,6 +56,7 @@ const applyPlan = async (pkg, raw) => {
   }
   if (plan.childPrice !== undefined) pkg.childPrice = money(plan.childPrice, 'child price');
   if (plan.advanceAmount !== undefined) pkg.advanceAmount = money(plan.advanceAmount, 'booking money');
+  if (plan.cancelRefund !== undefined) pkg.cancelRefund = parseCancelRefund(plan.cancelRefund);
   if (plan.excluded !== undefined) pkg.excluded = list(plan.excluded);
   if (plan.whatToBring !== undefined) pkg.whatToBring = list(plan.whatToBring);
   if (plan.difficulty !== undefined) {

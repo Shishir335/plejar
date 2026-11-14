@@ -128,7 +128,7 @@ const paymentView = p => ({
   sandbox: p.sandbox,
   flagged: p.flagged,
   paidAt: p.paidAt || null,
-  refund: p.refund && p.refund.requestedAt ? { reason: p.refund.reason, ref: p.refund.ref, error: p.refund.error, manual: p.refund.manual, at: p.refund.at || null } : null,
+  refund: p.refund && p.refund.requestedAt ? { amount: p.refund.amount || p.amount, reason: p.refund.reason, ref: p.refund.ref, error: p.refund.error, manual: p.refund.manual, at: p.refund.at || null } : null,
   createdAt: p.createdAt
 });
 
@@ -179,6 +179,6 @@ exports.settleRefund = catchAsync(async (req, res, next) => {
   }
   const done = updated && updated.status === 'refunded';
   if (done && payment.purpose !== 'ad') await bookingMoney.refundSettled(payment);
-  await logActivity(req, { action: payment.purpose === 'ad' ? 'ads.refund' : 'payments.refund', summary: `${ref ? 'Recorded a manual refund' : 'Retried the refund'} of ${payment.amount} BDT (${payment.invoice}): ${done ? 'refunded' : 'still not refunded'}`, agency: payment.agency });
+  await logActivity(req, { action: payment.purpose === 'ad' ? 'ads.refund' : 'payments.refund', summary: `${ref ? 'Recorded a manual refund' : 'Retried the refund'} of ${(payment.refund && payment.refund.amount) || payment.amount} BDT (${payment.invoice}): ${done ? 'refunded' : 'still not refunded'}`, agency: payment.agency });
   res.status(done ? 200 : 502).json({ status: done ? 'success' : 'fail', message: done ? 'Refund recorded.' : `The gateway still refused: ${updated && updated.refund.error}`, data: { payment: paymentView(updated.toObject()) } });
 });

@@ -23,7 +23,8 @@ const sums = rows => rows[0] || { amount: 0, commission: 0, plejarPays: 0, count
  * - tours the traveler pays the rest of to the agency: the booking money, minus Plejar's commission
  *   (with Plejar's coupon discount added), once the trip is completed; upcoming while confirmed
  * - accepted stays: the booking money, once the guest has checked out; upcoming before that
- * - kept on a cancellation (the traveler cancelled after it was confirmed): all of it, straight away
+ * - kept on a cancellation (the traveler cancelled after it was confirmed): all of it, or what the
+ *   cancellation refund left, straight away
  */
 const earningsFor = async agencyId => {
   const agency = oid(agencyId);
@@ -37,7 +38,16 @@ const earningsFor = async agencyId => {
   const depositGroup = { _id: null, amount: { $sum: '$depositAmount' }, commission: { $sum: '$commissionAmount' }, plejarPays: { $sum: '$plejarPays' }, count: { $sum: 1 } };
   const tourDeposits = { agency, paymentStatus: { $nin: PAID }, depositStatus: 'paid', depositAmount: { $gt: 0 } };
   const stayDeposits = { agency, status: 'accepted', depositStatus: 'paid', depositAmount: { $gt: 0 } };
-  const kept = { agency, depositStatus: 'kept', depositAmount: { $gt: 0 } };
+  // Kept: all of it, or what a late cancellation's partial refund left (depositRefunded is what went back)
+  const kept = {
+    agency,
+    depositAmount: { $gt: 0 },
+    $or: [
+      { depositStatus: 'kept' },
+      { status: 'cancelled', depositStatus: { $in: ['refunding', 'refunded', 'refund_failed'] }, $expr: { $and: [{ $gt: ['$depositRefunded', 0] }, { $lt: ['$depositRefunded', '$depositAmount'] }] } }
+    ]
+  };
+  const keptGroup = { _id: null, amount: { $sum: { $subtract: ['$depositAmount', { $ifNull: ['$depositRefunded', 0] }] } }, count: { $sum: 1 } };
   const [done, upcoming, payouts, staysDone, staysAhead, owedDone, owedAhead, depDone, depAhead, stayDepDone, stayDepAhead, keptTours, keptStays] = await Promise.all([
     Booking.aggregate([{ $match: { agency, status: 'completed', paymentStatus: { $in: PAID } } }, { $group: group }]),
     Booking.aggregate([{ $match: { agency, status: 'confirmed', paymentStatus: { $in: PAID } } }, { $group: group }]),
@@ -50,8 +60,8 @@ const earningsFor = async agencyId => {
     Booking.aggregate([{ $match: { ...tourDeposits, status: 'confirmed' } }, { $group: depositGroup }]),
     StayRequest.aggregate([{ $match: { ...stayDeposits, checkOut: { $lte: now } } }, { $group: depositGroup }]),
     StayRequest.aggregate([{ $match: { ...stayDeposits, checkOut: { $gt: now } } }, { $group: depositGroup }]),
-    Booking.aggregate([{ $match: kept }, { $group: depositGroup }]),
-    StayRequest.aggregate([{ $match: kept }, { $group: depositGroup }])
+    Booking.aggregate([{ $match: kept }, { $group: keptGroup }]),
+    StayRequest.aggregate([{ $match: kept }, { $group: keptGroup }])
   ]);
 
   const d = sums(done);

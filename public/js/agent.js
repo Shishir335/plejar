@@ -740,6 +740,11 @@ function planMissing() {
   if (form.priceFrom.value === '') missing.push('the price per person');
   if (!(Number(val('evAdvance')) >= 1)) missing.push('the booking money per traveler (at least 1 taka)');
   else if (form.priceFrom.value !== '' && Number(val('evAdvance')) > Number(form.priceFrom.value)) missing.push('booking money no higher than the price');
+  const refundDays = val('evRefundDays');
+  const refundPercent = val('evRefundPercent');
+  if ((refundDays === '') !== (refundPercent === '')) missing.push('both the cancellation refund days and percent (or neither)');
+  else if (refundDays !== '' && !(/^\d+$/.test(refundDays) && refundDays >= 1 && refundDays <= 365)) missing.push('cancellation refund days from 1 to 365');
+  else if (refundPercent !== '' && !(/^\d+$/.test(refundPercent) && refundPercent <= 100)) missing.push('a cancellation refund percent from 0 to 100');
   if (val('evRegularPrice') !== '' && form.priceFrom.value !== '' && Number(val('evRegularPrice')) < Number(form.priceFrom.value)) missing.push('a regular price no lower than the price (or leave it empty when there is no sale)');
   if (!val('evMeeting')) missing.push('the meeting point');
   if (!val('evStartDistrict')) missing.push('the district the tour starts from');
@@ -997,6 +1002,8 @@ function openEventEditor(ev) {
   }
   set('evChildPrice', ev && ev.childPrice);
   set('evAdvance', ev && ev.advanceAmount);
+  set('evRefundDays', ev && ev.cancelRefund && ev.cancelRefund.days);
+  set('evRefundPercent', ev && ev.cancelRefund && ev.cancelRefund.percent);
   set('evExcluded', ev ? (ev.excluded || []).join('\n') : '');
   set('evDeparture', ev && ev.departureTime);
   set('evTransport', ev && ev.transport && ev.transport.mode);
@@ -1071,6 +1078,7 @@ function planPayload() {
     returnInfo: val('evReturn'),
     childPrice: val('evChildPrice'),
     advanceAmount: val('evAdvance'),
+    cancelRefund: { days: val('evRefundDays'), percent: val('evRefundPercent') },
     excluded: linesOf($('evExcluded').value),
     whatToBring: linesOf($('evBring').value),
     difficulty: val('evDifficulty'),
@@ -1268,7 +1276,7 @@ async function loadRegistrations() {
             <span class="cell-sub">${u.phone ? `<a href="tel:${escapeHTML(u.phone)}">${escapeHTML(u.phone)}</a>` : ''}${u.phone && u.email ? ', ' : ''}${u.email ? `<a href="mailto:${escapeHTML(u.email)}">${escapeHTML(u.email)}</a>` : ''}</span>
             ${r.note ? `<span class="cell-sub">Note: ${escapeHTML(r.note)}</span>` : ''}</td>
           <td>${r.travelers}</td>
-          <td>${taka(r.amount)}<span class="cell-sub">${escapeHTML(PAY_TEXT[r.paymentStatus] || r.paymentStatus)}</span>${r.depositAmount > 0 ? `<span class="cell-sub">${escapeHTML(DEPOSIT_TEXT[r.depositStatus] || 'Booking money')}: ${taka(r.depositAmount)}</span>` : ''}</td>
+          <td>${taka(r.amount)}<span class="cell-sub">${escapeHTML(PAY_TEXT[r.paymentStatus] || r.paymentStatus)}</span>${r.depositAmount > 0 ? `<span class="cell-sub">${escapeHTML(depositText(r))}</span>` : ''}</td>
           <td>${escapeHTML(fmtDate(r.createdAt))}<span class="cell-sub">${escapeHTML(r.reference)}</span></td>
           <td><span class="badge badge-${escapeHTML(r.status)}">${escapeHTML(REG_TEXT[r.status])}</span>${r.status === 'cancelled' && r.cancelReason ? `<span class="cell-sub">${escapeHTML(r.cancelReason)}</span>` : ''}</td>
           <td class="actions">${actions.join('')}</td>
@@ -1439,7 +1447,15 @@ state.adPricing = { pricePerDay: 0, methods: [], sandbox: true };
 state.payingAd = null;
 
 // Booking money a traveler paid online to Plejar for a registration
-const DEPOSIT_TEXT = { paid: 'Booking money paid online', kept: 'Booking money kept (cancelled after confirming)', refunding: 'Booking money being refunded', refunded: 'Booking money refunded', refund_failed: 'Booking money refund pending' };
+// A late cancellation's partial refund: what went back, and what stays with the agency
+function depositText(r) {
+  const part = r.depositRefunded > 0 && r.depositRefunded < r.depositAmount;
+  if (part && ['refunding', 'refunded', 'refund_failed'].includes(r.depositStatus)) {
+    return `Booking money ${taka(r.depositAmount)}: ${taka(r.depositRefunded)} back to the traveler, ${taka(r.depositAmount - r.depositRefunded)} kept`;
+  }
+  return `${DEPOSIT_TEXT[r.depositStatus] || 'Booking money'}: ${taka(r.depositAmount)}`;
+}
+const DEPOSIT_TEXT = { paid: 'Booking money paid online', kept: 'Booking money kept (cancelled late)', refunding: 'Booking money being refunded', refunded: 'Booking money refunded', refund_failed: 'Booking money refund pending' };
 
 const PAY_METHODS = {
   bkash: ['bKash', 'Pay from your bKash account'],

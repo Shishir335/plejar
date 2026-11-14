@@ -54,6 +54,8 @@ const paymentSchema = new mongoose.Schema(
 
     refund: {
       reason: { type: String, default: '' },
+      // Taka sent back: all of it, or part on a late cancellation (unset: all)
+      amount: Number,
       ref: { type: String, default: '' },
       error: { type: String, default: '' },
       manual: { type: Boolean, default: false },

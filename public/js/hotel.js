@@ -762,6 +762,9 @@ async function removePhoto(url) {
 // Booking money the guest paid Plejar online for a request
 function bookingMoneyText(m) {
   const amount = taka(m.amount);
+  if (m.refunded > 0 && m.refunded < m.amount && ['refunding', 'refunded', 'refund_failed'].includes(m.status)) {
+    return `Booking money ${amount}: the guest cancelled late, so ${taka(m.refunded)} goes back to them and Plejar pays you ${taka(m.amount - m.refunded)}.`;
+  }
   return {
     paid: `Booking money paid online: ${amount}. Plejar pays it to you after the stay (declining refunds it to the guest).`,
     kept: `Booking money kept: ${amount}. The guest cancelled after you accepted, so Plejar pays it to you.`,
@@ -786,6 +789,8 @@ function renderDetails() {
   f.rooms.value = h.rooms || '';
   f.pricePerNight.value = h.pricePerNight || '';
   f.bookingMoney.value = h.bookingMoney || '';
+  f.refundDays.value = h.cancelRefund ? h.cancelRefund.days : '';
+  f.refundPercent.value = h.cancelRefund ? h.cancelRefund.percent : '';
   $('basePriceField').hidden = h.roomTypes.some(r => r.active);
   const chosen = new Set(h.amenities || []);
   $('amenityChips').innerHTML = AMENITIES.map(a => `<label class="chip"><input type="checkbox" value="${E(a)}" ${chosen.has(a) ? 'checked' : ''}><span>${E(a)}</span></label>`).join('');
@@ -856,6 +861,11 @@ $('detailsForm').addEventListener('submit', async e => {
   if (rooms && !/^\d+$/.test(rooms)) return showAlert('detailsError', 'Enter the number of rooms as a whole number, for example 24.');
   const bookingMoney = f.bookingMoney.value.trim();
   if (!/^\d+$/.test(bookingMoney) || Number(bookingMoney) < 1) return showAlert('detailsError', 'Enter the booking money per room in taka, for example 1000.');
+  const refundDays = f.refundDays.value.trim();
+  const refundPercent = f.refundPercent.value.trim();
+  if ((refundDays === '') !== (refundPercent === '')) return showAlert('detailsError', 'For the cancellation refund, enter both the days before check-in and the percent back, or leave both empty.');
+  if (refundDays && !(/^\d+$/.test(refundDays) && refundDays >= 1 && refundDays <= 365)) return showAlert('detailsError', 'Enter the cancellation refund days as a whole number from 1 to 365.');
+  if (refundPercent && !(/^\d+$/.test(refundPercent) && refundPercent <= 100)) return showAlert('detailsError', 'Enter the cancellation refund percent as a whole number from 0 to 100.');
   const amenities = [
     ...[...document.querySelectorAll('#amenityChips input:checked')].map(i => i.value),
     ...$('dAmenityOther').value.split(',').map(s => s.trim()).filter(Boolean)
@@ -870,6 +880,7 @@ $('detailsForm').addEventListener('submit', async e => {
     checkOut: f.checkOut.value,
     rooms,
     bookingMoney,
+    cancelRefund: { days: refundDays, percent: refundPercent },
     amenities,
     policies: Object.fromEntries(['cancellation', 'children', 'pets', 'smoking', 'other'].map(k => [k, f[k].value.trim()])),
     ...diningBody()

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { cancelRefundView } = require('../utils/cancelRefund');
 const paymentConfig = require('../utils/payments/config');
 const Package = require('../models/packageModel');
 const Agency = require('../models/agencyModel');
@@ -504,7 +505,7 @@ exports.getTour = catchAsync(async (req, res, next) => {
         // payWith (one of paymentMethods) and pay at the redirectUrl that comes back before it's booked.
         booking: {
           price: card.price,
-          bookingMoney: tour.advanceAmount >= 1 ? { perTraveler: Math.round(tour.advanceAmount) } : null,
+          bookingMoney: tour.advanceAmount >= 1 ? { perTraveler: Math.round(tour.advanceAmount), cancelRefund: cancelRefundView(tour) } : null,
           paymentMethods: paymentConfig.enabledMethods(),
           minTravelers: 1,
           maxTravelers: Math.max(maxTravelers, 0),

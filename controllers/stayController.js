@@ -14,6 +14,7 @@ const { claimCoupon, releaseCoupon } = require('../utils/coupons');
 const { CouponRedemption } = require('../models/couponModel');
 const Agency = require('../models/agencyModel');
 const { termsFor, snapshot } = require('../utils/commission');
+const { cancelRefundOf } = require('../utils/cancelRefund');
 const bookingMoney = require('../utils/bookingMoney');
 
 // What a stay request may carry, kept on a booking-money payment until the money arrives
@@ -72,7 +73,7 @@ const myView = r => ({
   // A coupon the guest used; estimatedTotal is already after it
   coupon: r.discountAmount ? { code: r.couponCode, discount: r.discountAmount, subtotal: r.subtotal } : null,
   // Booking money paid online: { amount, status } (refunded if cancelled before the hotel accepts)
-  bookingMoney: bookingMoney.depositView(r),
+  bookingMoney: bookingMoney.depositView(r, 'stay'),
   note: r.note,
   hotelNote: r.hotelNote,
   decidedAt: r.decidedAt,
@@ -212,7 +213,7 @@ const placeStay = async (ctx, prepared, payment = null) => {
       guestName: text(user.name, 80),
       phone,
       note: prepared.note,
-      ...(payment ? { depositAmount: payment.amount, depositPayment: payment._id, depositStatus: 'paid' } : {})
+      ...(payment ? { depositAmount: payment.amount, depositPayment: payment._id, depositStatus: 'paid', cancelRefund: cancelRefundOf(prepared.hotel) } : {})
     });
   } catch (err) {
     if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
@@ -305,8 +306,9 @@ exports.cancel = catchAsync(async (req, res, next) => {
   request.cancelledAt = new Date();
   await request.save();
   if (request.couponRedemption) await releaseCoupon({ stayRequest: request._id });
-  // Booking money comes back while the hotel hasn't answered; once it accepted, the hotel keeps it
+  // Booking money comes back while the hotel hasn't answered; once it accepted, the hotel's
+  // cancellation refund if early enough, and the hotel keeps the rest
   if (previous === 'pending') await bookingMoney.refundDeposit(StayRequest, request, { reason: 'Cancelled by the guest before the hotel answered', by: req.user._id });
-  else await bookingMoney.keepDeposit(StayRequest, request);
+  else await bookingMoney.cancelledLate(StayRequest, request, request.checkIn, { by: req.user._id });
   res.status(200).json({ status: 'success', data: { request: myView(request) } });
 });

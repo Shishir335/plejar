@@ -403,7 +403,7 @@ exports.cancelMyPackage = catchAsync(async (req, res, next) => {
   // Vouchers used on these registrations go back to the travelers
   const vouchers = await Booking.distinct('voucher', { ...filter, voucher: { $ne: null } });
   const couponBookings = await Booking.distinct('_id', { ...filter, couponRedemption: { $ne: null } });
-  const paidMoney = await Booking.find({ ...filter, depositStatus: 'paid' }).select('depositPayment depositStatus');
+  const paidMoney = await Booking.find({ ...filter, depositStatus: 'paid' }).select('depositPayment depositStatus depositAmount');
   const result = await Booking.updateMany(filter, { status: 'cancelled', cancelledAt: new Date(), cancelReason: `Cancelled by the agency: ${reason}`.slice(0, 500) });
   // Their booking money goes back to them
   for (const b of paidMoney) await bookingMoney.refundDeposit(Booking, b, { reason: `The agency cancelled the tour: ${reason}`.slice(0, 200) });

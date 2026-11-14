@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CANCEL_REFUND } = require('./cancelRefundSchema');
 
 // A traveler asking a hotel for a stay. The hotel accepts or declines it from its panel (/hotel);
 // payment is settled between the guest and the hotel.
@@ -53,6 +54,10 @@ const stayRequestSchema = new mongoose.Schema(
     depositAmount: { type: Number, min: 0, default: 0 },
     depositPayment: { type: mongoose.Schema.ObjectId, ref: 'Payment' },
     depositStatus: { type: String, enum: ['none', 'paid', 'refunding', 'refunded', 'refund_failed', 'kept'], default: 'none' },
+    // The tour's or hotel's cancellation refund when it was booked, and how much of the booking money went back
+    // (all of it unless it was a partial refund on a late cancellation)
+    cancelRefund: { type: CANCEL_REFUND, default: null },
+    depositRefunded: { type: Number, min: 0, default: 0 },
     guestName: { type: String, trim: true, maxlength: 80, default: '' },
     phone: { type: String, trim: true, maxlength: 20, default: '' },
     note: { type: String, trim: true, maxlength: 1000, default: '' },

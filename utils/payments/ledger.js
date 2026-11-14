@@ -68,21 +68,23 @@ const open = async (req, payment, { customer, product }) => {
 };
 
 /**
- * Send a paid payment's money back through its gateway. Never throws; a refund the gateway
- * turns down is left as refund_failed for an admin to settle by hand.
+ * Send a paid payment's money back through its gateway: all of it, or `amount` taka of it (a
+ * retry sends what was asked the first time). Never throws; a refund the gateway turns down is left
+ * as refund_failed for an admin to settle by hand.
  */
-const refund = async (payment, { reason, by } = {}) => {
+const refund = async (payment, { reason, by, amount } = {}) => {
+  const asked = Number(amount) > 0 ? Math.min(Math.round(Number(amount)), payment.amount) : (payment.refund && payment.refund.amount) || payment.amount;
   const claimed = await Payment.findOneAndUpdate(
     { _id: payment._id, status: { $in: ['paid', 'refund_failed'] } },
-    { $set: { status: 'refunding', 'refund.reason': reason || 'Refund', 'refund.requestedAt': new Date(), 'refund.error': '', 'refund.by': by } },
+    { $set: { status: 'refunding', 'refund.reason': reason || 'Refund', 'refund.amount': asked, 'refund.requestedAt': new Date(), 'refund.error': '', 'refund.by': by } },
     { new: true }
   );
   if (!claimed) return Payment.findById(payment._id);
   let result;
   try {
     result = claimed.method === 'bkash'
-      ? await bkash.refund({ gatewayId: claimed.gatewayId, trxId: claimed.trxId, amount: claimed.amount, reason })
-      : await sslcommerz.refund({ trxId: claimed.trxId, amount: claimed.amount, reason, refundId: `R${claimed.invoice}`.slice(0, 30) });
+      ? await bkash.refund({ gatewayId: claimed.gatewayId, trxId: claimed.trxId, amount: asked, reason })
+      : await sslcommerz.refund({ trxId: claimed.trxId, amount: asked, reason, refundId: `R${claimed.invoice}`.slice(0, 30) });
   } catch (err) {
     result = { done: false, reason: err.message };
   }

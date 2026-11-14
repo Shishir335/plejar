@@ -283,7 +283,7 @@ async function loadAdPayments(status = C.paymentStatus || 'paid') {
         <button class="btn btn-secondary btn-sm" onclick="retryRefund('${E(p._id)}')">Try again</button>
         <button class="btn btn-primary btn-sm" onclick="recordRefund('${E(p._id)}')">Refunded by hand</button>`;
     } else if (p.status === 'refunding') refundCell = '<span class="badge badge-manager">In progress</span>';
-    else if (p.status === 'refunded') refundCell = `<span class="badge badge-inactive">Refunded</span>${refund && refund.ref ? `<span class="lead-sub">${E(refund.manual ? 'By hand: ' : '')}${E(refund.ref)}</span>` : ''}${refund && refund.reason ? `<span class="lead-sub" style="white-space:normal;">${E(refund.reason)}</span>` : ''}`;
+    else if (p.status === 'refunded') refundCell = `<span class="badge badge-inactive">Refunded${refund && refund.amount && refund.amount < p.amount ? ` ${taka(refund.amount)} of ${taka(p.amount)}` : ''}</span>${refund && refund.ref ? `<span class="lead-sub">${E(refund.manual ? 'By hand: ' : '')}${E(refund.ref)}</span>` : ''}${refund && refund.reason ? `<span class="lead-sub" style="white-space:normal;">${E(refund.reason)}</span>` : ''}`;
     return `
     <tr>
       <td>${E(p.description)}<span class="lead-sub">${E(p.purposeName || 'Ad')} · ${E(p.invoice)}</span></td>
@@ -300,7 +300,7 @@ async function loadAdPayments(status = C.paymentStatus || 'paid') {
 
 async function retryRefund(id) {
   const p = C.adPayments.find(x => x._id === id);
-  if (!p || !confirm(`Ask ${PAY_NAMES[p.method] || p.method} again to refund ${taka(p.amount)} to ${p.agency ? p.agency.name : 'the vendor'}?`)) return;
+  if (!p || !confirm(`Ask ${PAY_NAMES[p.method] || p.method} again to refund ${taka((p.refund && p.refund.amount) || p.amount)} to ${p.purpose === 'ad' ? (p.agency ? p.agency.name : 'the vendor') : 'the traveler'}?`)) return;
   const { ok, data } = await adminFetch(`/api/v1/admin/ad-payments/${id}/refund`, { method: 'POST', body: JSON.stringify({}) });
   showAdminToast(data.message || (ok ? 'Refunded.' : 'Could not refund.'), ok ? 'success' : 'error');
   loadAdPayments();

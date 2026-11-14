@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CANCEL_REFUND } = require('./cancelRefundSchema');
 const crypto = require('crypto');
 
 // Short readable reference shown to travelers and in admin, for example PLZ-7K3QX9
@@ -69,6 +70,10 @@ const bookingSchema = new mongoose.Schema(
     depositAmount: { type: Number, min: 0, default: 0 },
     depositPayment: { type: mongoose.Schema.ObjectId, ref: 'Payment' },
     depositStatus: { type: String, enum: ['none', 'paid', 'refunding', 'refunded', 'refund_failed', 'kept'], default: 'none' },
+    // The tour's or hotel's cancellation refund when it was booked, and how much of the booking money went back
+    // (all of it unless it was a partial refund on a late cancellation)
+    cancelRefund: { type: CANCEL_REFUND, default: null },
+    depositRefunded: { type: Number, min: 0, default: 0 },
     paidAt: Date,
     confirmedAt: Date,
     completedAt: Date,
