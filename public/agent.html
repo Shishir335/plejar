@@ -9,15 +9,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="/css/agent.css">
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=2">
 </head>
 <body>
 
   <!-- Sign in -->
   <main class="auth-page" id="loginView" hidden>
     <form class="auth-card" id="loginForm" novalidate>
-      <a href="/" class="logo"><img class="brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74"></a>
+      <a href="/" class="logo"><img class="brand-logo" src="/assets/brand/plejar-logo.png?v=2" alt="Plejar" width="500" height="160"></a>
       <h1>Vendor sign in</h1>
       <p class="sub">Manage your tour events, registrations, announcements and team.</p>
       <div class="alert alert-error" id="loginError" role="alert" hidden></div>
@@ -46,7 +46,7 @@
   <!-- First sign-in: replace the temporary password -->
   <main class="auth-page" id="passwordView" hidden>
     <form class="auth-card" id="passwordForm" novalidate>
-      <a href="/" class="logo"><img class="brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74"></a>
+      <a href="/" class="logo"><img class="brand-logo" src="/assets/brand/plejar-logo.png?v=2" alt="Plejar" width="500" height="160"></a>
       <h1>Choose your own password</h1>
       <p class="sub">You signed in with the temporary password Plejar sent you. Pick a new one that only you know before you continue.</p>
       <div class="alert alert-error" id="passwordError" role="alert" hidden></div>
@@ -71,7 +71,7 @@
   <!-- Panel -->
   <div class="panel" id="panelView" hidden>
     <aside class="side">
-      <a href="/" class="logo"><img class="brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74"></a>
+      <a href="/" class="logo"><img class="brand-logo" src="/assets/brand/plejar-logo.png?v=2" alt="Plejar" width="500" height="160"></a>
       <div class="side-agency" id="sideAgency"></div>
       <nav class="side-nav" aria-label="Agency panel">
         <button data-view="overview" class="active">Overview</button>
@@ -590,8 +590,20 @@
             <input id="evChildPrice" type="number" min="0" step="50" inputmode="numeric" placeholder="Same as adult">
           </div>
           <div class="field">
-            <label for="evAdvance">Booking advance (৳) *</label>
-            <input id="evAdvance" type="number" min="0" step="50" inputmode="numeric" placeholder="0 if none">
+            <label for="evAdvance">Booking money per traveler (৳) *</label>
+            <input id="evAdvance" type="number" min="1" step="50" inputmode="numeric" placeholder="500">
+            <span class="hint">Travelers pay this online by bKash or card to book. Plejar adds it to your earnings, less commission.</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="evRefundDays">Cancellation refund: days before</label>
+            <input id="evRefundDays" type="number" min="1" max="365" step="1" inputmode="numeric" placeholder="3">
+          </div>
+          <div class="field">
+            <label for="evRefundPercent">Booking money back (%)</label>
+            <input id="evRefundPercent" type="number" min="0" max="100" step="5" inputmode="numeric" placeholder="50">
+            <span class="hint">A traveler who cancels a confirmed booking at least this many days before the start date gets this share of the booking money back; later, none. Leave both empty for no refund once confirmed. Before you confirm, it's always refunded in full.</span>
           </div>
         </div>
         <div class="field-row">
@@ -617,6 +629,11 @@
             <label for="evDeparture">Departure time *</label>
             <input id="evDeparture" type="time">
           </div>
+        </div>
+        <div class="field">
+          <label for="evStartDistrict">District the tour starts from *</label>
+          <select id="evStartDistrict" name="startDistrict"><option value="">Choose a district</option></select>
+          <span class="hint">Your ads for this tour are shown first to travelers in and near this district.</span>
         </div>
         <div class="field-row">
           <div class="field">
@@ -962,6 +979,7 @@
         </div>
       </div>
       <p class="muted" style="font-size: 0.8rem; margin: -6px 0 14px;">Leave the dates empty to show it from when it's accepted until the tour leaves.</p>
+      <div class="ad-price" id="adPrice" hidden></div>
       <div class="field">
         <label>Preview</label>
         <div id="adPreview"></div>
@@ -969,6 +987,20 @@
       <div class="alert alert-error" id="adError" hidden></div>
       <button type="submit" class="btn btn-primary btn-block" id="adSubmit">Send for review</button>
     </form>
+  </div>
+
+  <div class="drawer-bg" id="adPayDrawer" hidden>
+    <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="adPayTitle">
+      <div class="drawer-head">
+        <h2 id="adPayTitle">Pay for your ad</h2>
+        <button type="button" class="drawer-close" data-action="close-drawer" aria-label="Close">&times;</button>
+      </div>
+      <div id="adPaySummary"></div>
+      <p class="muted" style="font-size: 0.85rem;">Your ad goes to Plejar for review as soon as the payment goes through. If Plejar asks for changes, fix the ad and send it again at no extra cost. Delete it before it runs and you get your money back.</p>
+      <div class="alert alert-warn" id="adPaySandbox" hidden>Test mode: payments go to the gateway's sandbox and no real money moves.</div>
+      <div class="pay-options" id="adPayOptions"></div>
+      <div class="alert alert-error" id="adPayError" hidden></div>
+    </div>
   </div>
 
   <div class="drawer-bg" id="announcementDrawer" hidden>

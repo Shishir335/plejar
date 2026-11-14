@@ -16,9 +16,9 @@
     })();
   </script>
   <link rel="stylesheet" href="/css/admin.css">
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png?v=2">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -32,7 +32,7 @@
     </button>
     <div class="login-card">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png" alt="" width="40" height="40">
+        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png?v=2" alt="" width="40" height="40">
         <div>
           <h2 style="font-size: 1.3rem; font-weight: 700;">Admin Console</h2>
           <p style="font-size: 0.84rem; color: var(--text-muted);">Sign in with administrator privileges</p>
@@ -82,9 +82,9 @@
     <!-- Sidebar -->
     <aside class="admin-sidebar">
       <div class="sidebar-header">
-        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png" alt="" width="34" height="34">
+        <img class="sidebar-brand-mark" src="/assets/brand/plejar-mark.png?v=2" alt="" width="34" height="34">
         <div class="sidebar-brand-name">
-          <img class="sidebar-brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74">
+          <img class="sidebar-brand-logo" src="/assets/brand/plejar-logo-light.png?v=2" alt="Plejar" width="500" height="160">
           <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;">Admin Console</span>
         </div>
       </div>
@@ -450,6 +450,14 @@
           </div>
 
           <div class="subpane" id="csub-ads">
+            <form id="adPriceForm" class="ad-price-card" style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 14px 16px; margin: 0 0 16px; border: 1px solid var(--admin-border); border-radius: 12px;">
+              <div>
+                <label for="adPricePerDay" style="display: block; font-weight: 600; margin-bottom: 4px;">Ad price per day (৳)</label>
+                <input id="adPricePerDay" type="number" min="0" max="100000" step="1" inputmode="numeric" style="width: 140px;" placeholder="0">
+              </div>
+              <button type="submit" class="btn btn-primary">Save price</button>
+              <p class="lead-sub" id="adPriceNote" style="margin: 0; flex: 1 1 260px;">Vendors pay this for every day their ad runs, when they apply. 0 keeps ads free.</p>
+            </form>
             <p class="lead-sub" style="margin: 0 0 12px;">Vendors apply here to advertise a tour. An accepted ad becomes a slide on the app's Tours screen during its dates, and joins the Tours banners list.</p>
             <div class="control-bar">
               <div class="filters" id="adRequestChips"></div>
@@ -459,6 +467,18 @@
               <table class="admin-table lead-table">
                 <thead><tr><th>Ad</th><th>Vendor</th><th>Tour</th><th>Shows</th><th>Sent</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="adRequestsTableBody"></tbody>
+              </table>
+            </div>
+            <h3 style="margin: 28px 0 8px;">Payments: ads and booking money</h3>
+            <p class="lead-sub" style="margin: 0 0 12px;">What vendors paid for ads, and the booking money travelers paid for tours and hotel stays. Refunds happen automatically (an ad deleted before it runs, a booking declined or cancelled in time); when the gateway refuses, the refund waits here for you.</p>
+            <div class="control-bar">
+              <div class="filters" id="adPaymentChips"></div>
+              <div class="actions"><button class="btn btn-secondary" onclick="loadAdPayments()">↻ Refresh</button></div>
+            </div>
+            <div class="table-container">
+              <table class="admin-table lead-table">
+                <thead><tr><th>For</th><th>Vendor</th><th>Amount</th><th>Paid with</th><th>When</th><th style="text-align: right;">Refund</th></tr></thead>
+                <tbody id="adPaymentsTableBody"></tbody>
               </table>
             </div>
           </div>

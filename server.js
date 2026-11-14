@@ -1,8 +1,19 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const database = require('./utils/database');
 
+// The mode comes from the shell or the host, never from config.env (see utils/database.js)
+const modeFromHost = process.env.NODE_ENV;
 dotenv.config({ path: './config.env' });
 dotenv.config(); // fallback to .env if config.env not deployed
+const modeInFile = modeFromHost ? '' : process.env.NODE_ENV || '';
+const mode = database.resolveMode({
+  processEnv: modeFromHost,
+  argv: process.argv,
+  onRender: Boolean(process.env.RENDER)
+});
+process.env.NODE_ENV = mode;
+const isDev = mode === 'development';
 
 if (!process.env.JWT_SECRET) {
   console.error('[CONFIG ERROR] JWT_SECRET is not set. Add it to config.env before starting the server.');
@@ -22,36 +33,15 @@ process.on('uncaughtException', err => {
   }
 });
 
-// Detect whether server is started in dev / development mode
-const isDev =
-  process.env.NODE_ENV === 'development' ||
-  process.argv.includes('dev') ||
-  process.argv.includes('development') ||
-  process.env.npm_lifecycle_event === 'dev' ||
-  process.env.npm_lifecycle_event === 'start:dev' ||
-  process.env.npm_lifecycle_event === 'start-dev';
-
-if (isDev) {
-  process.env.NODE_ENV = 'development';
-}
-
 // Configure MongoDB connection (Production vs Development DB)
-let dbUri = '';
-let dbLabel = '';
-
-if (isDev) {
-  dbUri =
-    process.env.DATABASE_DEV ||
+let dbUri = isDev
+  ? process.env.DATABASE_DEV ||
     (process.env.DATABASE
-      ? process.env.DATABASE.replace('/plezar?', '/plezar_dev?').replace('/plezar', '/plezar_dev')
+      ? process.env.DATABASE.replace('/plezar?', '/plezar_dev?').replace(/\/plezar$/, '/plezar_dev')
       : '') ||
     process.env.DATABASE_LOCAL ||
-    '';
-  dbLabel = 'plezar_dev [DEVELOPMENT DATABASE]';
-} else {
-  dbUri = process.env.DATABASE || '';
-  dbLabel = 'plezar [PRODUCTION DATABASE]';
-}
+    ''
+  : process.env.DATABASE || '';
 
 // Accept both our <PASSWORD> placeholder and Atlas's default <db_password>
 if (process.env.DATABASE_PASSWORD) {
@@ -61,6 +51,23 @@ if (process.env.DATABASE_PASSWORD) {
 }
 
 const isPlaceholderUri = !dbUri || dbUri.includes('<USERNAME>') || dbUri.includes('<NEW_CLUSTER_HOST>');
+const dbLabel = `${database.describe(dbUri)} [${isDev ? 'DEVELOPMENT' : 'PRODUCTION'}]`;
+
+if (modeInFile && modeInFile.toLowerCase() !== mode) {
+  console.warn(`[CONFIG] NODE_ENV=${modeInFile} in config.env is ignored; running in ${mode} mode. Use npm run start:prod to run against production.`);
+}
+
+// Development must never write to the live database
+const refusal = isDev && !isPlaceholderUri ? database.devRefusal(dbUri) : null;
+if (refusal) {
+  console.error('------------------------------------------------------------');
+  console.error(`[CONFIG ERROR] Development mode won't connect to ${database.describe(dbUri)}:`);
+  console.error(`  ${refusal}.`);
+  console.error('  Set DATABASE_DEV in config.env to your development database,');
+  console.error('  or run with NODE_ENV=production if you really mean the live one.');
+  console.error('------------------------------------------------------------');
+  process.exit(1);
+}
 
 if (isPlaceholderUri) {
   console.log('------------------------------------------------------------');
@@ -68,7 +75,7 @@ if (isPlaceholderUri) {
   console.log('[CONFIG] Set your cluster URI in config.env -> DATABASE');
   console.log('------------------------------------------------------------');
 } else {
-  console.log(`[MONGODB] Mode: ${isDev ? 'DEVELOPMENT' : 'PRODUCTION'}`);
+  console.log(`[MONGODB] Mode: ${isDev ? 'DEVELOPMENT' : 'PRODUCTION'}${process.env.RENDER && !modeFromHost ? ' (Render, NODE_ENV not set)' : ''}`);
   console.log(`[MONGODB] Target: ${dbLabel}`);
   console.log('[MONGODB] Connecting to MongoDB cluster...');
   mongoose

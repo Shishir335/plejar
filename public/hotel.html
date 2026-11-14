@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="/css/hotel.css">
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=2">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
   <main class="auth" id="loginView" hidden>
     <div class="auth-art">
       <div>
-        <span class="brand"><img class="brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74"> <small>for hotels</small></span>
+        <span class="brand"><img class="brand-logo" src="/assets/brand/plejar-logo-light.png?v=2" alt="Plejar" width="500" height="160"> <small>for hotels</small></span>
         <h2>Your rooms, in front of every traveler planning a trip.</h2>
         <p>Keep your rooms, rates and photos up to date, and answer stay requests from the Plejar app.</p>
       </div>
@@ -51,7 +51,7 @@
   <main class="auth" id="passwordView" hidden>
     <div class="auth-art">
       <div>
-        <span class="brand"><img class="brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74"> <small>for hotels</small></span>
+        <span class="brand"><img class="brand-logo" src="/assets/brand/plejar-logo-light.png?v=2" alt="Plejar" width="500" height="160"> <small>for hotels</small></span>
         <h2>Welcome to Plejar.</h2>
         <p>One last step before you open your hotel panel.</p>
       </div>
@@ -85,7 +85,7 @@
     <header class="top">
       <div class="top-inner">
         <div class="top-row">
-          <a href="/" class="brand"><img class="brand-logo" src="/assets/brand/plejar-logo.png" alt="Plejar" width="356" height="74"> <small>for hotels</small></a>
+          <a href="/" class="brand"><img class="brand-logo" src="/assets/brand/plejar-logo.png?v=2" alt="Plejar" width="500" height="160"> <small>for hotels</small></a>
           <div class="top-hotel"><strong id="topHotel"></strong><span id="topStatus"></span></div>
           <div class="top-user"><span id="topUser"></span><a class="btn btn-ghost btn-sm" id="otherPanel" href="/agent" hidden>Tour agency panel</a><button class="btn btn-ghost btn-sm" data-action="logout">Sign out</button></div>
         </div>
@@ -223,6 +223,16 @@
               <input id="dPrice" name="pricePerNight" type="number" min="0" inputmode="numeric">
               <span class="hint">Once you add room types, this comes from your cheapest room.</span>
             </div>
+            <div class="field">
+              <label for="dBookingMoney">Booking money per room (৳) *</label>
+              <input id="dBookingMoney" name="bookingMoney" type="number" min="1" max="1000000" inputmode="numeric" placeholder="1000" required>
+              <span class="hint">Guests pay this online by bKash or card for each room when they request a stay. It's refunded if you decline; Plejar adds it to your earnings, less commission.</span>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="dRefundDays">Cancellation refund: days before check-in</label><input id="dRefundDays" name="refundDays" type="number" min="1" max="365" step="1" inputmode="numeric" placeholder="3"></div>
+              <div class="field"><label for="dRefundPercent">Booking money back (%)</label><input id="dRefundPercent" name="refundPercent" type="number" min="0" max="100" step="5" inputmode="numeric" placeholder="50"></div>
+            </div>
+            <span class="hint">A guest who cancels an accepted stay at least this many days before check-in gets this share of the booking money back; later, none. Leave both empty for no refund once you accept. Before you answer, it's always refunded in full.</span>
           </div>
           <div class="card">
             <h2>Amenities</h2>

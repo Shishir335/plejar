@@ -1,5 +1,6 @@
 const ActivityLog = require('../models/activityLogModel');
 const LoginEvent = require('../models/loginEventModel');
+const { noteSeen } = require('./client');
 
 const clientIp = req => (req && (req.ip || (req.headers && req.headers['x-forwarded-for']))) || '';
 
@@ -18,7 +19,8 @@ const logActivity = async (req, { action, summary, user, agency }) => {
       agency,
       action,
       summary,
-      ip: String(clientIp(req)).slice(0, 80)
+      ip: String(clientIp(req)).slice(0, 80),
+      ...(req && req.client ? { client: req.client } : {})
     });
   } catch (err) {
     console.warn('[ACTIVITY LOG WARNING]', err.message);
@@ -37,8 +39,10 @@ const recordLogin = async (req, { user, email, success, reason = '', method = 'p
       reason,
       method,
       ip: String(clientIp(req)).slice(0, 80),
-      userAgent: String((req.headers && req.headers['user-agent']) || '').slice(0, 300)
+      userAgent: String((req.headers && req.headers['user-agent']) || '').slice(0, 300),
+      ...(req.client ? { client: req.client } : {})
     });
+    if (success && user) noteSeen(user, req.client);
   } catch (err) {
     console.warn('[LOGIN EVENT WARNING]', err.message);
   }

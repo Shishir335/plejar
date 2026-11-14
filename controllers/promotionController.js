@@ -7,6 +7,8 @@ const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const { logActivity } = require('../utils/activity');
 const { saveContentImage, removeContentImage, removeContentFolder } = require('../utils/uploads');
+const { priceView } = require('../utils/tourCards');
+const { viewerDistrict, sliderFor, allAdsPage, newSeed } = require('../utils/adRanking');
 
 // Banners on the app's Tours screen ("Summer Adventure Sale"), managed in the admin panel
 
@@ -30,25 +32,66 @@ const bannerView = p => ({
 });
 
 /**
- * The slides to show now, in the admin's order. A vendor's ad also needs its tour to still be
- * bookable and its agency active, so an ad never leads to a tour travelers can't open.
+ * The slider for a request: Plejar's banners first, then agents' ads nearest the traveler, taking
+ * turns (utils/adRanking.js). An ad only shows while its tour is published and its agency active.
+ * Returns { banners, adsTotal }; with `count`, each ad shown counts a view.
  */
-const liveBanners = async (limit = 10) => {
-  const rows = await Promotion.find(Promotion.liveFilter()).sort({ order: 1, createdAt: -1 }).limit(limit * 3).lean();
-  const ads = rows.filter(p => p.source === 'vendor');
-  // The agency that owns the tour decides, not a copy on the ad
-  const tours = ads.length ? await Package.find({ _id: { $in: ads.map(p => p.tour) }, status: 'published', hiddenByAdmin: { $ne: true } }).select('agency').lean() : [];
-  const agencies = tours.length ? await Agency.find({ _id: { $in: tours.map(t => t.agency) }, status: 'active' }).select('_id').lean() : [];
-  const openAgencies = new Set(agencies.map(a => String(a._id)));
-  const openTours = new Set(tours.filter(t => openAgencies.has(String(t.agency))).map(t => String(t._id)));
-  return rows.filter(p => p.source !== 'vendor' || openTours.has(String(p.tour))).slice(0, limit);
+const liveBanners = async (req, { count = false } = {}) => {
+  const viewer = viewerDistrict({ lat: req.query.lat, lng: req.query.lng, districtCode: req.query.district, user: req.user });
+  const { slides, adsTotal } = await sliderFor(viewer, { count });
+  return { banners: slides, adsTotal };
 };
 exports.liveBanners = liveBanners;
 
-// GET /promotions — live banners, in the admin's order
+// GET /promotions?lat&lng&district — the slider. Cached for a minute, so it doesn't count views.
 exports.listLive = catchAsync(async (req, res) => {
-  const rows = await liveBanners();
-  res.status(200).json({ status: 'success', data: { banners: rows.map(bannerView) } });
+  const { banners, adsTotal } = await liveBanners(req);
+  res.status(200).json({ status: 'success', data: { banners: banners.map(bannerView), adsTotal } });
+});
+
+// One ad on the "See all" screen: the slide, plus the tour it is for
+const adListView = p => {
+  const t = p.tourDoc;
+  return {
+    ...bannerView(p),
+    nearness: p.nearness,
+    tour: {
+      _id: t._id,
+      title: t.title,
+      photo: (t.photos || [])[0] || '',
+      location: t.destination || '',
+      startDate: t.startDate || null,
+      endDate: t.endDate || null,
+      startsFrom: p.start ? { code: p.start.code, name: p.start.name, nameBn: p.start.nameBn } : null,
+      price: priceView(t.priceFrom, t.regularPrice),
+      agency: { _id: t.agency._id, name: t.agency.name, logo: t.agency.logo || '', verified: Boolean(t.agency.verified) }
+    }
+  };
+};
+
+/**
+ * GET /promotions/ads?lat&lng&district&seed&page&limit — every live agent's ad, nearest first, for the
+ * "See all" screen. The first page returns a `seed`; send it back with the next pages so the order
+ * stays the same while the traveler scrolls.
+ */
+exports.listAds = catchAsync(async (req, res) => {
+  const viewer = viewerDistrict({ lat: req.query.lat, lng: req.query.lng, districtCode: req.query.district, user: req.user });
+  const seed = /^[a-f0-9]{6,32}$/.test(String(req.query.seed || '')) ? String(req.query.seed) : newSeed();
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 30);
+  const { rows, total } = await allAdsPage(viewer, { seed, page, limit });
+  res.status(200).json({
+    status: 'success',
+    data: {
+      ads: rows.map(adListView),
+      seed,
+      district: viewer ? { code: viewer.code, name: viewer.name, nameBn: viewer.nameBn } : null,
+      page,
+      limit,
+      total,
+      hasMore: page * limit < total
+    }
+  });
 });
 
 // ---------- Admin ----------
@@ -127,6 +170,7 @@ const adminView = async p => {
     source: p.source || 'admin',
     order: p.order,
     clicks: p.clicks,
+    views: p.views || 0,
     updatedAt: p.updatedAt
   };
 };

@@ -17,6 +17,10 @@ const { UserVoucher } = require('../models/voucherModel');
 const { claimCoupon, releaseCoupon } = require('../utils/coupons');
 const { CouponRedemption } = require('../models/couponModel');
 const { hasRole } = require('../utils/roles');
+const { cancelRefundOf } = require('../utils/cancelRefund');
+const { clientOf } = require('../utils/client');
+const bookingMoney = require('../utils/bookingMoney');
+const { GATEWAY_NAMES } = require('../utils/payments/ledger');
 
 // A restriction with an end date stops applying once that date has passed
 const restricted = (user, what) => {
@@ -88,7 +92,11 @@ const bookTour = async (req, travelers) => {
     pricePerPerson: pkg.priceFrom,
     regularPrice: pkg.regularPrice > pkg.priceFrom ? pkg.regularPrice : null,
     amount,
-    ...snapshot(amount, termsFor(agency))
+    ...snapshot(amount, termsFor(agency)),
+    // Booking money per traveler, set by the agency on the tour (older tours may have none)
+    depositPer: pkg.advanceAmount >= 1 ? Math.round(pkg.advanceAmount) : 0,
+    // And its cancellation refund, kept with the booking as it was when booked
+    cancelRefund: cancelRefundOf(pkg)
   };
 };
 
@@ -161,33 +169,41 @@ const bookGuide = async (req, travelers) => {
   };
 };
 
+// What a booking request may carry, kept on a booking-money payment until the money arrives
+const DRAFT_KEYS = ['kind', 'packageId', 'hotelId', 'guideId', 'travelers', 'travelDate', 'checkIn', 'checkOut', 'rooms', 'startDate', 'endDate', 'note', 'couponCode', 'voucherCode'];
+const draftOf = body => Object.fromEntries(DRAFT_KEYS
+  .filter(k => body[k] !== undefined && body[k] !== null && body[k] !== '')
+  .map(k => [k, typeof body[k] === 'number' ? body[k] : String(body[k]).slice(0, k === 'note' ? 500 : 60)]));
+
 /**
- * POST /bookings
- * Tour:  { packageId, travelers }
- * Hotel: { kind: "hotel", hotelId, checkIn, checkOut, rooms, travelers }
- * Guide: { kind: "guide", guideId, startDate, endDate, travelers }
- * Any of them can add voucherCode (a voucher redeemed in Vouchers & Rewards) for a discount.
- * Every booking starts as pending until the agency (or Plejar, for hotels) confirms it.
+ * Check a booking request and work out what it costs, with its coupon or voucher claimed.
+ * `ctx` is { body, user }. Returns { kind, travelers, fields, deposit, depositPer, coupon, voucher }.
+ * The booking money (deposit) comes from the tour itself, never from the request.
  */
-exports.createBooking = catchAsync(async (req, res, next) => {
-  if (!hasRole(req.user, 'user')) return next(new AppError('Only traveler accounts can book trips. Sign in to the Plejar app first.', 403));
-  if (restricted(req.user, 'booking')) return next(new AppError('Booking is switched off for your account. Contact Plejar support.', 403));
-  let kind = req.body.kind || 'tour';
-  if (!req.body.kind && req.body.hotelId) kind = 'hotel';
-  if (!req.body.kind && req.body.guideId) kind = 'guide';
-  if (!Booking.KINDS.includes(kind)) return next(new AppError('Book a tour, a hotel or a guide.', 400));
+const prepareBooking = async ctx => {
+  const { body, user } = ctx;
+  if (!hasRole(user, 'user')) throw new AppError('Only traveler accounts can book trips. Sign in to the Plejar app first.', 403);
+  if (restricted(user, 'booking')) throw new AppError('Booking is switched off for your account. Contact Plejar support.', 403);
+  let kind = body.kind || 'tour';
+  if (!body.kind && body.hotelId) kind = 'hotel';
+  if (!body.kind && body.guideId) kind = 'guide';
+  if (!Booking.KINDS.includes(kind)) throw new AppError('Book a tour, a hotel or a guide.', 400);
 
-  const travelers = Number(req.body.travelers === undefined && kind !== 'tour' ? 1 : req.body.travelers);
-  if (!Number.isInteger(travelers) || travelers < 1 || travelers > 50) return next(new AppError('Enter between 1 and 50 travelers.', 400));
+  const travelers = Number(body.travelers === undefined && kind !== 'tour' ? 1 : body.travelers);
+  if (!Number.isInteger(travelers) || travelers < 1 || travelers > 50) throw new AppError('Enter between 1 and 50 travelers.', 400);
 
-  const fields = await { tour: bookTour, hotel: bookHotel, guide: bookGuide }[kind](req, travelers);
-  const hasCoupon = Boolean(String(req.body.couponCode || '').trim());
-  if (hasCoupon && String(req.body.voucherCode || '').trim()) {
-    return next(new AppError('Use a voucher or a coupon on a booking, not both.', 400));
+  const fields = await { tour: bookTour, hotel: bookHotel, guide: bookGuide }[kind](ctx, travelers);
+  const depositPer = fields.depositPer || 0;
+  const cancelRefund = fields.cancelRefund || null;
+  delete fields.depositPer;
+  delete fields.cancelRefund;
+  const hasCoupon = Boolean(String(body.couponCode || '').trim());
+  if (hasCoupon && String(body.voucherCode || '').trim()) {
+    throw new AppError('Use a voucher or a coupon on a booking, not both.', 400);
   }
   let coupon = null;
   if (hasCoupon) {
-    coupon = await claimCoupon(req.body.couponCode, { user: req.user._id, kind, vendor: fields.agency, packageId: fields.package, subtotal: fields.amount });
+    coupon = await claimCoupon(body.couponCode, { user: user._id, kind, vendor: fields.agency, packageId: fields.package, subtotal: fields.amount });
     fields.subtotal = fields.amount;
     fields.discountAmount = coupon.discount;
     fields.amount -= coupon.discount;
@@ -203,8 +219,13 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     }
   }
   let voucher = null;
-  if (String(req.body.voucherCode || '').trim()) {
-    voucher = await claimVoucher(req.user._id, req.body.voucherCode, kind, fields.amount);
+  if (String(body.voucherCode || '').trim()) {
+    try {
+      voucher = await claimVoucher(user._id, body.voucherCode, kind, fields.amount);
+    } catch (err) {
+      if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
+      throw err;
+    }
     // Plejar pays for the discount, so the agency's share stays the same: first out of its commission,
     // and whatever the commission doesn't cover (all of it, when commission is off) is owed to the agency
     fields.subtotal = fields.amount;
@@ -216,21 +237,92 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     fields.voucher = voucher.userVoucher._id;
     fields.voucherCode = voucher.userVoucher.code;
   }
+  // Never more than the booking costs after its discount
+  const deposit = Math.max(0, Math.min(depositPer * travelers, Math.floor(fields.amount)));
+  return { kind, travelers, fields, deposit, depositPer, cancelRefund, coupon, voucher };
+};
+
+const releaseClaims = async ({ coupon, voucher }) => {
+  if (voucher) await releaseVoucher(voucher.userVoucher._id);
+  if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
+};
+
+/** Make the booking a prepared request describes; `payment` is the booking money it was paid with */
+const placeBooking = async (ctx, prepared, payment = null) => {
+  const { fields, coupon, voucher, travelers } = prepared;
   let booking;
   try {
-    booking = await Booking.create({ ...fields, user: req.user._id, note: req.body.note });
+    booking = await Booking.create({
+      ...fields,
+      user: ctx.user._id,
+      note: ctx.body.note,
+      // The app or the website: from this request, or (paid by gateway callback) from when payment started
+      source: ctx.req ? clientOf(ctx.req) : (payment && payment.source) || undefined,
+      ...(payment ? { depositAmount: payment.amount, depositPayment: payment._id, depositStatus: 'paid' } : {}),
+      ...(payment && prepared.cancelRefund ? { cancelRefund: prepared.cancelRefund } : {})
+    });
   } catch (err) {
-    if (voucher) await releaseVoucher(voucher.userVoucher._id);
-    if (coupon) await releaseCoupon({ _id: coupon.redemption._id });
+    await releaseClaims(prepared);
     throw err;
   }
   if (voucher) await UserVoucher.updateOne({ _id: voucher.userVoucher._id }, { booking: booking._id });
   if (coupon) await CouponRedemption.updateOne({ _id: coupon.redemption._id }, { booking: booking._id });
   await bookingRequested(booking);
-  await logActivity(req, { action: 'booking.created', summary: `Booked ${booking.packageTitle} (${booking.reference}) for ${travelers} traveler${travelers === 1 ? '' : 's'}`, user: req.user._id, agency: booking.agency });
+  await logActivity(ctx.req || null, {
+    action: 'booking.created',
+    summary: `Booked ${booking.packageTitle} (${booking.reference}) for ${travelers} traveler${travelers === 1 ? '' : 's'}${payment ? `, paid ${payment.amount} BDT booking money by ${GATEWAY_NAMES[payment.method]} (${payment.trxId})` : ''}`,
+    user: ctx.user._id,
+    agency: booking.agency
+  });
+  return booking;
+};
 
-  res.status(201).json({ status: 'success', message: kind === 'hotel' ? 'Request sent. Plejar will confirm your stay with the hotel.' : 'Request sent. You will get a notification when it is confirmed.', data: { booking } });
+const bookedMessage = kind => (kind === 'hotel' ? 'Request sent. Plejar will confirm your stay with the hotel.' : 'Request sent. You will get a notification when it is confirmed.');
+
+/**
+ * POST /bookings
+ * Tour:  { packageId, travelers }
+ * Hotel: { kind: "hotel", hotelId, checkIn, checkOut, rooms, travelers }
+ * Guide: { kind: "guide", guideId, startDate, endDate, travelers }
+ * Any of them can add voucherCode (a voucher redeemed in Vouchers & Rewards) for a discount.
+ * Every booking starts as pending until the agency (or Plejar, for hotels) confirms it.
+ *
+ * A tour with booking money: send payWith ("bkash" or "sslcommerz") too. Nothing is booked yet; the
+ * answer (202) has the payment and a redirectUrl to pay at. Once the gateway confirms the money the
+ * booking is made (GET /payments/:id shows it), or the money is refunded if the seats went meanwhile.
+ */
+exports.createBooking = catchAsync(async (req, res) => {
+  const ctx = { body: req.body || {}, user: req.user, req };
+  const prepared = await prepareBooking(ctx);
+  if (prepared.deposit > 0) {
+    await releaseClaims(prepared);
+    const { fields } = prepared;
+    const started = await bookingMoney.start(req, {
+      purpose: 'booking',
+      method: ctx.body.payWith,
+      agency: fields.agency,
+      amount: prepared.deposit,
+      perUnit: prepared.depositPer,
+      units: prepared.travelers,
+      description: `Booking money: ${fields.packageTitle}`,
+      draft: draftOf(ctx.body)
+    });
+    return res.status(202).json({ status: 'success', message: 'Pay the booking money to send your booking request.', data: started });
+  }
+  const booking = await placeBooking(ctx, prepared);
+  res.status(201).json({ status: 'success', message: bookedMessage(prepared.kind), data: { booking } });
 });
+
+/** Make a paid-for booking from its payment's draft (utils/bookingMoney.js). Throws AppError when it can't. */
+exports.placePaidBooking = async (user, payment) => {
+  const ctx = { body: payment.draft || {}, user };
+  const prepared = await prepareBooking(ctx);
+  if (prepared.deposit !== payment.amount || String(prepared.fields.agency) !== String(payment.agency)) {
+    await releaseClaims(prepared);
+    throw new AppError('The tour changed while you were paying. Your booking money is being refunded; please book again.', 409);
+  }
+  return placeBooking(ctx, prepared, payment);
+};
 
 // ---------- My Bookings ----------
 
@@ -302,6 +394,8 @@ const bookingCards = async bookings => {
       nights: b.kind === 'hotel' ? b.units : null,
       days: b.kind === 'guide' ? b.units : null,
       paymentStatus: b.paymentStatus,
+      // Booking money paid online: { amount, status } (refunded if cancelled before it's confirmed)
+      bookingMoney: bookingMoney.depositView(b, 'booking'),
       pointsEarned: b.pointsAwarded || 0,
       canCancel: ['pending', 'confirmed'].includes(b.status),
       canReview: b.status === 'completed' && !reviews.has(String(b._id)),

@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { CLIENT } = require('./clientSchema');
+const { CANCEL_REFUND } = require('./cancelRefundSchema');
 
 // A traveler asking a hotel for a stay. The hotel accepts or declines it from its panel (/hotel);
 // payment is settled between the guest and the hotel.
@@ -48,6 +50,17 @@ const stayRequestSchema = new mongoose.Schema(
     commissionRate: { type: Number, min: 0, max: 100, default: 0 },
     commissionFlat: { type: Number, min: 0, default: 0 },
     commissionAmount: { type: Number, min: 0, default: 0 },
+    // Booking money the traveler paid online to Plejar (per room x rooms). Refunded when the hotel declines or
+    // the traveler cancels before it's accepted; kept (and paid out to the vendor) once accepted.
+    // Made in the app or on the website (utils/client.js)
+    source: { type: CLIENT, default: undefined },
+    depositAmount: { type: Number, min: 0, default: 0 },
+    depositPayment: { type: mongoose.Schema.ObjectId, ref: 'Payment' },
+    depositStatus: { type: String, enum: ['none', 'paid', 'refunding', 'refunded', 'refund_failed', 'kept'], default: 'none' },
+    // The tour's or hotel's cancellation refund when it was booked, and how much of the booking money went back
+    // (all of it unless it was a partial refund on a late cancellation)
+    cancelRefund: { type: CANCEL_REFUND, default: null },
+    depositRefunded: { type: Number, min: 0, default: 0 },
     guestName: { type: String, trim: true, maxlength: 80, default: '' },
     phone: { type: String, trim: true, maxlength: 20, default: '' },
     note: { type: String, trim: true, maxlength: 1000, default: '' },

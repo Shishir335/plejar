@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const StayRequest = require('../models/stayRequestModel');
 const { releaseCoupon } = require('./coupons');
+const bookingMoney = require('./bookingMoney');
 const Notification = require('../models/notificationModel');
 require('../models/hotelModel'); // for populate('hotel')
 
@@ -24,6 +25,8 @@ const expireStayRequests = async (scope = {}, now = new Date()) => {
     expired += 1;
     // Its coupon use goes back to the guest
     if (request.couponRedemption) await releaseCoupon({ stayRequest: request._id });
+    // ...and its booking money
+    await bookingMoney.refundDeposit(StayRequest, request, { reason: "The hotel didn't answer within 24 hours" });
     const hotelName = (request.hotel && request.hotel.name) || 'The hotel';
     await Notification.create({
       user: request.user,

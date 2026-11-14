@@ -17,6 +17,8 @@ const { commissionView } = require('../utils/commission');
 const { HOLDS_SEAT, scheduleFrom, registrationStats, withStats } = require('../utils/events');
 const { notifyUsers } = require('../utils/notify');
 const { applyPlan, planProblems, describeMissing } = require('../utils/tourPlan');
+const bookingMoney = require('../utils/bookingMoney');
+const { district, tourStartDistrict } = require('../utils/places');
 const { bookingStatusChanged } = require('../utils/bookingEvents');
 const Announcement = require('../models/announcementModel');
 const Destination = require('../models/destinationModel');
@@ -249,10 +251,24 @@ const publishBlocked = (pkg, next) => {
   return true;
 };
 
+// The district the tour starts from: a code from the district list, or empty to clear it
+const applyStartDistrict = (pkg, value, next) => {
+  if (value === undefined) return true;
+  const code = String(value || '').trim();
+  if (code && !district(code)) {
+    next(new AppError('Choose the district the tour starts from.', 400));
+    return false;
+  }
+  pkg.startDistrict = code;
+  return true;
+};
+
 // An event with its registration numbers and what its plan still lacks
 const eventView = (pkg, stats) => {
   const missing = planProblems(pkg);
-  return { ...withStats(pkg, stats), planComplete: !missing.length, planMissing: missing };
+  // An older tour without a start district: a guess from its meeting point, to fill in the form
+  const guess = district(pkg.startDistrict) ? null : tourStartDistrict(pkg);
+  return { ...withStats(pkg, stats), planComplete: !missing.length, planMissing: missing, startDistrictGuess: guess ? guess.code : '' };
 };
 
 // Upcoming events first (soonest at the top), then past and undated ones, newest first
@@ -290,6 +306,7 @@ exports.createMyPackage = catchAsync(async (req, res, next) => {
     pkg.destinationRef = linked.id;
     pkg.destination = linked.label;
   }
+  if (!applyStartDistrict(pkg, req.body.startDistrict, next)) return;
   await applyPlan(pkg, req.body.plan);
   if (!applyPackageStatus(pkg, req.body.status, next)) return;
   if (publishBlocked(pkg, next)) return;
@@ -330,6 +347,7 @@ exports.updateMyPackage = catchAsync(async (req, res, next) => {
     }
     pkg.seats = seats;
   }
+  if (!applyStartDistrict(pkg, req.body.startDistrict, next)) return;
   await applyPlan(pkg, req.body.plan);
   if (!applyPackageStatus(pkg, req.body.status, next)) return;
   if (publishBlocked(pkg, next)) return;
@@ -385,7 +403,10 @@ exports.cancelMyPackage = catchAsync(async (req, res, next) => {
   // Vouchers used on these registrations go back to the travelers
   const vouchers = await Booking.distinct('voucher', { ...filter, voucher: { $ne: null } });
   const couponBookings = await Booking.distinct('_id', { ...filter, couponRedemption: { $ne: null } });
+  const paidMoney = await Booking.find({ ...filter, depositStatus: 'paid' }).select('depositPayment depositStatus depositAmount');
   const result = await Booking.updateMany(filter, { status: 'cancelled', cancelledAt: new Date(), cancelReason: `Cancelled by the agency: ${reason}`.slice(0, 500) });
+  // Their booking money goes back to them
+  for (const b of paidMoney) await bookingMoney.refundDeposit(Booking, b, { reason: `The agency cancelled the tour: ${reason}`.slice(0, 200) });
 
   await Promise.all(vouchers.map(releaseVoucher));
   if (couponBookings.length) await releaseCoupon({ booking: { $in: couponBookings } });

@@ -32,6 +32,7 @@ router.route('/me/guides/:id').patch(imageUpload.single('photo'), guides.updateG
 // Ads for a tour on the app's Tours screen (a Plejar admin reviews each one)
 router.route('/me/ads').get(ads.myAds).post(imageUpload.single('image'), ads.applyForAd);
 router.route('/me/ads/:id').patch(imageUpload.single('image'), ads.updateMyAd).delete(ads.removeMyAd);
+router.post('/me/ads/:id/pay', ads.payForAd);
 
 router.patch('/me', agencyController.requireOwner, imageUpload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), agencyController.updateMyAgency);
 

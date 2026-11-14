@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { cancelRefundView } = require('../utils/cancelRefund');
+const paymentConfig = require('../utils/payments/config');
 const Hotel = require('../models/hotelModel');
 const Destination = require('../models/destinationModel');
 const RecentView = require('../models/recentViewModel');
@@ -109,6 +111,9 @@ exports.getHotel = catchAsync(async (req, res, next) => {
         website: hotel.website,
         checkIn: hotel.checkIn,
         checkOut: hotel.checkOut,
+        // Paid online per room when asking for a stay: send payWith (one of paymentMethods) with the request
+        bookingMoney: hotel.agency && hotel.bookingMoney >= 1 ? { perRoom: Math.round(hotel.bookingMoney), cancelRefund: cancelRefundView(hotel) } : null,
+        paymentMethods: paymentConfig.enabledMethods(),
         // Room types and house rules the hotel manages itself; stays can be requested when it has its own account
         roomTypes: (hotel.roomTypes || []).filter(r => r.active !== false).map(r => ({
           _id: r._id,

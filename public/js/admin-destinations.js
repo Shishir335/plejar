@@ -171,7 +171,9 @@ async function loadDestinations(page = D.page) {
           ${d.source === 'vendor' ? `<span class="lead-sub vendor-added">Added by ${E(d.addedByAgency ? d.addedByAgency.name : 'a vendor')}${d.status === 'draft' ? ', waiting for review' : ''}</span>` : ''}</div>
         </div></td>
         <td>${E(DEST_TYPES[d.type])}${d.childCount ? `<span class="lead-sub">${n(d.childCount)} inside</span>` : ''}</td>
-        <td><span class="lead-sub" style="margin:0">${d.hasLocation ? '📍 On the map' : '<span style="color:var(--color-danger)">No location</span>'}</span><span class="lead-sub">${d.photoCount} photo${d.photoCount === 1 ? '' : 's'}</span></td>
+        <td><span class="lead-sub" style="margin:0">${d.hasLocation
+          ? `<a href="${E(googleMapsUrl(d))}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open in Google Maps">📍 On the map ↗</a>`
+          : `<span style="color:var(--color-danger)">No location</span> · <a href="${E(googleMapsUrl(d))}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Search for it on Google Maps">Find ↗</a>`}</span><span class="lead-sub">${d.photoCount} photo${d.photoCount === 1 ? '' : 's'}</span></td>
         <td><span class="badge ${AVAIL_BADGE[d.availability.status]}">${E(AVAIL_TEXT[d.availability.status])}</span>${d.availability.status === 'seasonal' ? `<span class="lead-sub">${E(monthList(d.availability.openMonths))}</span>` : ''}</td>
         <td>${n(d.stats.upcomingEvents)} upcoming<span class="lead-sub">${n(d.stats.events)} in total</span></td>
         <td>${n(d.stats.travelers)}<span class="lead-sub">${n(d.stats.recentTravelers)} in 30 days</span></td>
@@ -820,6 +822,25 @@ async function saveDestinationDetails(e) {
   }, 'Details saved.', e.submitter);
 }
 
+// Google Maps at a place's pin, or (no pin yet) a search for it by name and area, in a new tab
+function googleMapsUrl(d) {
+  if (hasLoc(d)) {
+    const [lng, lat] = d.location.coordinates;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+  }
+  const area = (d.path || []).map(p => (typeof p === 'string' ? p : p && p.name)).filter(n => n && n !== 'Bangladesh').reverse().join(', ');
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([d.name, area, 'Bangladesh'].filter(Boolean).join(', '))}`;
+}
+
+// Whatever is typed in the location fields now
+function openTypedInGoogleMaps() {
+  const lat = val('deLat').trim();
+  const lng = val('deLng').trim();
+  const d = D.detail.destination;
+  const url = lat && lng ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}` : googleMapsUrl(d);
+  window.open(url, '_blank', 'noopener');
+}
+
 // Location: a map to drop the pin, plus exact coordinates
 function destLocationTab() {
   const d = D.detail.destination;
@@ -835,6 +856,7 @@ function destLocationTab() {
       </div>
       <div class="lead-actions">
         <button type="submit" class="btn btn-primary">Save location</button>
+        <button type="button" class="btn btn-secondary" onclick="openTypedInGoogleMaps()">${hasLoc(d) ? 'Open in Google Maps' : 'Find on Google Maps'}</button>
         ${hasLoc(d) ? '<button type="button" class="btn btn-secondary" onclick="clearDestinationLocation()">Remove from map</button>' : ''}
       </div>
     </form>`;
