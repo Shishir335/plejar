@@ -1029,3 +1029,19 @@ tr.is-muted td { opacity: 0.6; }
 #bannerModal .field-row,
 #hotelModal .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 12px; }
 #bannerModal .check-list .check { margin-bottom: 6px; }
+
+/* Ticking rows in a list and acting on them together (Destinations) */
+.admin-table .sel-col { width: 40px; padding-right: 0; }
+.admin-table .sel-col input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-primary); }
+.admin-table tr.row-selected td { background: var(--accent-glow); }
+.bulk-bar {
+  position: sticky; top: 8px; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  margin-bottom: 12px; padding: 10px 14px;
+  background: var(--admin-sidebar-bg); border: 1px solid var(--accent-primary); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); font-size: 0.88rem; color: var(--text-primary);
+}
+.bulk-bar[hidden] { display: none; }
+.bulk-bar .link-btn { font-size: 0.86rem; }
+.bulk-bar .bulk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.bulk-bar button:disabled { opacity: 0.6; cursor: wait; }

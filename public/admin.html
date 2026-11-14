@@ -639,9 +639,10 @@
                 <button class="btn btn-primary" onclick="openNewDestination()">+ Add destination</button>
               </div>
             </div>
+            <div id="destBulkBar" class="bulk-bar" hidden role="region" aria-label="Selected destinations"></div>
             <div class="table-container">
               <table class="admin-table">
-                <thead><tr><th>Destination</th><th>Type</th><th>Map &amp; media</th><th>Availability</th><th>Events</th><th>Travelers</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+                <thead><tr><th class="sel-col"><input type="checkbox" id="destSelectPage" aria-label="Select every place on this page" onchange="selectDestinationPage(this.checked)"></th><th>Destination</th><th>Type</th><th>Map &amp; media</th><th>Availability</th><th>Events</th><th>Travelers</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
                 <tbody id="destinationsTableBody"></tbody>
               </table>
             </div>
