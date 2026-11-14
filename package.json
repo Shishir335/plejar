@@ -14,6 +14,7 @@
     "start:prod": "NODE_ENV=production node server.js",
     "create-admin": "node scripts/create-admin.js",
     "seed-destinations": "node scripts/seed-destinations.js",
+    "import-spots": "node scripts/import-tourist-spots.js",
     "seed-demo-tours": "node scripts/seed-demo-tours.js",
     "check-cloudinary": "node scripts/check-cloudinary.js",
     "migrate-user-indexes": "node scripts/migrate-user-indexes.js"

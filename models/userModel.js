@@ -90,6 +90,11 @@ const userSchema = new mongoose.Schema({
     walletBalance: { type: Number, default: 0 },
 
     lastLoginAt: Date,
+    // When the person last used the app and the website (utils/client.js), saved at most hourly
+    seen: {
+      app: { at: Date, version: String, platform: String },
+      web: { at: Date, platform: String }
+    },
     loginCount: { type: Number, default: 0 },
 
     // Identity verification (NID, passport...) reviewed by the master admin

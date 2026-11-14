@@ -15,6 +15,7 @@ const { CouponRedemption } = require('../models/couponModel');
 const Agency = require('../models/agencyModel');
 const { termsFor, snapshot } = require('../utils/commission');
 const { cancelRefundOf } = require('../utils/cancelRefund');
+const { clientOf } = require('../utils/client');
 const bookingMoney = require('../utils/bookingMoney');
 
 // What a stay request may carry, kept on a booking-money payment until the money arrives
@@ -197,6 +198,8 @@ const placeStay = async (ctx, prepared, payment = null) => {
       hotel: hotel._id,
       agency: hotel.agency,
       user: user._id,
+      // The app or the website: from this request, or (paid by gateway callback) from when payment started
+      source: ctx.req ? clientOf(ctx.req) : (payment && payment.source) || undefined,
       items,
       roomType: items[0].roomType,
       roomName: summary.length > 120 ? `${summary.slice(0, 119)}…` : summary,
@@ -251,7 +254,7 @@ const sentMessage = hotel => `Request sent to ${hotel.name}. They will accept or
  * the request goes to the hotel (GET /payments/:id shows it), or the money is refunded if the rooms went.
  */
 exports.create = catchAsync(async (req, res) => {
-  const ctx = { user: req.user, hotelId: req.params.id, body: req.body || {}, base: `${req.protocol}://${req.get('host')}` };
+  const ctx = { req, user: req.user, hotelId: req.params.id, body: req.body || {}, base: `${req.protocol}://${req.get('host')}` };
   const prepared = await prepareStay(ctx);
   if (prepared.deposit > 0) {
     await releaseStayClaims(prepared);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CLIENT } = require('./clientSchema');
 
 /**
  * Money paid to Plejar through bKash or SSLCommerz:
@@ -28,6 +29,8 @@ const paymentSchema = new mongoose.Schema(
     // What it was for, kept even if the ad is later deleted
     description: { type: String, trim: true, maxlength: 200, default: '' },
 
+    // Made in the app or on the website (utils/client.js)
+    source: { type: CLIENT, default: undefined },
     amount: { type: Number, required: true, min: 1 },
     currency: { type: String, default: 'BDT' },
     days: Number,

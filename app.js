@@ -17,6 +17,7 @@ const xss = require('xss-clean');
 const hpp = require('hpp');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
+const { clientInfo } = require('./utils/client');
 const cors = require('cors');
 
 const userRouter = require('./routes/userRoutes');
@@ -63,6 +64,9 @@ app.enable('trust proxy');
 // visitor's IP from CF-Connecting-IP, which can't be faked, rather than X-Forwarded-For, which can
 app.use(cloudflare.originGuard);
 app.use(cloudflare.realClientIp);
+
+// WHICH CLIENT: the Plejar app or the website (req.client, for counting; see utils/client.js)
+app.use(clientInfo);
 
 // COMPRESS RESPONSES (first, so pages, scripts and styles are compressed as well as the API)
 app.use(compression());

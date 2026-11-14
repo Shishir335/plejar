@@ -18,6 +18,7 @@ const { claimCoupon, releaseCoupon } = require('../utils/coupons');
 const { CouponRedemption } = require('../models/couponModel');
 const { hasRole } = require('../utils/roles');
 const { cancelRefundOf } = require('../utils/cancelRefund');
+const { clientOf } = require('../utils/client');
 const bookingMoney = require('../utils/bookingMoney');
 const { GATEWAY_NAMES } = require('../utils/payments/ledger');
 
@@ -255,6 +256,8 @@ const placeBooking = async (ctx, prepared, payment = null) => {
       ...fields,
       user: ctx.user._id,
       note: ctx.body.note,
+      // The app or the website: from this request, or (paid by gateway callback) from when payment started
+      source: ctx.req ? clientOf(ctx.req) : (payment && payment.source) || undefined,
       ...(payment ? { depositAmount: payment.amount, depositPayment: payment._id, depositStatus: 'paid' } : {}),
       ...(payment && prepared.cancelRefund ? { cancelRefund: prepared.cancelRefund } : {})
     });

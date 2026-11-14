@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CLIENT } = require('./clientSchema');
 const { CANCEL_REFUND } = require('./cancelRefundSchema');
 const crypto = require('crypto');
 
@@ -67,6 +68,8 @@ const bookingSchema = new mongoose.Schema(
     },
     // Booking money the traveler paid online to Plejar (per traveler x travelers). Refunded when the agency declines or
     // the traveler cancels before it's confirmed; kept (and paid out to the vendor) once confirmed.
+    // Made in the app or on the website (utils/client.js)
+    source: { type: CLIENT, default: undefined },
     depositAmount: { type: Number, min: 0, default: 0 },
     depositPayment: { type: mongoose.Schema.ObjectId, ref: 'Payment' },
     depositStatus: { type: String, enum: ['none', 'paid', 'refunding', 'refunded', 'refund_failed', 'kept'], default: 'none' },

@@ -18,6 +18,7 @@ const AppError = require('./appError');
 const { logActivity } = require('./activity');
 const config = require('./payments/config');
 const ledger = require('./payments/ledger');
+const { clientOf } = require('./client');
 const { cancelRefundOf, cancelRefundView } = require('./cancelRefund');
 
 /** What the app needs to show a booking-money payment and follow it */
@@ -62,6 +63,7 @@ const start = async (req, { purpose, method, agency, amount, perUnit, units, des
     units,
     draft,
     method,
+    source: clientOf(req),
     invoice: ledger.newInvoice(purpose === 'stay' ? 'PLJST' : 'PLJBK'),
     sandbox: !config.isLive()
   });
