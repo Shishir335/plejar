@@ -21,6 +21,8 @@ const { clientInfo } = require('./utils/client');
 const cors = require('cors');
 
 const userRouter = require('./routes/userRoutes');
+const accountDeletionRouter = require('./routes/accountDeletionRoutes');
+const legalPages = require('./controllers/legalPageController');
 const subscriberRouter = require('./routes/subscriberRoutes');
 const applicationRouter = require('./routes/applicationRoutes');
 const travelerRoutes = require('./routes/travelerRoutes');
@@ -116,6 +118,7 @@ const authLimiter = rateLimit({
     message: { status: 'fail', message: 'Too many authentication attempts from this IP. Please try again after 15 minutes.' }
 });
 app.use('/api/v1/users/login', authLimiter);
+app.use('/api/v1/account-deletion', authLimiter);
 app.use('/api/v1/users/signup', authLimiter);
 app.use('/api/v1/users/google-login', authLimiter);
 app.use('/api/v1/users/forgotPassword', authLimiter);
@@ -210,6 +213,11 @@ app.get(['/agent', '/agent/dashboard', '/vendor', '/vendor/dashboard'], sendPage
 app.get(['/hotel', '/hotel/dashboard'], sendPage('hotel.html'));
 app.get(['/apply', '/apply/status'], sendPage('apply.html'));
 app.get('/accept-invite', sendPage('accept-invite.html'));
+// Public pages Google Play and the App Store link to
+app.get('/about', legalPages.page('about'));
+app.get(['/privacy', '/privacy-policy'], legalPages.page('privacy'));
+app.get(['/terms', '/terms-of-use'], legalPages.page('terms'));
+app.get('/delete-account', legalPages.deleteAccount);
 
 // SWAGGER UI INTERACTIVE API TESTING DASHBOARD
 app.use(
@@ -256,6 +264,7 @@ app.get('/api/v1/promotions', publicCache({ server: 60, browser: 60 }));
 
 // API ROUTES
 app.use('/api/v1/users', userRouter);
+app.use('/api/v1/account-deletion', accountDeletionRouter);
 app.use('/api/v1/subscribers', subscriberRouter);
 app.use('/api/v1/applications', applicationRouter);
 app.use('/api/v1/events', travelerRoutes.events);

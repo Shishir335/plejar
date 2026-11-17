@@ -1,0 +1,83 @@
+extends layout
+
+block content
+  section.hero.hero-delete
+    p.eyebrow Plejar
+    h1= title
+    p.tagline Close your Plejar account and remove your personal data.
+
+  section.card
+    p.num 01
+    h2 In the app
+    p.point Open Plejar and go to Profile, then Settings.
+    p.point Tap Delete account under Account.
+    p.point Type DELETE and tap Delete my account.
+
+  section.card
+    p.num 02
+    h2 On this page
+    p Can't open the app? Enter the email or mobile number on your account. We'll send you a 4-digit code to confirm it's you.
+    form#ask.form(novalidate)
+      label(for='identifier') Email or mobile number
+      input#identifier(name='identifier' type='text' autocomplete='username' placeholder='you@example.com or 01712345678' required)
+      button(type='submit') Send code
+    form#confirm.form(hidden novalidate)
+      p#sent.note
+      label(for='code') 4-digit code
+      input#code(name='code' type='text' inputmode='numeric' maxlength='4' pattern='[0-9]{4}' autocomplete='one-time-code' required)
+      button.danger(type='submit') Delete my account
+      button.plain#again(type='button') Use a different email or number
+    p#message.message(role='status' aria-live='polite')
+    div#done.done(hidden)
+      h3 Your account is deleted
+      p You have been signed out of Plejar everywhere. We're sorry to see you go.
+
+  section.card
+    p.num 03
+    h2 What happens to your data
+    p.point Deleted right away: your name, email, mobile number, photos, date of birth, addresses, ID documents and face photos, saved tours, searches, follows and sign-in history.
+    p.point Your reward points and unused vouchers can no longer be used.
+    p.point Kept as the law requires: records of bookings and payments, linked to a closed account that shows as “Deleted user”. Reviews and posts you shared stay without your name.
+    p.point The account can't be signed in to again.
+
+  script.
+    (() => {
+      const $ = id => document.getElementById(id);
+      const say = (text, bad) => { $('message').textContent = text || ''; $('message').className = 'message' + (bad ? ' bad' : ''); };
+      const post = async (url, body) => {
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.message || 'Something went wrong. Try again.');
+        return json;
+      };
+      const busy = (form, on) => form.querySelectorAll('button,input').forEach(el => { el.disabled = on; });
+
+      $('ask').addEventListener('submit', async e => {
+        e.preventDefault();
+        const identifier = $('identifier').value.trim();
+        if (!identifier) return say('Enter your email or mobile number.', true);
+        busy($('ask'), true); say('');
+        try {
+          const json = await post('/api/v1/account-deletion/code', { identifier });
+          $('sent').textContent = json.message + (json.data && json.data.devCode ? ` (development code: ${json.data.devCode})` : '');
+          $('ask').hidden = true; $('confirm').hidden = false; $('code').focus();
+        } catch (err) { say(err.message, true); }
+        busy($('ask'), false);
+      });
+
+      $('confirm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const code = $('code').value.trim();
+        if (!/^\d{4}$/.test(code)) return say('Enter the 4-digit code.', true);
+        if (!window.confirm('Delete your Plejar account? This can’t be undone.')) return;
+        busy($('confirm'), true); say('');
+        try {
+          await post('/api/v1/account-deletion/confirm', { identifier: $('identifier').value.trim(), code });
+          $('confirm').hidden = true; $('done').hidden = false;
+        } catch (err) { say(err.message, true); busy($('confirm'), false); }
+      });
+
+      $('again').addEventListener('click', () => {
+        $('confirm').hidden = true; $('ask').hidden = false; $('code').value = ''; say(''); $('identifier').focus();
+      });
+    })();

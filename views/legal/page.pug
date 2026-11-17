@@ -1,0 +1,41 @@
+extends layout
+
+block content
+  section.hero(class=`hero-${key}`)
+    p.eyebrow Plejar
+    h1= title
+    p.tagline= tagline
+    p.meta
+      span #{sections.length} sections · #{minutes} min read
+      if updatedAt
+        span Updated #{updatedAt}
+
+  if intro.length
+    aside.summary
+      h2 In short
+      each line in intro
+        p= line.text
+
+  if sections.length > 1
+    nav.contents(aria-label='On this page')
+      h2 On this page
+      ol
+        each s in sections
+          li
+            a(href=`#${s.id}`)
+              span.num= s.number
+              | #{s.title}
+
+  each s in sections
+    section.card(id=s.id)
+      p.num= s.number
+      h2= s.title
+      each line in s.lines
+        if line.point
+          p.point= line.text
+        else
+          p= line.text
+
+  if sections.length > 3
+    p.top-link
+      a(href='#') ↑ Back to top

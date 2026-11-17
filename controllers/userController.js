@@ -10,6 +10,7 @@ const { saveProfileImage } = require('../utils/userImages');
 const { logActivity } = require('../utils/activity');
 const { STAFF, LABELS, hasRole, rolesOf, isTravelerOnly, setRoles } = require('../utils/roles');
 const { linkVendorAgency } = require('../utils/vendorLink');
+const { closeAccount } = require('../utils/accountClosing');
 
 const multerStorage = multer.memoryStorage();
 
@@ -68,13 +69,15 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     });
 });
 
+// DELETE /users/deleteMe — the traveler closes their own account (see utils/accountClosing)
 exports.deleteMe = catchAsync(async (req, res, next) => {
-    await User.findByIdAndUpdate(req.user.id, { active: false });
-
-    res.status(204).json({
-        status: 'success'
-    });
-})
+    const { closed, problem } = await closeAccount(req.user.id);
+    if (!closed) return next(new AppError(problem, 400));
+    // No actor: the log must not keep the name that was just removed
+    await logActivity(null, { action: 'user.self_deleted', summary: 'Closed their own account in the app', user: req.user._id });
+    res.clearCookie('jwt');
+    res.status(204).json({ status: 'success', data: null });
+});
 
 // ---------- Traveler identity verification ----------
 

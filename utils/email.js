@@ -128,6 +128,10 @@ module.exports = class Email {
     }
 
     // 4-digit code for "forgot password" in the app (this.data.code)
+    async sendDeleteAccountCode() {
+        await this.send('deleteAccountCode', `${this.data.code} is your code to delete your ${process.env.APP_NAME || 'Plejar'} account`);
+    }
+
     async sendPasswordCode() {
         await this.send('passwordCode', `${this.data.code} is your ${process.env.APP_NAME || 'Plejar'} security code`);
     }

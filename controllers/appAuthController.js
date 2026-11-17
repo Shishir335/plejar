@@ -522,3 +522,6 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
   await recordLogin(req, { user, email: otp.destination, success: true, reason: 'password_reset' });
   sendSession(res, 200, user, 'Your password is changed.');
 });
+
+// Shared with the website's delete-account page (controllers/accountDeletionController.js)
+exports.codeHelpers = { readContact, findTraveler, mask, exposeDevCode, fieldErrors, sha256, sameHash, CODE_LIFETIME, RESEND_AFTER, MAX_CODES_PER_HOUR, MAX_TRIES };

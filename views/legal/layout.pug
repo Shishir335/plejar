@@ -1,0 +1,32 @@
+doctype html
+html(lang='en')
+  head
+    meta(charset='UTF-8')
+    meta(name='viewport' content='width=device-width, initial-scale=1.0')
+    title #{title} · Plejar
+    meta(name='description' content=`${title} for Plejar, the travel app for Bangladesh.`)
+    link(rel='canonical' href=`https://www.plejar.com/${key === 'delete' ? 'delete-account' : key}`)
+    link(rel='preconnect' href='https://fonts.googleapis.com')
+    link(rel='preconnect' href='https://fonts.gstatic.com' crossorigin)
+    link(rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap')
+    link(rel='stylesheet' href='/css/legal.css')
+    link(rel='icon' type='image/svg+xml' href='/assets/favicon.svg?v=2')
+  body
+    header.top
+      a.brand(href='/')
+        img(src='/assets/brand/plejar-logo.png' alt='Plejar' height='30')
+      nav.links
+        a(href='/about' class=key === 'about' ? 'on' : '') About
+        a(href='/privacy' class=key === 'privacy' ? 'on' : '') Privacy
+        a(href='/terms' class=key === 'terms' ? 'on' : '') Terms
+    main.wrap
+      block content
+    footer.foot
+      p © #{year} Plejar · 
+        a(href='/about') About
+        |  · 
+        a(href='/privacy') Privacy Policy
+        |  · 
+        a(href='/terms') Terms of Use
+        |  · 
+        a(href='/delete-account') Delete account

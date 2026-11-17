@@ -1,0 +1,7 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  p Someone asked to delete your Plejar account. Enter this code on the delete-account page to confirm:
+  p(style='font-size: 32px; font-weight: 700; letter-spacing: 10px; margin: 24px 0;') #{code}
+  p The code works for 10 minutes. If this wasn't you, ignore this email; your account stays as it is.
