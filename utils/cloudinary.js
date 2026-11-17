@@ -44,6 +44,33 @@ const rootFolder = () => {
 };
 const cloudFolder = folder => `${rootFolder()}/${folder}`;
 
+/**
+ * The SDK drops Cloudinary's reply for some statuses (403, for one) and reports only "unexpected
+ * status code". When that happens, send a 1-pixel signed upload ourselves and log what Cloudinary
+ * actually said, at most once every 10 minutes. The secret is never logged.
+ */
+let lastExplainedAt = 0;
+const explainUploadFailure = async error => {
+  if (!error || error.name !== 'UnexpectedResponse' || Date.now() - lastExplainedAt < 10 * 60 * 1000) return;
+  lastExplainedAt = Date.now();
+  try {
+    configure();
+    const { CLOUDINARY_CLOUD_NAME: cloud, CLOUDINARY_API_KEY: key, CLOUDINARY_API_SECRET: secret } = process.env;
+    const params = { timestamp: Math.floor(Date.now() / 1000), type: 'authenticated', public_id: `${rootFolder()}/diag/check-${randomId()}` };
+    const form = new FormData();
+    Object.entries(params).forEach(([k, v]) => form.append(k, String(v)));
+    form.append('api_key', key);
+    form.append('signature', cloudinary.utils.api_sign_request(params, secret));
+    form.append('file', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: form, signal: AbortSignal.timeout(20000) });
+    const text = (await response.text()).replace(/\s+/g, ' ').slice(0, 500);
+    console.error(`[CLOUDINARY] Check upload (cloud ${cloud}, key ending ${String(key).slice(-4)}): status ${response.status}: ${text}`);
+    if (response.ok) await cloudinary.uploader.destroy(params.public_id, { type: 'authenticated' }).catch(() => {});
+  } catch (err) {
+    console.error('[CLOUDINARY] Check upload could not run:', err.message);
+  }
+};
+
 /** Upload a buffer. `folder` is relative to the root, such as "hotels/<id>". Returns Cloudinary's answer. */
 const uploadBufferToCloudinary = (buffer, { folder, resourceType = 'image' }) => new Promise((resolve, reject) => {
   configure();
@@ -51,6 +78,7 @@ const uploadBufferToCloudinary = (buffer, { folder, resourceType = 'image' }) =>
   const stream = cloudinary.uploader.upload_stream({ public_id: `${cloudFolder(folder)}/${randomId()}`, resource_type: resourceType }, (error, result) => {
     if (!error) return resolve(result);
     console.error('[CLOUDINARY] Upload failed:', error.message);
+    explainUploadFailure(error);
     reject(new AppError("That file couldn't be saved right now. Please try again.", 502));
   });
   stream.end(buffer);
@@ -109,6 +137,7 @@ const uploadPrivateFile = (buffer, { folder, mimeType }) => new Promise((resolve
   const stream = cloudinary.uploader.upload_stream({ public_id: id, type: 'authenticated', resource_type: isImage ? 'image' : 'raw' }, (error, result) => {
     if (error) {
       console.error('[CLOUDINARY] Private upload failed:', error.message);
+      explainUploadFailure(error);
       return reject(new AppError("That file couldn't be saved right now. Please try again.", 502));
     }
     resolve({ ref: `cloudinary:${result.resource_type}:${result.format || '-'}:${result.public_id}`, bytes: result.bytes, width: result.width, height: result.height });
@@ -165,6 +194,7 @@ const deletePrivateFolder = async folder => {
 };
 
 module.exports = {
+  explainUploadFailure,
   cloudinary,
   configure,
   isCloudinaryConfigured,
