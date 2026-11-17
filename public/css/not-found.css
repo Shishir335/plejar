@@ -1,0 +1,54 @@
+/* The page shown for a web address that doesn't exist (loads after legal.css) */
+.nf-body { min-height: 100vh; display: flex; flex-direction: column; }
+.nf {
+  flex: 1; width: 100%; max-width: 560px; margin: 0 auto;
+  padding: 56px 16px 64px; text-align: center;
+}
+.nf-art {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-bottom: 18px; color: var(--tea);
+}
+.nf-digit { font-size: clamp(96px, 26vw, 148px); font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--ink); }
+.nf-pin { display: block; color: var(--tea); animation: nf-bob 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.nf-pin svg { display: block; width: clamp(56px, 15vw, 84px); height: auto; filter: drop-shadow(0 10px 14px rgba(21, 90, 62, 0.25)); }
+.nf-trail {
+  position: absolute; left: 12%; right: 12%; bottom: -12px; height: 0;
+  border-top: 3px dashed var(--line);
+}
+@keyframes nf-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) { .nf-pin { animation: none; } }
+
+.nf-eyebrow { margin: 34px 0 0; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--tea); }
+.nf h1 { margin: 6px 0 10px; font-size: clamp(26px, 6vw, 36px); line-height: 1.15; }
+.nf-text { margin: 0 auto; max-width: 440px; color: var(--ink-soft); }
+.nf-path {
+  padding: 2px 8px; border-radius: 6px; background: var(--tea-wash); color: var(--tea-deep);
+  font: 600 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all;
+}
+
+.nf-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 28px; }
+.nf-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 150px;
+  padding: 12px 22px; border-radius: 999px; font: 700 15px/1 var(--sans);
+  text-decoration: none; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+}
+.nf-primary { background: var(--tea); color: var(--white); border: 1px solid var(--tea); }
+.nf-primary:hover { background: var(--tea-deep); border-color: var(--tea-deep); }
+.nf-secondary { background: var(--white); color: var(--ink); border: 1px solid var(--line); }
+.nf-secondary:hover { border-color: var(--tea); color: var(--tea-deep); }
+.nf-btn:focus-visible { outline: 3px solid var(--marigold); outline-offset: 2px; }
+
+.nf-more { margin-top: 40px; padding-top: 22px; border-top: 1px solid var(--line); }
+.nf-more p { margin: 0 0 10px; font-size: 14px; color: var(--ink-faint); }
+.nf-more nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.nf-more a {
+  padding: 6px 14px; border-radius: 999px; background: var(--white); border: 1px solid var(--line);
+  color: var(--ink-soft); font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.nf-more a:hover { border-color: var(--tea); color: var(--tea-deep); }
+
+@media (max-width: 480px) {
+  .top .links { display: none; }
+  .nf { padding-top: 36px; }
+  .nf-btn { flex: 1; }
+}

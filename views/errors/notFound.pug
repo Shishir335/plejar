@@ -1,0 +1,52 @@
+doctype html
+html(lang='en')
+  head
+    meta(charset='UTF-8')
+    meta(name='viewport' content='width=device-width, initial-scale=1.0')
+    meta(name='robots' content='noindex')
+    title Page not found · Plejar
+    link(rel='preconnect' href='https://fonts.googleapis.com')
+    link(rel='preconnect' href='https://fonts.gstatic.com' crossorigin)
+    link(rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap')
+    link(rel='stylesheet' href='/css/legal.css')
+    link(rel='stylesheet' href='/css/not-found.css')
+    link(rel='icon' type='image/svg+xml' href='/assets/favicon.svg?v=2')
+  body.nf-body
+    header.top
+      a.brand(href='/')
+        img(src='/assets/brand/plejar-logo.png' alt='Plejar' height='30')
+      nav.links
+        a(href='/about') About
+        a(href='/privacy') Privacy
+        a(href='/terms') Terms
+    main.nf
+      .nf-art(aria-hidden='true')
+        span.nf-digit 4
+        span.nf-pin
+          svg(viewBox='0 0 48 64' width='72' height='96')
+            path(d='M24 2C12 2 2 11.6 2 23.6 2 39 24 62 24 62s22-23 22-38.4C46 11.6 36 2 24 2z' fill='currentColor')
+            circle(cx='24' cy='23' r='8.5' fill='#fff')
+        span.nf-digit 4
+        span.nf-trail
+      p.nf-eyebrow Error 404
+      h1 This page took a wrong turn
+      p.nf-text
+        | We couldn't find 
+        code.nf-path= path
+        | . The link may be wrong, or the page may have moved.
+      .nf-actions
+        a.nf-btn.nf-primary(href='/') Back to home
+        button.nf-btn.nf-secondary(type='button' onclick='history.length > 1 ? history.back() : location.assign("/")') Go back
+      .nf-more
+        p Looking for something else?
+        nav
+          a(href='/apply') List your agency
+          a(href='/about') About Plejar
+          a(href='/delete-account') Delete account
+    footer.foot
+      p © #{year} Plejar · 
+        a(href='/about') About
+        |  · 
+        a(href='/privacy') Privacy Policy
+        |  · 
+        a(href='/terms') Terms of Use

@@ -312,7 +312,19 @@ app.use('/api/v1/admin', adminAgencyRouter);
 app.use('/api/v1/admin/notifications', adminNotificationRouter);
 
 // 404 UNHANDLED ROUTE CATCHER
+// A browser asking for a page gets a proper "page not found" page; the API keeps its JSON.
+const notFoundView = path.join(__dirname, 'views', 'errors', 'notFound.pug');
 app.all('*', (req, res, next) => {
+    const isPage = (req.method === 'GET' || req.method === 'HEAD')
+        && !req.path.startsWith('/api')
+        && req.accepts(['html', 'json']) === 'html';
+    if (isPage) {
+        const shown = req.path.length > 80 ? `${req.path.slice(0, 77)}…` : req.path;
+        res.set('Cache-Control', 'no-store');
+        return res.status(404).type('html').send(
+            require('pug').renderFile(notFoundView, { path: shown, year: new Date().getFullYear(), cache: process.env.NODE_ENV === 'production' })
+        );
+    }
     next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
